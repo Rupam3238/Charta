@@ -1176,6 +1176,10 @@ void PageView::createAnnotationsVideoWidgets(PageViewItem *item, const QList<Oku
             }
         }
     }
+
+    if (d->annotator) {
+        d->annotator->finishPaintCycle();
+    }
 }
 
 // BEGIN DocumentObserver inherited methods
@@ -1505,6 +1509,7 @@ void PageView::notifyPageChanged(int pageNumber, int changedFlags)
     }
 
     if (changedFlags & DocumentObserver::Annotations) {
+        d->annotator->cancelPendingFreehandHandoff();
         const QList<Okular::Annotation *> annots = d->document->page(pageNumber)->annotations();
         const QList<Okular::Annotation *>::ConstIterator annItEnd = annots.end();
         QSet<AnnotWindow *>::Iterator it = d->m_annowindows.begin();

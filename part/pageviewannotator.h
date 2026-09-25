@@ -10,6 +10,8 @@
 #include <QObject>
 #include <qdom.h>
 
+#include <memory>
+
 #include <KActionCollection>
 
 #include "annotationtools.h"
@@ -83,6 +85,8 @@ public:
     bool routeKeyEvent(QKeyEvent *event);
     bool routePaints(const QRect wantedRect) const;
     void routePaint(QPainter *painter, const QRect paintRect);
+    void finishPaintCycle();
+    void cancelPendingFreehandHandoff();
 
     void reparseConfig();
 
@@ -179,6 +183,10 @@ private:
     int m_lastToolId;
     QRect m_lastDrawnRect;
     PageViewItem *m_lockedItem;
+    std::unique_ptr<SmoothPath> m_pendingFreehandPath;
+    PageViewItem *m_pendingFreehandItem = nullptr;
+    QRect m_pendingFreehandRect;
+    bool m_pendingFreehandPainted = false;
     // selected annotation name
     // QString m_selectedAnnotationName;
 };

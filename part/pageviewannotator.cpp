@@ -1220,6 +1220,12 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
             m_continuousMode = false;
         }
 
+        if (auto *smoothEngine = dynamic_cast<SmoothPathEngine *>(m_engine)) {
+            m_pendingFreehandPath = std::make_unique<SmoothPath>(smoothEngine->endSmoothPath());
+            m_pendingFreehandItem = m_lockedItem;
+            m_pendingFreehandRect = m_lastDrawnRect;
+        }
+
         if (m_continuousMode) {
             selectLastTool();
         } else {
@@ -1281,13 +1287,14 @@ bool PageViewAnnotator::routeKeyEvent(QKeyEvent *event)
 
 bool PageViewAnnotator::routePaints(const QRect wantedRect) const
 {
-    return m_engine && wantedRect.intersects(m_lastDrawnRect) && m_lockedItem;
+    const bool paintsLive = m_engine && m_lockedItem && wantedRect.intersects(m_lastDrawnRect);
+    const bool paintsPending = m_pendingFreehandPath && m_pendingFreehandItem && wantedRect.intersects(m_pendingFreehandRect);
+    return paintsLive || paintsPending;
 }
 
 void PageViewAnnotator::routePaint(QPainter *painter, const QRect paintRect)
 {
-    // if there's no locked item, then there's no decided place to draw on
-    if (!m_lockedItem) {
+    if (!m_lockedItem && !m_pendingFreehandPath) {
         return;
     }
 
@@ -1297,19 +1304,46 @@ void PageViewAnnotator::routePaint(QPainter *painter, const QRect paintRect)
         painter->drawRect(paintRect);
     }
 #endif
-    // move painter to current itemGeometry rect
-    const QRect &itemRect = m_lockedItem->uncroppedGeometry();
-    painter->save();
-    painter->translate(itemRect.topLeft());
-    // TODO: Clip annotation painting to cropped page.
+    if (m_engine && m_lockedItem && paintRect.intersects(m_lastDrawnRect)) {
+        const QRect &itemRect = m_lockedItem->uncroppedGeometry();
+        painter->save();
+        painter->translate(itemRect.topLeft());
+        QRect annotRect = paintRect.intersected(m_lastDrawnRect);
+        annotRect.translate(-itemRect.topLeft());
+        m_engine->paint(painter, m_lockedItem->uncroppedWidth(), m_lockedItem->uncroppedHeight(), annotRect);
+        painter->restore();
+    }
 
-    // transform cliprect from absolute to item relative coords
-    QRect annotRect = paintRect.intersected(m_lastDrawnRect);
-    annotRect.translate(-itemRect.topLeft());
+    if (m_pendingFreehandPath && m_pendingFreehandItem && paintRect.intersects(m_pendingFreehandRect)) {
+        const QRect &itemRect = m_pendingFreehandItem->uncroppedGeometry();
+        painter->save();
+        painter->translate(itemRect.topLeft());
+        m_pendingFreehandPath->paint(painter, m_pendingFreehandItem->uncroppedWidth(), m_pendingFreehandItem->uncroppedHeight());
+        painter->restore();
+        m_pendingFreehandPainted = true;
+    }
+}
 
-    // use current engine for painting (in virtual page coordinates)
-    m_engine->paint(painter, m_lockedItem->uncroppedWidth(), m_lockedItem->uncroppedHeight(), annotRect);
-    painter->restore();
+void PageViewAnnotator::finishPaintCycle()
+{
+    if (!m_pendingFreehandPainted) {
+        return;
+    }
+
+    const QRect repaintRect = m_pendingFreehandRect;
+    m_pendingFreehandPath.reset();
+    m_pendingFreehandItem = nullptr;
+    m_pendingFreehandRect = QRect();
+    m_pendingFreehandPainted = false;
+    m_pageView->viewport()->update(repaintRect.translated(-m_pageView->contentAreaPosition()));
+}
+
+void PageViewAnnotator::cancelPendingFreehandHandoff()
+{
+    m_pendingFreehandPath.reset();
+    m_pendingFreehandItem = nullptr;
+    m_pendingFreehandRect = QRect();
+    m_pendingFreehandPainted = false;
 }
 
 void PageViewAnnotator::selectBuiltinTool(int toolId, ShowTip showTip)
