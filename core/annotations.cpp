@@ -2548,6 +2548,8 @@ public:
 
     QList<QList<NormalizedPoint>> m_inkPaths;
     QList<QList<NormalizedPoint>> m_transformedInkPaths;
+    QList<QList<qreal>> m_sessionPressures;
+    qreal m_sessionPressureStrokeWidth = 0.0;
 };
 
 InkAnnotation::InkAnnotation()
@@ -2580,6 +2582,25 @@ QList<QList<NormalizedPoint>> InkAnnotation::transformedInkPaths() const
 {
     Q_D(const InkAnnotation);
     return d->m_transformedInkPaths;
+}
+
+void InkAnnotation::setSessionPressures(const QList<QList<qreal>> &pressures, qreal strokeWidth)
+{
+    Q_D(InkAnnotation);
+    d->m_sessionPressures = pressures;
+    d->m_sessionPressureStrokeWidth = strokeWidth;
+}
+
+QList<QList<qreal>> InkAnnotation::sessionPressures() const
+{
+    Q_D(const InkAnnotation);
+    return d->m_sessionPressures;
+}
+
+qreal InkAnnotation::sessionPressureStrokeWidth() const
+{
+    Q_D(const InkAnnotation);
+    return d->m_sessionPressureStrokeWidth;
 }
 
 Annotation::SubType InkAnnotation::subType() const

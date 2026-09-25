@@ -446,10 +446,12 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
 
                 // draw each ink path
                 const QList<QList<Okular::NormalizedPoint>> transformedInkPaths = ia->transformedInkPaths();
+                const QList<QList<qreal>> sessionPressures = ia->sessionPressures();
 
                 const QPen inkPen = buildPen(a, a->style().width(), acolor);
 
-                for (const QList<Okular::NormalizedPoint> &inkPath : transformedInkPaths) {
+                for (int pathIndex = 0; pathIndex < transformedInkPaths.size(); ++pathIndex) {
+                    const QList<Okular::NormalizedPoint> &inkPath = transformedInkPaths[pathIndex];
                     // normalize page point to image
                     NormalizedPath path;
                     for (const Okular::NormalizedPoint &inkPoint : inkPath) {
@@ -458,8 +460,27 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
                             (inkPoint.y - yOffset) * yScale);
                         path.append(point);
                     }
-                    // draw the normalized path into image
-                    drawShapeOnImage(backImage, path, false, inkPen, QBrush(), pageScale);
+                    const QList<qreal> pressurePath = sessionPressures.value(pathIndex);
+                    if (pressurePath.size() == inkPath.size() && pressurePath.size() > 1) {
+                        const double dpr = backImage.devicePixelRatio();
+                        const double imageWidth = backImage.width() / dpr;
+                        const double imageHeight = backImage.height() / dpr;
+                        const qreal sessionWidth = ia->sessionPressureStrokeWidth() > 0.0 ? ia->sessionPressureStrokeWidth() : inkPen.widthF();
+                        QPainter painter(&backImage);
+                        painter.setRenderHint(QPainter::Antialiasing, true);
+                        for (int pointIndex = 1; pointIndex < path.size(); ++pointIndex) {
+                            QPen segmentPen = inkPen;
+                            segmentPen.setJoinStyle(Qt::RoundJoin);
+                            segmentPen.setCapStyle(Qt::RoundCap);
+                            segmentPen.setWidthF(qBound(0.5, pressurePath[pointIndex] * sessionWidth * pageScale, 100.0));
+                            painter.setPen(segmentPen);
+                            painter.drawLine(QPointF(path[pointIndex - 1].x * imageWidth, path[pointIndex - 1].y * imageHeight),
+                                             QPointF(path[pointIndex].x * imageWidth, path[pointIndex].y * imageHeight));
+                        }
+                    } else {
+                        // PDF-loaded annotations have no session pressure data.
+                        drawShapeOnImage(backImage, path, false, inkPen, QBrush(), pageScale);
+                    }
                 }
             }
         } // end current annotation drawing

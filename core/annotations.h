@@ -1466,6 +1466,11 @@ public:
      */
     QList<QList<NormalizedPoint>> transformedInkPaths() const;
 
+    /** Session-only pressure values parallel to inkPaths(). Not serialized. */
+    void setSessionPressures(const QList<QList<qreal>> &pressures, qreal strokeWidth);
+    QList<QList<qreal>> sessionPressures() const;
+    qreal sessionPressureStrokeWidth() const;
+
     /**
      * Returns the sub type of the ink annotation.
      */

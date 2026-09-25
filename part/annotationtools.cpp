@@ -183,7 +183,7 @@ void SmoothPath::paint(QPainter *painter, double xScale, double yScale) const
         for (int index = 1; index < points.size(); ++index) {
             const qreal pressure = pressures.value(index, 1.0);
             QPen segmentPen = pen;
-            segmentPen.setWidthF(qBound(0.5, pressure * pen.widthF() * 2.0, 100.0));
+            segmentPen.setWidthF(qBound(0.5, pressure * pen.widthF(), 100.0));
             painter->setPen(segmentPen);
             painter->drawLine(QPointF(points[index - 1].x * xScale, points[index - 1].y * yScale),
                               QPointF(points[index].x * xScale, points[index].y * yScale));
@@ -212,6 +212,7 @@ QList<Okular::Annotation *> SmoothPathEngine::end()
         QList<QList<Okular::NormalizedPoint>> list = ia->inkPaths();
         list.append(points);
         ia->setInkPaths(list);
+        ia->setSessionPressures({pressures}, representativeStrokeWidth(pressures, ia->style().width()));
         ia->setBoundingRectangle(totalRect);
     }
 
@@ -264,8 +265,13 @@ qreal SmoothPathEngine::representativeStrokeWidth(const QList<qreal> &pressures,
     }
 
     double sum = 0.0;
+    bool constantMousePressure = true;
     for (const qreal pressure : pressures) {
         sum += pressure;
+        constantMousePressure = constantMousePressure && qFuzzyCompare(pressure, 1.0);
+    }
+    if (constantMousePressure) {
+        return baseWidth;
     }
     const qreal averagePressure = sum / pressures.size();
     return qBound(0.5, baseWidth * (0.75 + averagePressure), 12.0);
