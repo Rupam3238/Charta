@@ -15,10 +15,12 @@
 
 // local includes
 #include "core/annotations.h"
+#include "core/page.h"
 
 AnnotatorEngine::AnnotatorEngine(const QDomElement &engineElement)
     : m_engineElement(engineElement)
     , m_creationCompleted(false)
+    , m_cursor(Qt::CrossCursor)
     , m_item(nullptr)
 {
     // parse common engine attributes
@@ -89,7 +91,12 @@ AnnotatorEngine::~AnnotatorEngine()
 
 QCursor AnnotatorEngine::cursor() const
 {
-    return Qt::CrossCursor;
+    return m_cursor;
+}
+
+void AnnotatorEngine::setCursor(const QCursor &cursor)
+{
+    m_cursor = cursor;
 }
 
 SmoothPath::SmoothPath(const QList<Okular::NormalizedPoint> &points, const QList<qreal> &pressures, const QPen &pen, qreal opacity, QPainter::CompositionMode compositionMode)
@@ -112,9 +119,14 @@ SmoothPathEngine::SmoothPathEngine(const QDomElement &engineElement)
     }
 }
 
-QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers, double nX, double nY, double xScale, double yScale, const Okular::Page * /*page*/)
+QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers, double nX, double nY, double xScale, double yScale, const Okular::Page *page)
 {
     const qreal basePenWidth = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("1")).toDouble();
+    if (page) {
+        m_pageWidth = page->width();
+    }
+    m_lastXScale = xScale;
+    const qreal screenPenWidth = basePenWidth * xScale / m_pageWidth;
     if (button != Left) {
         return QRect();
     }
@@ -143,7 +155,7 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
         incrementalRect.top = qMin(nextPoint.y, lastPoint.y);
         incrementalRect.bottom = qMax(nextPoint.y, lastPoint.y);
         lastPoint = nextPoint;
-        const qreal radius = qMax<qreal>(1.0, pressures.last() * basePenWidth * 2.0);
+        const qreal radius = qMax<qreal>(1.0, pressures.last() * screenPenWidth * 2.0);
         return incrementalRect.geometry((int)xScale, (int)yScale).adjusted(-qCeil(radius), -qCeil(radius), qCeil(radius), qCeil(radius));
     } else if (type == Release && points.count() > 0) {
         if (points.count() < 2) {
@@ -164,7 +176,7 @@ void SmoothPathEngine::paint(QPainter *painter, double xScale, double yScale, co
 
     const QList<Okular::NormalizedPoint> &processedPoints = points;
     const QList<qreal> &processedPressures = pressures;
-    QPen pen(m_engineColor, representativeStrokeWidth(processedPressures, penWidth));
+    QPen pen(m_engineColor, representativeStrokeWidth(processedPressures, penWidth) * xScale / m_pageWidth);
     pen.setJoinStyle(Qt::RoundJoin);
     pen.setCapStyle(Qt::RoundCap);
     pen.setColor(m_engineColor);
@@ -237,7 +249,7 @@ SmoothPath SmoothPathEngine::endSmoothPath()
     const int width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toInt();
     const qreal opacity = m_annotElement.attribute(QStringLiteral("opacity"), QStringLiteral("1.0")).toDouble();
 
-    return SmoothPath(points, pressures, QPen(color, width), opacity, compositionMode);
+    return SmoothPath(points, pressures, QPen(color, representativeStrokeWidth(pressures, width) * m_lastXScale / m_pageWidth), opacity, compositionMode);
 }
 
 Okular::NormalizedPoint SmoothPathEngine::processPoint(const Okular::NormalizedPoint &point, qreal pressure)

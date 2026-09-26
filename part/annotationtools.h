@@ -9,6 +9,7 @@
 
 #include <QPainter>
 #include <QPen>
+#include <QCursor>
 #include <QRect>
 #include <qdom.h>
 
@@ -66,6 +67,7 @@ public:
     static void decodeEvent(const QTabletEvent *tabletEvent, EventType *eventType, Button *button, qreal *pressure);
 
     virtual QCursor cursor() const;
+    void setCursor(const QCursor &cursor);
 
 protected:
     PageViewItem *item()
@@ -79,6 +81,7 @@ protected:
     QColor m_engineColor;
     // other vars (remove this!)
     bool m_creationCompleted;
+    QCursor m_cursor;
 
 private:
     PageViewItem *m_item;
@@ -108,7 +111,7 @@ class SmoothPathEngine : public AnnotatorEngine
 public:
     explicit SmoothPathEngine(const QDomElement &engineElement);
 
-    QRect event(EventType type, Button button, Modifiers modifiers, double nX, double nY, double xScale, double yScale, const Okular::Page * /*page*/) override;
+    QRect event(EventType type, Button button, Modifiers modifiers, double nX, double nY, double xScale, double yScale, const Okular::Page *page) override;
 
     void paint(QPainter *painter, double xScale, double yScale, const QRect & /*clipRect*/) override;
 
@@ -129,6 +132,8 @@ private:
     Okular::NormalizedRect totalRect;
     Okular::NormalizedPoint lastPoint;
     QPainter::CompositionMode compositionMode;
+    double m_pageWidth = 1.0;
+    double m_lastXScale = 1.0;
 };
 
 #endif

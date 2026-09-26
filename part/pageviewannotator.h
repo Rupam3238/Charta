@@ -69,6 +69,8 @@ public:
     bool active() const;
     void setEraserMode(bool enabled);
     bool eraserMode() const;
+    void setEraserWidth(double width);
+    double eraserWidth() const;
     void setAnnotationSelectionMode(bool enabled);
     // @return Are we currently annotating (using the selected tool)?
     bool annotating() const;
@@ -131,6 +133,7 @@ public:
 
     // methods that write the properties
     void setAnnotationWidth(double width);
+    void setDrawingToolWidthPixels(double width);
     void setAnnotationColor(const QColor &color);
     void setAnnotationInnerColor(const QColor &color);
     void setAnnotationOpacity(double opacity);
@@ -180,6 +183,7 @@ private:
     bool m_continuousMode;
     bool m_constrainRatioAndAngle;
     bool m_signatureMode;
+    double m_eraserWidth = 20.0;
 
     // creation related variables
     AnnotationTools *m_lastToolsDefinition;

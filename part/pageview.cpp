@@ -4393,6 +4393,8 @@ void PageView::updateCursor(const QPoint p)
         } else {
             setCursor(Qt::ForbiddenCursor);
         }
+    } else if (d->annotationSelectionMode) {
+        setCursor(Qt::CrossCursor);
     } else if (scrollerState == QScroller::Pressed || scrollerState == QScroller::Dragging) {
         setCursor(Qt::ClosedHandCursor);
     } else if (pageItem) {

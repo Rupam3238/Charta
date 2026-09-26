@@ -46,6 +46,7 @@ private Q_SLOTS:
     void slotAnnotationToolBarVisibilityChanged(bool visible);
 
 private:
+    bool eventFilter(QObject *watched, QEvent *event) override;
     class AnnotationActionHandlerPrivate *d;
 };
 

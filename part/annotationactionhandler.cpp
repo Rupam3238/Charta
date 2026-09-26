@@ -8,14 +8,28 @@
 
 // qt includes
 #include <QActionGroup>
+#include <QApplication>
 #include <QBitmap>
 #include <QColorDialog>
+#include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QEvent>
 #include <QFileInfo>
 #include <QFontDialog>
+#include <QGuiApplication>
+#include <QHash>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
+#include <QRadioButton>
+#include <QSlider>
 #include <QSignalBlocker>
+#include <QScreen>
+#include <QVBoxLayout>
+#include <QWidgetAction>
 
 // kde includes
 #include <KActionCollection>
@@ -40,6 +54,15 @@ class AnnotationActionHandlerPrivate
 {
 public:
     enum class AnnotationColor { Color, InnerColor };
+    enum class DrawingToolKind { Pen, Eraser, Line, Arrow, Rectangle, Ellipse, Polygon, Text };
+    struct DrawingToolSettings {
+        double width = 3.0;
+        QColor color = Qt::black;
+        QColor fillColor = Qt::transparent;
+        int fillOpacity = 0;
+        bool partialEraser = false;
+        bool initialized = false;
+    };
     static const QList<QPair<KLocalizedString, QColor>> defaultColors;
     static const QList<double> widthStandardValues;
     static const QList<double> opacityStandardValues;
@@ -106,6 +129,7 @@ public:
     void slotQuickToolSelected(int favToolId);
     void slotSetColor(AnnotationColor colorType, const QColor &color = QColor());
     void slotSelectAnnotationFont();
+    bool showToolSettings(QAction *action);
     bool isQuickToolAction(QAction *aTool);
     bool isQuickToolStamp(int toolId);
     void assertToolBarExists(KParts::MainWindow *mw, const QString &toolBarName);
@@ -118,6 +142,12 @@ public:
     QList<QAction *> textTools;
     QList<QAction *> textQuickTools;
     QList<QAction *> drawingTools;
+    QHash<QAction *, DrawingToolKind> drawingToolKinds;
+    QHash<QAction *, int> drawingToolIds;
+    QHash<QString, DrawingToolSettings> drawingToolSettings;
+    QHash<QObject *, QAction *> settingsButtonActions;
+    QAction *pendingMousePopupAction = nullptr;
+    bool deselectingTools = false;
     QActionGroup *agTools;
     QAction *agLastAction;
 
@@ -141,6 +171,7 @@ public:
     KToggleAction *aEraserTool;
     KToggleAction *aDrawingBrowse;
     QAction *aBrowseTool;
+    KToolBar *drawingToolBar = nullptr;
     bool selectModeSwitchingToBrowse = false;
 
     QAction *aCustomStamp;
@@ -191,6 +222,201 @@ QAction *AnnotationActionHandlerPrivate::selectActionItem(KSelectAction *aList, 
         aList->setCurrentAction(aCustom);
     }
     return aCustom;
+}
+
+bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
+{
+    const auto kindIt = drawingToolKinds.constFind(action);
+    if (kindIt == drawingToolKinds.cend()) {
+        return false;
+    }
+
+    const QString key = action->objectName().isEmpty() ? action->text() : action->objectName();
+    DrawingToolSettings &initialSettings = drawingToolSettings[key];
+    if (!initialSettings.initialized) {
+        if (*kindIt == DrawingToolKind::Eraser) {
+            initialSettings.width = annotator->eraserWidth();
+        } else if (const auto toolId = drawingToolIds.constFind(action); toolId != drawingToolIds.cend()) {
+            const QDomElement annotation = annotator->builtinTool(*toolId).firstChildElement(QStringLiteral("engine")).firstChildElement(QStringLiteral("annotation"));
+            initialSettings.width = annotation.hasAttribute(QStringLiteral("width")) ? annotation.attribute(QStringLiteral("width")).toDouble() / 0.75 : 3.0;
+            const QString colorAttribute = annotation.attribute(QStringLiteral("textColor"), annotation.attribute(QStringLiteral("color")));
+            if (QColor color(colorAttribute); color.isValid()) {
+                initialSettings.color = color;
+            }
+            const QColor fill(annotation.attribute(QStringLiteral("innerColor")));
+            if (fill.isValid()) {
+                initialSettings.fillOpacity = qRound(fill.alphaF() * 100.0);
+                initialSettings.fillColor = QColor(fill.red(), fill.green(), fill.blue());
+            }
+        }
+        initialSettings.initialized = true;
+    }
+
+    QMenu popup;
+    auto *contents = new QWidget(&popup);
+    auto *layout = new QVBoxLayout(contents);
+    layout->setContentsMargins(12, 10, 12, 10);
+    layout->setSpacing(8);
+
+    auto addWidthControl = [&](double minimum, double maximum, int decimals) {
+        auto *row = new QHBoxLayout;
+        auto *title = new QLabel(i18n("Width"), contents);
+        auto *currentValue = new QLabel(contents);
+        row->addWidget(title);
+        row->addStretch(1);
+        row->addWidget(currentValue);
+        layout->addLayout(row);
+
+        auto *slider = new QSlider(Qt::Horizontal, contents);
+        const int scale = decimals == 0 ? 1 : 2;
+        slider->setRange(qRound(minimum * scale), qRound(maximum * scale));
+        slider->setSingleStep(1);
+
+        auto *spinBox = new QDoubleSpinBox(contents);
+        spinBox->setRange(minimum, maximum);
+        spinBox->setDecimals(decimals);
+        spinBox->setSingleStep(decimals == 0 ? 1.0 : 0.5);
+        spinBox->setSuffix(i18n(" px"));
+        spinBox->setFixedWidth(110);
+        auto *controlRow = new QHBoxLayout;
+        controlRow->setSpacing(8);
+        controlRow->addWidget(slider, 1);
+        controlRow->addWidget(spinBox);
+        layout->addLayout(controlRow);
+
+        const double initialWidth = drawingToolSettings.value(key).width;
+        spinBox->setValue(initialWidth);
+        slider->setValue(qRound(initialWidth * scale));
+        currentValue->setText(i18n("%1 px", spinBox->value()));
+
+        QObject::connect(slider, &QSlider::valueChanged, spinBox, [spinBox, scale](int value) { spinBox->setValue(static_cast<double>(value) / scale); });
+        QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, slider, [slider, scale](double value) { slider->setValue(qRound(value * scale)); });
+        QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, currentValue, [currentValue](double value) { currentValue->setText(i18n("%1 px", value)); });
+        QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, q, [this, key, kind = *kindIt](double value) {
+            drawingToolSettings[key].width = value;
+            if (kind == DrawingToolKind::Eraser) {
+                annotator->setEraserWidth(value);
+            } else if (kind != DrawingToolKind::Line && kind != DrawingToolKind::Arrow) {
+                annotator->setDrawingToolWidthPixels(value);
+            }
+        });
+    };
+
+    auto addColorControl = [&](const QString &label, bool fillColor) {
+        auto *row = new QHBoxLayout;
+        auto *title = new QLabel(label, contents);
+        auto *swatch = new QToolButton(contents);
+        swatch->setMinimumWidth(92);
+        swatch->setMinimumHeight(28);
+        swatch->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        swatch->setText(i18n("Choose…"));
+        swatch->setToolTip(label);
+        const QColor color = fillColor ? drawingToolSettings.value(key).fillColor : drawingToolSettings.value(key).color;
+        auto setSwatch = [swatch](const QColor &swatchColor) {
+            QPixmap pixmap(18, 18);
+            pixmap.fill(swatchColor);
+            QPainter painter(&pixmap);
+            painter.setPen(QApplication::palette().color(QPalette::Mid));
+            painter.drawRect(pixmap.rect().adjusted(0, 0, -1, -1));
+            swatch->setIcon(QIcon(pixmap));
+        };
+        setSwatch(color);
+        row->addWidget(title);
+        row->addStretch(1);
+        row->addWidget(swatch);
+        layout->addLayout(row);
+        QObject::connect(swatch, &QToolButton::clicked, q, [this, swatch, key, label, fillColor] {
+            const QColor initial = fillColor ? drawingToolSettings.value(key).fillColor : drawingToolSettings.value(key).color;
+            QColorDialog colorDialog(initial, drawingToolBar ? drawingToolBar->window() : QApplication::activeWindow());
+            colorDialog.setWindowTitle(label);
+            colorDialog.setOption(QColorDialog::ShowAlphaChannel, fillColor);
+            if (colorDialog.exec() != QDialog::Accepted) {
+                return;
+            }
+            const QColor selected = colorDialog.selectedColor();
+            if (!selected.isValid()) {
+                return;
+            }
+            if (fillColor) {
+                drawingToolSettings[key].fillColor = selected;
+                QColor effectiveFillColor = selected;
+                effectiveFillColor.setAlphaF(drawingToolSettings[key].fillOpacity / 100.0);
+                currentInnerColor = effectiveFillColor;
+                annotator->setAnnotationInnerColor(effectiveFillColor);
+            } else {
+                drawingToolSettings[key].color = selected;
+                currentColor = selected;
+                annotator->setAnnotationColor(selected);
+            }
+            QPixmap pixmap(18, 18);
+            pixmap.fill(fillColor ? drawingToolSettings.value(key).fillColor : selected);
+            QPainter painter(&pixmap);
+            painter.setPen(QApplication::palette().color(QPalette::Mid));
+            painter.drawRect(pixmap.rect().adjusted(0, 0, -1, -1));
+            swatch->setIcon(QIcon(pixmap));
+        });
+    };
+
+    addWidthControl(*kindIt == DrawingToolKind::Eraser ? 1.0 : 0.5, *kindIt == DrawingToolKind::Eraser ? 64.0 : 20.0, *kindIt == DrawingToolKind::Eraser ? 0 : 1);
+
+    if (*kindIt != DrawingToolKind::Eraser) {
+        addColorControl(i18n("Color"), false);
+    }
+    if (*kindIt == DrawingToolKind::Rectangle || *kindIt == DrawingToolKind::Ellipse) {
+        addColorControl(i18n("Fill color"), true);
+        auto *opacityTitle = new QLabel(i18n("Fill opacity"), contents);
+        auto *opacityValue = new QLabel(contents);
+        auto *opacityRow = new QHBoxLayout;
+        opacityRow->addWidget(opacityTitle);
+        opacityRow->addStretch(1);
+        opacityRow->addWidget(opacityValue);
+        layout->addLayout(opacityRow);
+        auto *opacitySlider = new QSlider(Qt::Horizontal, contents);
+        opacitySlider->setRange(0, 100);
+        opacitySlider->setValue(drawingToolSettings.value(key).fillOpacity);
+        layout->addWidget(opacitySlider);
+        opacityValue->setText(i18n("%1%", opacitySlider->value()));
+        QObject::connect(opacitySlider, &QSlider::valueChanged, opacityValue, [opacityValue](int value) { opacityValue->setText(i18n("%1%", value)); });
+        QObject::connect(opacitySlider, &QSlider::valueChanged, q, [this, key](int value) {
+            drawingToolSettings[key].fillOpacity = value;
+            QColor fill = drawingToolSettings[key].fillColor;
+            fill.setAlphaF(value / 100.0);
+            currentInnerColor = fill;
+            annotator->setAnnotationInnerColor(fill);
+        });
+    }
+    if (*kindIt == DrawingToolKind::Eraser) {
+        auto *modeLabel = new QLabel(i18n("Mode"), contents);
+        layout->addWidget(modeLabel);
+        auto *mode = new QComboBox(contents);
+        mode->addItems({i18n("Stroke eraser"), i18n("Partial eraser")});
+        mode->setCurrentIndex(drawingToolSettings.value(key).partialEraser ? 1 : 0);
+        layout->addWidget(mode);
+        QObject::connect(mode, &QComboBox::currentIndexChanged, q, [this, key](int index) { drawingToolSettings[key].partialEraser = index == 1; });
+    }
+
+    auto *widgetAction = new QWidgetAction(&popup);
+    widgetAction->setDefaultWidget(contents);
+    popup.addAction(widgetAction);
+    popup.setWindowTitle(i18n("%1 Settings", action->text()));
+    popup.setMinimumWidth(250);
+    popup.ensurePolished();
+    popup.adjustSize();
+    QPoint popupPosition = QCursor::pos();
+    if (drawingToolBar) {
+        if (QWidget *toolButton = drawingToolBar->widgetForAction(action)) {
+            popupPosition = toolButton->mapToGlobal(QPoint(toolButton->width() + 6, 0));
+        }
+    }
+    if (QScreen *screen = QGuiApplication::screenAt(popupPosition)) {
+        const QRect available = screen->availableGeometry();
+        if (popupPosition.x() + popup.width() > available.right()) {
+            popupPosition.setX(qMax(available.left(), popupPosition.x() - popup.width() - (drawingToolBar ? drawingToolBar->width() + 12 : 0)));
+        }
+        popupPosition.setY(qBound(available.top(), popupPosition.y(), available.bottom() - popup.height() + 1));
+    }
+    popup.exec(popupPosition);
+    return true;
 }
 
 void AnnotationActionHandlerPrivate::maybeUpdateCustomStampAction(const QString &stampIconName)
@@ -277,6 +503,7 @@ void AnnotationActionHandlerPrivate::parseTool(int toolId)
 void AnnotationActionHandlerPrivate::updateConfigActions(const QString &annotType)
 {
     const bool isAnnotationSelected = !annotType.isEmpty();
+    const bool isEraser = annotator->eraserMode();
     const bool isTypewriter = annotType == QStringLiteral("typewriter");
     const bool isInlineNote = annotType == QStringLiteral("note-inline");
     const bool isText = isInlineNote || isTypewriter;
@@ -294,13 +521,20 @@ void AnnotationActionHandlerPrivate::updateConfigActions(const QString &annotTyp
     aInnerColor->setIcon(GuiUtils::createColorIcon({currentInnerColor}, QIcon::fromTheme(QStringLiteral("format-fill-color"))));
 
     aAddToQuickTools->setEnabled(isAnnotationSelected);
-    aWidth->setEnabled(isLine || isShape);
+    aWidth->setEnabled(isLine || isShape || isEraser);
     aColor->setEnabled(isAnnotationSelected && !isStamp);
     aInnerColor->setEnabled(isShape);
     aOpacity->setEnabled(isAnnotationSelected);
     aFont->setEnabled(isText);
     aConstrainRatioAndAngle->setEnabled(isStraightLine || isShape);
     aAdvancedSettings->setEnabled(isAnnotationSelected);
+
+    if (isEraser) {
+        const double width = annotator->eraserWidth();
+        aCustomWidth = selectActionItem(aWidth, aCustomWidth, width, widthStandardValues, widthIcon(width), i18nc("@item:inlistbox", "Eraser diameter %1 px", width));
+        aWidth->setToolTip(i18nc("@info:tooltip", "Eraser diameter"));
+        return;
+    }
 
     // set tooltips
     if (!isAnnotationSelected) {
@@ -588,7 +822,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     KToggleAction *aInlineNote = new KToggleAction(QIcon::fromTheme(QStringLiteral("tool-text")), i18nc("@action:intoolbar Annotation tool", "Text"), this);
     KToggleAction *aPopupNote = new KToggleAction(QIcon::fromTheme(QStringLiteral("edit-comment")), i18nc("@action:intoolbar Annotation tool", "Popup Note"), this);
     d->aSelectTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("edit-select-all")), i18nc("@action:intoolbar Drawing tool", "Select"), this);
-    d->aEraserTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-eraser-delete-objects")), i18nc("@action:intoolbar Drawing tool", "Eraser"), this);
+    d->aEraserTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-eraser")), i18nc("@action:intoolbar Drawing tool", "Eraser"), this);
     d->aBrowseTool = ac->action(QStringLiteral("mouse_drag"));
     Q_ASSERT(d->aBrowseTool);
     d->aDrawingBrowse = new KToggleAction(QIcon::fromTheme(QStringLiteral("transform-browse")), i18nc("@action:intoolbar Drawing tool", "Browse"), this);
@@ -600,6 +834,19 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     KToggleAction *aRectangle = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-rectangle")), i18nc("@action:intoolbar Annotation tool", "Rectangle"), this);
     KToggleAction *aEllipse = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-ellipse")), i18nc("@action:intoolbar Annotation tool", "Ellipse"), this);
     KToggleAction *aPolygon = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-polyline")), i18nc("@action:intoolbar Annotation tool", "Polygon"), this);
+    d->drawingToolKinds.insert(aFreehandLine, AnnotationActionHandlerPrivate::DrawingToolKind::Pen);
+    d->drawingToolKinds.insert(d->aEraserTool, AnnotationActionHandlerPrivate::DrawingToolKind::Eraser);
+    d->drawingToolKinds.insert(aStraightLine, AnnotationActionHandlerPrivate::DrawingToolKind::Line);
+    d->drawingToolKinds.insert(aArrow, AnnotationActionHandlerPrivate::DrawingToolKind::Arrow);
+    d->drawingToolKinds.insert(aRectangle, AnnotationActionHandlerPrivate::DrawingToolKind::Rectangle);
+    d->drawingToolKinds.insert(aEllipse, AnnotationActionHandlerPrivate::DrawingToolKind::Ellipse);
+    d->drawingToolKinds.insert(aPolygon, AnnotationActionHandlerPrivate::DrawingToolKind::Polygon);
+    d->drawingToolIds.insert(aFreehandLine, 8);
+    d->drawingToolIds.insert(aStraightLine, 10);
+    d->drawingToolIds.insert(aArrow, 9);
+    d->drawingToolIds.insert(aRectangle, 11);
+    d->drawingToolIds.insert(aEllipse, 12);
+    d->drawingToolIds.insert(aPolygon, 13);
     d->drawingTools = {d->aDrawingBrowse, d->aSelectTool, aFreehandLine, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aTypewriter};
     d->aGeomShapes = new ToggleActionMenu(i18nc("@action", "Geometrical shapes"), this);
     d->aGeomShapes->setEnabled(true); // Need to explicitly set this once, or refreshActions() in part.cpp will disable this action
@@ -672,6 +919,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
             d->annotator->setAnnotationSelectionMode(false);
         }
         d->annotator->setEraserMode(checked);
+        d->updateConfigActions();
     });
     connect(d->aBrowseTool, &QAction::toggled, this, [this](bool checked) {
         const QSignalBlocker blocker(d->aDrawingBrowse);
@@ -767,7 +1015,10 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     for (auto width : d->widthStandardValues) {
         KToggleAction *ann = new KToggleAction(d->widthIcon(width), i18nc("@item:inlistbox", "Width %1", width), this);
         d->aWidth->addAction(ann);
-        connect(ann, &QAction::triggered, this, [this, width]() { d->annotator->setAnnotationWidth(width); });
+        connect(ann, &QAction::triggered, this, [this, width]() {
+            d->annotator->setAnnotationWidth(width);
+            d->updateConfigActions();
+        });
     }
 
     // Opacity list
@@ -789,10 +1040,21 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     // Other parts of code dependent to this workaround are marked with "action group workaround".
     connect(d->agTools, &QActionGroup::triggered, this, [this](QAction *action) {
         if (action == d->agLastAction) {
-            d->agLastAction = nullptr;
-            d->agTools->checkedAction()->setChecked(false);
-            d->selectTool(-1);
+            const bool mouseRepeat = d->pendingMousePopupAction == action;
+            d->pendingMousePopupAction = nullptr;
+            if (d->deselectingTools) {
+                d->agLastAction = nullptr;
+                d->agTools->checkedAction()->setChecked(false);
+                d->selectTool(-1);
+            } else if (mouseRepeat && d->showToolSettings(action)) {
+                return;
+            } else if (!d->drawingToolKinds.contains(action)) {
+                d->agLastAction = nullptr;
+                d->agTools->checkedAction()->setChecked(false);
+                d->selectTool(-1);
+            }
         } else {
+            d->pendingMousePopupAction = nullptr;
             d->agLastAction = action;
             // Show the annotation toolbar whenever builtin tool actions are triggered (e.g using shortcuts)
             if (!d->isQuickToolAction(action)) {
@@ -865,6 +1127,17 @@ AnnotationActionHandler::~AnnotationActionHandler()
     delete d;
 }
 
+bool AnnotationActionHandler::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonPress) {
+        const auto action = d->settingsButtonActions.constFind(watched);
+        if (action != d->settingsButtonActions.cend() && d->agTools->checkedAction() == *action) {
+            d->pendingMousePopupAction = *action;
+        }
+    }
+    return QObject::eventFilter(watched, event);
+}
+
 void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
 {
     // find the main window associated to the toggle toolbar action
@@ -894,9 +1167,19 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
         drawingToolBar->setFloatable(false);
         drawingToolBar->setAllowedAreas(Qt::LeftToolBarArea);
     }
+    d->drawingToolBar = drawingToolBar;
     if (drawingToolBar->actions().isEmpty()) {
         for (QAction *action : std::as_const(d->drawingTools)) {
             drawingToolBar->addAction(action);
+        }
+    }
+    for (auto it = d->drawingToolKinds.cbegin(); it != d->drawingToolKinds.cend(); ++it) {
+        if (QWidget *toolButton = drawingToolBar->widgetForAction(it.key())) {
+            if (!d->settingsButtonActions.contains(toolButton)) {
+                d->settingsButtonActions.insert(toolButton, it.key());
+                toolButton->installEventFilter(this);
+                connect(toolButton, &QObject::destroyed, this, [this, toolButton] { d->settingsButtonActions.remove(toolButton); });
+            }
         }
     }
     if (createDrawingToolBar) {
@@ -970,7 +1253,9 @@ void AnnotationActionHandler::deselectAllAnnotationActions()
 {
     QAction *checkedAction = d->agTools->checkedAction();
     if (checkedAction) {
+        d->deselectingTools = true;
         checkedAction->trigger(); // action group workaround: using trigger instead of setChecked
+        d->deselectingTools = false;
     }
 }
 

@@ -18,6 +18,7 @@
 #include <QList>
 #include <QLoggingCategory>
 #include <QPainter>
+#include <QPixmap>
 #include <QSet>
 #include <QVariant>
 
@@ -46,12 +47,28 @@
 #include "settings.h"
 #include "signaturepartutils.h"
 
+static QCursor penToolCursor()
+{
+    QPixmap pixmap(24, 24);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(Qt::black, 5, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(4, 20, 18, 6);
+    painter.setPen(QPen(Qt::white, 2, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(4, 20, 18, 6);
+    painter.setPen(Qt::black);
+    painter.drawLine(2, 22, 4, 17);
+    return QCursor(pixmap, 2, 22);
+}
+
 class EraserEngine : public AnnotatorEngine
 {
 public:
-    explicit EraserEngine(Okular::Document *document)
+    EraserEngine(Okular::Document *document, double width)
         : AnnotatorEngine({})
         , m_document(document)
+        , m_width(width)
     {
     }
 
@@ -67,16 +84,23 @@ public:
         }
 
         m_center = QPointF(nX * xScale, nY * yScale);
-        m_bounds = QRectF(m_center.x() - m_diameter / 2.0, m_center.y() - m_diameter / 2.0, m_diameter, m_diameter).toAlignedRect().adjusted(-2, -2, 2, 2);
+        m_visualBounds = QRectF(m_center.x() - m_width / 2.0, m_center.y() - m_width / 2.0, m_width, m_width).toAlignedRect();
+        m_bounds = m_visualBounds.adjusted(-2, -2, 2, 2);
 
         if (type == Press && button == Left) {
             m_down = true;
         }
         if (m_down && button == Left && page) {
             const QList<Okular::Annotation *> annotations = page->annotations();
+            const qreal radius = m_width / 2.0;
+            const qreal radiusSquared = radius * radius;
             for (Okular::Annotation *annotation : annotations) {
-                if (Okular::AnnotationUtils::annotationGeometry(annotation, (int)xScale, (int)yScale).intersects(m_bounds)
-                    && m_document->canRemovePageAnnotation(annotation)) {
+                const QRectF annotationBounds = Okular::AnnotationUtils::annotationGeometry(annotation, (int)xScale, (int)yScale);
+                const qreal nearestX = qBound(annotationBounds.left(), m_center.x(), annotationBounds.right());
+                const qreal nearestY = qBound(annotationBounds.top(), m_center.y(), annotationBounds.bottom());
+                const qreal dx = m_center.x() - nearestX;
+                const qreal dy = m_center.y() - nearestY;
+                if (dx * dx + dy * dy <= radiusSquared && m_document->canRemovePageAnnotation(annotation)) {
                     m_document->removePageAnnotation(item()->pageNumber(), annotation);
                 }
             }
@@ -90,10 +114,26 @@ public:
     void paint(QPainter *painter, double, double, const QRect &) override
     {
         painter->save();
-        painter->setPen(QPen(QApplication::palette().color(QPalette::Active, QPalette::Highlight), 2));
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(QPen(QApplication::palette().color(QPalette::Active, QPalette::Highlight), 1));
         painter->setBrush(Qt::NoBrush);
-        painter->drawEllipse(QRectF(m_center.x() - m_diameter / 2.0, m_center.y() - m_diameter / 2.0, m_diameter, m_diameter));
+        painter->drawEllipse(QRectF(m_center.x() - m_width / 2.0 + 0.5, m_center.y() - m_width / 2.0 + 0.5, qMax(0.0, m_width - 1.0), qMax(0.0, m_width - 1.0)));
         painter->restore();
+    }
+
+    QCursor cursor() const override
+    {
+        const int diameter = qMax(1, qCeil(m_width));
+        QPixmap pixmap(diameter, diameter);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        const QRectF circle(0.5, 0.5, qMax<qreal>(0.0, m_width - 1.0), qMax<qreal>(0.0, m_width - 1.0));
+        painter.setPen(QPen(Qt::black, 1));
+        painter.drawEllipse(circle);
+        painter.setPen(QPen(Qt::white, 1, Qt::DashLine));
+        painter.drawEllipse(circle);
+        return QCursor(pixmap, diameter / 2, diameter / 2);
     }
 
     QList<Okular::Annotation *> end() override
@@ -105,8 +145,9 @@ private:
     Okular::Document *m_document;
     QPointF m_center;
     QRect m_bounds;
+    QRect m_visualBounds;
     bool m_down = false;
-    static constexpr int m_diameter = 24;
+    double m_width;
 };
 
 /** @short PickPointEngine */
@@ -659,8 +700,11 @@ public:
         return Okular::NormalizedPoint(x, y);
     }
 
-    QRect event(EventType type, Button button, Modifiers modifiers, double nX, double nY, double xScale, double yScale, const Okular::Page * /*page*/) override
+    QRect event(EventType type, Button button, Modifiers modifiers, double nX, double nY, double xScale, double yScale, const Okular::Page *page) override
     {
+        if (page) {
+            pagewidth = page->width();
+        }
         // only proceed if pressing left button
         //            if ( button != Left )
         //                return rect;
@@ -733,13 +777,25 @@ public:
             painter->drawRect((int)(first.x * (double)xScale), (int)(first.y * (double)yScale), (int)((second.x - first.x) * (double)xScale), (int)((second.y - first.y) * (double)yScale));
         } else if (!points.isEmpty()) {
             // draw a polyline that connects the constructed points
-            painter->setPen(QPen(m_engineColor, 2));
+            QPen pen(m_engineColor, 2);
+            if (numofpoints == -1) {
+                const QColor color = m_annotElement.hasAttribute(QStringLiteral("color")) ? QColor(m_annotElement.attribute(QStringLiteral("color"))) : m_engineColor;
+                const qreal width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toDouble() * xScale / pagewidth;
+                pen = QPen(color, qMax<qreal>(0.5, width));
+            }
+            painter->setPen(pen);
             for (int i = 1; i < points.count(); ++i) {
                 painter->drawLine((int)(points[i - 1].x * (double)xScale), (int)(points[i - 1].y * (double)yScale), (int)(points[i].x * (double)xScale), (int)(points[i].y * (double)yScale));
             }
             painter->drawLine((int)(points.last().x * (double)xScale), (int)(points.last().y * (double)yScale), (int)(movingpoint.x * (double)xScale), (int)(movingpoint.y * (double)yScale));
         } else {
-            painter->setPen(QPen(m_engineColor, 2));
+            QPen pen(m_engineColor, 2);
+            if (numofpoints == -1) {
+                const QColor color = m_annotElement.hasAttribute(QStringLiteral("color")) ? QColor(m_annotElement.attribute(QStringLiteral("color"))) : m_engineColor;
+                const qreal width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toDouble() * xScale / pagewidth;
+                pen = QPen(color, qMax<qreal>(0.5, width));
+            }
+            painter->setPen(pen);
             painter->drawLine((int)(newPoint.x * (double)xScale), (int)(newPoint.y * (double)yScale), (int)(movingpoint.x * (double)xScale), (int)(movingpoint.y * (double)yScale));
         }
     }
@@ -822,6 +878,7 @@ private:
     bool last;
     int numofpoints;
     bool hasMovingPoint;
+    double pagewidth = 1.0;
 };
 
 /** @short TextSelectorEngine */
@@ -1177,14 +1234,39 @@ void PageViewAnnotator::setEraserMode(bool enabled)
         m_lastDrawnRect = {};
     }
     if (enabled) {
-        m_engine = new EraserEngine(m_document);
+        m_engine = new EraserEngine(m_document, m_eraserWidth);
     }
     Q_EMIT toolActive(enabled || m_signatureMode);
+    m_pageView->updateCursor();
 }
 
 bool PageViewAnnotator::eraserMode() const
 {
     return dynamic_cast<EraserEngine *>(m_engine) != nullptr;
+}
+
+void PageViewAnnotator::setEraserWidth(double width)
+{
+    m_eraserWidth = qBound(1.0, width, 64.0);
+    if (!eraserMode()) {
+        return;
+    }
+
+    if (m_engine) {
+        delete m_engine;
+    }
+    m_engine = new EraserEngine(m_document, m_eraserWidth);
+    m_lockedItem = nullptr;
+    if (m_lastDrawnRect.isValid()) {
+        m_pageView->viewport()->update(m_lastDrawnRect.translated(-m_pageView->contentAreaPosition()));
+        m_lastDrawnRect = {};
+    }
+    m_pageView->updateCursor();
+}
+
+double PageViewAnnotator::eraserWidth() const
+{
+    return m_eraserWidth;
 }
 
 void PageViewAnnotator::setAnnotationSelectionMode(bool enabled)
@@ -1558,6 +1640,15 @@ void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId,
                 qCWarning(OkularUiDebug).nospace() << "tools.xml: engine type:'" << type << "' is not defined!";
             }
 
+            if (m_engine) {
+                const QString annotationType = toolElement.attribute(QStringLiteral("type"));
+                if (annotationType == QLatin1String("ink")) {
+                    m_engine->setCursor(penToolCursor());
+                } else if (annotationType == QLatin1String("typewriter")) {
+                    m_engine->setCursor(Qt::IBeamCursor);
+                }
+            }
+
             if (showTip == ShowTip::Yes) {
                 // display the tooltip
                 const QString annotType = toolElement.attribute(QStringLiteral("type"));
@@ -1890,7 +1981,22 @@ QDomElement PageViewAnnotator::currentAnnotationElement()
 
 void PageViewAnnotator::setAnnotationWidth(double width)
 {
+    if (eraserMode()) {
+        setEraserWidth(width);
+        return;
+    }
     currentAnnotationElement().setAttribute(QStringLiteral("width"), QString::number(width));
+    saveBuiltinAnnotationTools();
+    selectLastTool();
+}
+
+void PageViewAnnotator::setDrawingToolWidthPixels(double width)
+{
+    if (eraserMode()) {
+        setEraserWidth(width);
+        return;
+    }
+    currentAnnotationElement().setAttribute(QStringLiteral("width"), QString::number(width * 0.75));
     saveBuiltinAnnotationTools();
     selectLastTool();
 }
@@ -1912,10 +2018,10 @@ void PageViewAnnotator::setAnnotationColor(const QColor &color)
 void PageViewAnnotator::setAnnotationInnerColor(const QColor &color)
 {
     QDomElement annotationElement = currentAnnotationElement();
-    if (color == Qt::transparent) {
+    if (!color.isValid()) {
         annotationElement.removeAttribute(QStringLiteral("innerColor"));
     } else {
-        annotationElement.setAttribute(QStringLiteral("innerColor"), color.name(QColor::HexRgb));
+        annotationElement.setAttribute(QStringLiteral("innerColor"), color.name(QColor::HexArgb));
     }
     saveBuiltinAnnotationTools();
     selectLastTool();

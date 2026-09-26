@@ -1847,7 +1847,7 @@ void GeomAnnotation::store(QDomNode &node, QDomDocument &document) const
         geomElement.setAttribute(QStringLiteral("type"), (int)d->m_geomType);
     }
     if (d->m_geomInnerColor.isValid()) {
-        geomElement.setAttribute(QStringLiteral("color"), d->m_geomInnerColor.name());
+        geomElement.setAttribute(QStringLiteral("color"), d->m_geomInnerColor.name(QColor::HexArgb));
     }
 }
 
