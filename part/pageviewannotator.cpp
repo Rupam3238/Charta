@@ -58,6 +58,14 @@ public:
     QRect event(EventType type, Button button, Modifiers, double nX, double nY, double xScale, double yScale, const Okular::Page *page) override
     {
         const QRect oldRect = m_bounds;
+        if (!page) {
+            m_bounds = {};
+            if (type == Release) {
+                m_down = false;
+            }
+            return oldRect;
+        }
+
         m_center = QPointF(nX * xScale, nY * yScale);
         m_bounds = QRectF(m_center.x() - m_diameter / 2.0, m_center.y() - m_diameter / 2.0, m_diameter, m_diameter).toAlignedRect().adjusted(-2, -2, 2, 2);
 
@@ -190,7 +198,9 @@ public:
     void paint(QPainter *painter, double xScale, double yScale, const QRect & /*clipRect*/) override
     {
         if (clicked) {
-            if (m_block) {
+            const QString annotationType = m_annotElement.attribute(QStringLiteral("type"));
+            const bool isGeometry = annotationType == QLatin1String("GeomSquare") || annotationType == QLatin1String("GeomCircle");
+            if (m_block && !isGeometry) {
                 const Okular::NormalizedRect tmprect(qMin(startpoint.x, point.x), qMin(startpoint.y, point.y), qMax(startpoint.x, point.x), qMax(startpoint.y, point.y));
                 const QRect realrect = tmprect.geometry((int)xScale, (int)yScale);
                 const QPen origpen = painter->pen();
@@ -208,12 +218,6 @@ public:
                 painter->drawLine(realrect.topLeft(), realrect.bottomLeft());
                 painter->drawLine(realrect.topRight(), realrect.bottomRight());
                 painter->drawLine(realrect.bottomLeft(), realrect.bottomRight());
-
-                if (m_annotElement.attribute(QStringLiteral("type")) == QLatin1String("GeomCircle")) {
-                    painter->setPen(QPen(m_engineColor, qMax<qreal>(1.0, penWidth)));
-                    painter->setBrush(Qt::NoBrush);
-                    painter->drawEllipse(realrect.normalized());
-                }
 
                 pen.setDashOffset(penWidth * 5);
                 pen.setColor(textColor);
@@ -246,6 +250,19 @@ public:
                 painter->drawLine(xVertical1, rectTopLeft.y(), xVertical1, rectBottomRight.y());
                 painter->drawLine(xVertical2, rectTopLeft.y(), xVertical2, rectBottomRight.y());
                 painter->setPen(origpen);
+            }
+            if (m_block && isGeometry) {
+                const Okular::NormalizedRect tmprect(qMin(startpoint.x, point.x), qMin(startpoint.y, point.y), qMax(startpoint.x, point.x), qMax(startpoint.y, point.y));
+                const QRect realrect = tmprect.geometry((int)xScale, (int)yScale).normalized();
+                const QColor color = m_annotElement.hasAttribute(QStringLiteral("color")) ? QColor(m_annotElement.attribute(QStringLiteral("color"))) : m_engineColor;
+                const qreal width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("1")).toDouble() * xScale / pagewidth;
+                painter->setPen(QPen(color, qMax<qreal>(1.0, width)));
+                painter->setBrush(m_annotElement.hasAttribute(QStringLiteral("innerColor")) ? QBrush(QColor(m_annotElement.attribute(QStringLiteral("innerColor")))) : Qt::NoBrush);
+                if (annotationType == QLatin1String("GeomCircle")) {
+                    painter->drawEllipse(realrect);
+                } else {
+                    painter->drawRect(realrect);
+                }
             }
             if (!pixmap.isNull()) {
                 painter->drawPixmap(QPointF(rect.left * xScale, rect.top * yScale), pixmap);
@@ -1170,6 +1187,11 @@ bool PageViewAnnotator::eraserMode() const
     return dynamic_cast<EraserEngine *>(m_engine) != nullptr;
 }
 
+void PageViewAnnotator::setAnnotationSelectionMode(bool enabled)
+{
+    m_pageView->setAnnotationSelectionMode(enabled);
+}
+
 bool PageViewAnnotator::annotating() const
 {
     return active() && m_lockedItem;
@@ -1197,6 +1219,21 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
     } else if (button == AnnotatorEngine::Right && eventType == AnnotatorEngine::Release) {
         detachAnnotation();
         return QRect();
+    }
+
+    const bool isEraser = eraserMode();
+    if (isEraser && m_lockedItem != item) {
+        m_lockedItem = item;
+        m_engine->setItem(item);
+    }
+    if (isEraser && !item) {
+        const QRect oldRect = m_lastDrawnRect;
+        m_engine->event(eventType, button, modifiers, 0.0, 0.0, 0.0, 0.0, nullptr);
+        m_lastDrawnRect = {};
+        if (oldRect.isValid()) {
+            m_pageView->viewport()->update(oldRect.translated(-m_pageView->contentAreaPosition()));
+        }
+        return oldRect;
     }
 
     // 1. lock engine to current item

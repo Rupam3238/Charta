@@ -69,6 +69,7 @@ public:
     bool active() const;
     void setEraserMode(bool enabled);
     bool eraserMode() const;
+    void setAnnotationSelectionMode(bool enabled);
     // @return Are we currently annotating (using the selected tool)?
     bool annotating() const;
 

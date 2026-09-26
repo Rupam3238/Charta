@@ -174,6 +174,11 @@ public:
     bool mouseTextSelecting = false;
     QSet<int> pagesWithTextSelection;
     bool mouseOnRect = false;
+    bool annotationSelectionMode = false;
+    bool annotationAreaSelectionDragging = false;
+    PageViewItem *annotationAreaSelectionItem = nullptr;
+    QPoint annotationAreaSelectionStart;
+    QPoint annotationAreaSelectionEnd;
     int mouseMode = 0;
     MouseAnnotation *mouseAnnotation = nullptr;
 
@@ -1256,6 +1261,8 @@ void PageView::notifySetup(const QList<Okular::Page *> &pageSet, int setupFlags)
 
     // mouseAnnotation must not access our PageViewItem widgets any longer
     d->mouseAnnotation->reset();
+    d->annotationAreaSelectionDragging = false;
+    d->annotationAreaSelectionItem = nullptr;
 
     // delete all widgets (one for each page in pageSet)
     qDeleteAll(d->items);
@@ -1879,6 +1886,18 @@ void PageView::paintEvent(QPaintEvent *pe)
     selectionRectInternal.adjust(1, 1, -1, -1);
     // color for blending
     QColor selBlendColor = (selectionRect.width() > 8 || selectionRect.height() > 8) ? d->mouseSelectionColor : Qt::red;
+    const auto paintAnnotationAreaMarquee = [this](QPainter &painter, const QRect &rect) {
+        painter.save();
+        QColor fill = palette().color(QPalette::Active, QPalette::Highlight);
+        fill.setAlpha(32);
+        painter.fillRect(rect.adjusted(1, 1, -1, -1), fill);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(Qt::black, 1, Qt::DashLine));
+        painter.drawRect(rect);
+        painter.setPen(QPen(Qt::white, 1, Qt::DashLine));
+        painter.drawRect(rect.adjusted(1, 1, -1, -1));
+        painter.restore();
+    };
 
     // subdivide region into rects
     QRegion rgn = pe->region();
@@ -1985,6 +2004,12 @@ void PageView::paintEvent(QPaintEvent *pe)
                 }
             }
             drawTableDividers(&pixmapPainter);
+            if (d->annotationAreaSelectionDragging) {
+                const QRect selectionRect = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
+                if (selectionRect.intersects(contentsRect)) {
+                    paintAnnotationAreaMarquee(pixmapPainter, selectionRect);
+                }
+            }
             // 3a) Layer 1: give annotator painting control
             if (d->annotator && d->annotator->routePaints(contentsRect)) {
                 d->annotator->routePaint(&pixmapPainter, contentsRect);
@@ -2021,6 +2046,12 @@ void PageView::paintEvent(QPaintEvent *pe)
                 }
             }
             drawTableDividers(&screenPainter);
+            if (d->annotationAreaSelectionDragging) {
+                const QRect selectionRect = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
+                if (selectionRect.intersects(contentsRect)) {
+                    paintAnnotationAreaMarquee(screenPainter, selectionRect);
+                }
+            }
             // 3a) Layer 1: give annotator painting control
             if (d->annotator && d->annotator->routePaints(contentsRect)) {
                 d->annotator->routePaint(&screenPainter, contentsRect);
@@ -2163,6 +2194,13 @@ void PageView::keyPressEvent(QKeyEvent *e)
         }
         break;
     case Qt::Key_Escape:
+        if (d->annotationAreaSelectionDragging) {
+            const QRect marquee = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized().adjusted(-2, -2, 2, 2);
+            d->annotationAreaSelectionDragging = false;
+            d->annotationAreaSelectionItem = nullptr;
+            d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+            viewport()->update(marquee.translated(-contentAreaPosition()));
+        }
         Q_EMIT escPressed();
         selectionClear(d->tableDividersGuessed ? ClearOnlyDividers : ClearAllSelection);
         textSelectionClear();
@@ -2322,6 +2360,19 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
     bool rightButton = (e->buttons() == Qt::RightButton);
 
     PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
+    if (d->annotationSelectionMode && d->annotationAreaSelectionDragging) {
+        const QRect oldSelection = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
+        d->annotationAreaSelectionEnd = eventPos;
+        const QRect newSelection = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
+        viewport()->update((oldSelection | newSelection).adjusted(-2, -2, 2, 2).translated(-contentAreaPosition()));
+        return;
+    }
+    if (d->annotationSelectionMode) {
+        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton);
+        updateCursor();
+        return;
+    }
+
     switch (d->mouseMode) {
     case Okular::Settings::EnumMouseMode::Browse: {
         if (leftButton) {
@@ -2441,6 +2492,21 @@ void PageView::mousePressEvent(QMouseEvent *e)
         d->scroller->stop();
         PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
         d->annotator->routeMouseEvent(e, pageItem);
+        return;
+    }
+
+    if (d->annotationSelectionMode) {
+        if (e->button() == Qt::LeftButton) {
+            PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
+            if (pageItem) {
+                d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+                d->annotationAreaSelectionDragging = true;
+                d->annotationAreaSelectionItem = pageItem;
+                d->annotationAreaSelectionStart = eventPos;
+                d->annotationAreaSelectionEnd = eventPos;
+                d->scroller->stop();
+            }
+        }
         return;
     }
 
@@ -2654,7 +2720,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
     const bool leftButton = e->button() == Qt::LeftButton;
     const bool rightButton = e->button() == Qt::RightButton;
 
-    if (d->mouseAnnotation->isActive() && leftButton) {
+    if (!d->annotationSelectionMode && d->mouseAnnotation->isActive() && leftButton) {
         // Just finished to move the annotation
         d->mouseAnnotation->routeMouseReleaseEvent();
     }
@@ -2673,6 +2739,28 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
     // handle mode independent mid bottom zoom
     if (e->button() == Qt::MiddleButton) {
         continuousZoomEnd();
+        return;
+    }
+
+    if (d->annotationSelectionMode) {
+        if (leftButton) {
+            if (d->annotationAreaSelectionDragging && d->annotationAreaSelectionItem) {
+                if ((eventPos - d->annotationAreaSelectionStart).manhattanLength() >= QApplication::startDragDistance()) {
+                    const QRect selectionRect = QRect(d->annotationAreaSelectionStart, eventPos)
+                                                   .normalized()
+                                                   .translated(-d->annotationAreaSelectionItem->uncroppedGeometry().topLeft())
+                                                   .intersected(QRect(QPoint(0, 0), d->annotationAreaSelectionItem->uncroppedGeometry().size()));
+                    d->mouseAnnotation->selectAnnotationsInRect(d->annotationAreaSelectionItem, selectionRect);
+                } else {
+                    d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+                }
+                const QRect repaintRect = QRect(d->annotationAreaSelectionStart, eventPos).normalized().adjusted(-2, -2, 2, 2);
+                d->annotationAreaSelectionDragging = false;
+                d->annotationAreaSelectionItem = nullptr;
+                viewport()->update(repaintRect.translated(-contentAreaPosition()));
+            }
+        }
+        updateCursor();
         return;
     }
 
@@ -3315,6 +3403,10 @@ void PageView::guessTableDividers()
 
 void PageView::mouseDoubleClickEvent(QMouseEvent *e)
 {
+    if (d->annotationSelectionMode) {
+        return;
+    }
+
     if (e->button() == Qt::LeftButton) {
         const QPoint eventPos = contentAreaPoint(e->pos());
         const PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
@@ -4273,6 +4365,17 @@ void PageView::updateCursor()
 {
     const QPoint p = contentAreaPosition() + viewport()->mapFromGlobal(QCursor::pos());
     updateCursor(p);
+}
+
+void PageView::setAnnotationSelectionMode(bool enabled)
+{
+    if (d->annotationSelectionMode && !enabled) {
+        d->annotationAreaSelectionDragging = false;
+        d->annotationAreaSelectionItem = nullptr;
+        d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+    }
+    d->annotationSelectionMode = enabled;
+    updateCursor();
 }
 
 void PageView::updateCursor(const QPoint p)

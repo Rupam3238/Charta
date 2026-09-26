@@ -113,7 +113,6 @@
   <Spacer/>
   <Action name="mouse_drag"/>
   <Action name="mouse_selecttools"/>
-  <Action name="annotation_favorites"/>
   <Separator/>
   <Action name="hamburger_menu"/>
 </ToolBar>

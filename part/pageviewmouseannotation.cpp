@@ -194,6 +194,33 @@ void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoi
     }
 }
 
+void MouseAnnotation::selectAnnotationsInRect(PageViewItem *pageViewItem, const QRect &selectionRect)
+{
+    if (m_focusedAnnotation.isValid()) {
+        setState(StateInactive, {});
+    }
+    m_areaSelectedAnnotations.clear();
+
+    if (pageViewItem && !selectionRect.isNull()) {
+        const QRect normalizedSelection = selectionRect.normalized();
+        for (Okular::Annotation *annotation : pageViewItem->page()->annotations()) {
+            if (Okular::AnnotationUtils::annotationGeometry(annotation, pageViewItem->uncroppedWidth(), pageViewItem->uncroppedHeight()).normalized().intersects(normalizedSelection)) {
+                AnnotationDescription selected;
+                selected.annotation = annotation;
+                selected.pageViewItem = pageViewItem;
+                selected.pageNumber = pageViewItem->pageNumber();
+                m_areaSelectedAnnotations.append(selected);
+            }
+        }
+
+        if (m_areaSelectedAnnotations.size() == 1) {
+            setState(StateFocused, m_areaSelectedAnnotations.constFirst());
+        }
+    }
+
+    m_pageView->viewport()->update();
+}
+
 void MouseAnnotation::routeKeyPressEvent(const QKeyEvent *e)
 {
     switch (e->key()) {
@@ -201,7 +228,16 @@ void MouseAnnotation::routeKeyPressEvent(const QKeyEvent *e)
         cancel();
         break;
     case Qt::Key_Delete:
-        if (m_focusedAnnotation.isValid()) {
+        if (!m_areaSelectedAnnotations.isEmpty()) {
+            const QList<AnnotationDescription> selectedAnnotations = std::exchange(m_areaSelectedAnnotations, {});
+            cancel();
+            for (const AnnotationDescription &selected : selectedAnnotations) {
+                if (selected.isValid() && selected.isContainedInPage(m_document, selected.pageNumber)) {
+                    m_document->removePageAnnotation(selected.pageNumber, selected.annotation);
+                }
+            }
+            m_pageView->viewport()->update();
+        } else if (m_focusedAnnotation.isValid()) {
             AnnotationDescription adToBeDeleted = m_focusedAnnotation;
             cancel();
             m_document->removePageAnnotation(adToBeDeleted.pageNumber, adToBeDeleted.annotation);
@@ -232,6 +268,22 @@ void MouseAnnotation::routePaint(QPainter *painter, const QRect paintRect)
     /* QPainter draws relative to the origin of uncropped viewport. */
     static const QColor borderColor = QColor::fromHsvF(0, 0, 1.0);
     static const QColor fillColor = QColor::fromHsvF(0, 0, 0.75, 0.66);
+
+    for (const AnnotationDescription &selected : std::as_const(m_areaSelectedAnnotations)) {
+        if (!selected.isValid() || (isFocused() && selected.annotation == m_focusedAnnotation.annotation)) {
+            continue;
+        }
+        const QRect boundingRect = Okular::AnnotationUtils::annotationGeometry(selected.annotation, selected.pageViewItem->uncroppedWidth(), selected.pageViewItem->uncroppedHeight());
+        const QPoint origin = selected.pageViewItem->uncroppedGeometry().topLeft();
+        if (!paintRect.intersects(boundingRect.translated(origin).adjusted(-handleSizeHalf, -handleSizeHalf, handleSizeHalf, handleSizeHalf))) {
+            continue;
+        }
+        painter->save();
+        painter->translate(origin);
+        painter->setPen(QPen(fillColor, 2, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
+        painter->drawRect(boundingRect);
+        painter->restore();
+    }
 
     if (!isFocused()) {
         return;
@@ -373,6 +425,8 @@ void MouseAnnotation::notifyAnnotationChanged(int pageNumber)
         m_mouseOverAnnotation = emptyAd;
         m_pageView->updateCursor();
     }
+
+    m_areaSelectedAnnotations.removeIf([this, pageNumber](const AnnotationDescription &selected) { return !selected.isContainedInPage(m_document, pageNumber); });
 }
 
 void MouseAnnotation::updateAnnotationPointers()
@@ -383,6 +437,12 @@ void MouseAnnotation::updateAnnotationPointers()
 
     if (m_mouseOverAnnotation.annotation) {
         m_mouseOverAnnotation.annotation = m_document->page(m_mouseOverAnnotation.pageNumber)->annotation(m_mouseOverAnnotation.annotation->uniqueName());
+    }
+
+    for (AnnotationDescription &selected : m_areaSelectedAnnotations) {
+        if (selected.annotation) {
+            selected.annotation = m_document->page(selected.pageNumber)->annotation(selected.annotation->uniqueName());
+        }
     }
 }
 
@@ -399,6 +459,7 @@ void MouseAnnotation::reset()
     cancel();
     m_focusedAnnotation.invalidate();
     m_mouseOverAnnotation.invalidate();
+    m_areaSelectedAnnotations.clear();
 }
 
 /* Handle state changes for the focused annotation. */

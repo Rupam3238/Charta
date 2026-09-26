@@ -84,6 +84,7 @@ public:
 
     /* Process a mouse move event. eventPos: Mouse position in content area coordinates. */
     void routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed);
+    void selectAnnotationsInRect(PageViewItem *pageViewItem, const QRect &selectionRect);
 
     /* Process a key event. */
     void routeKeyPressEvent(const QKeyEvent *e);
@@ -166,6 +167,7 @@ private:
     /* Mouse tracking, always kept up to date with the latest mouse position and annotation under mouse cursor. */
     AnnotationDescription m_mouseOverAnnotation;
     QPoint m_mousePosition; // in page view item coordinates
+    QList<AnnotationDescription> m_areaSelectedAnnotations;
 
     QList<ResizeHandle> m_resizeHandleList;
 };

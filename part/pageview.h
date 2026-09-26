@@ -135,6 +135,7 @@ public:
     void clearLastSourceLocationViewport();
 
     void updateCursor();
+    void setAnnotationSelectionMode(bool enabled);
 
     void highlightSignatureFormWidget(const Okular::FormFieldSignature *form);
 
