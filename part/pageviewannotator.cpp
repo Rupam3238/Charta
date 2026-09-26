@@ -46,6 +46,61 @@
 #include "settings.h"
 #include "signaturepartutils.h"
 
+class EraserEngine : public AnnotatorEngine
+{
+public:
+    explicit EraserEngine(Okular::Document *document)
+        : AnnotatorEngine({})
+        , m_document(document)
+    {
+    }
+
+    QRect event(EventType type, Button button, Modifiers, double nX, double nY, double xScale, double yScale, const Okular::Page *page) override
+    {
+        const QRect oldRect = m_bounds;
+        m_center = QPointF(nX * xScale, nY * yScale);
+        m_bounds = QRectF(m_center.x() - m_diameter / 2.0, m_center.y() - m_diameter / 2.0, m_diameter, m_diameter).toAlignedRect().adjusted(-2, -2, 2, 2);
+
+        if (type == Press && button == Left) {
+            m_down = true;
+        }
+        if (m_down && button == Left && page) {
+            const QList<Okular::Annotation *> annotations = page->annotations();
+            for (Okular::Annotation *annotation : annotations) {
+                if (Okular::AnnotationUtils::annotationGeometry(annotation, (int)xScale, (int)yScale).intersects(m_bounds)
+                    && m_document->canRemovePageAnnotation(annotation)) {
+                    m_document->removePageAnnotation(item()->pageNumber(), annotation);
+                }
+            }
+        }
+        if (type == Release) {
+            m_down = false;
+        }
+        return oldRect | m_bounds;
+    }
+
+    void paint(QPainter *painter, double, double, const QRect &) override
+    {
+        painter->save();
+        painter->setPen(QPen(QApplication::palette().color(QPalette::Active, QPalette::Highlight), 2));
+        painter->setBrush(Qt::NoBrush);
+        painter->drawEllipse(QRectF(m_center.x() - m_diameter / 2.0, m_center.y() - m_diameter / 2.0, m_diameter, m_diameter));
+        painter->restore();
+    }
+
+    QList<Okular::Annotation *> end() override
+    {
+        return {};
+    }
+
+private:
+    Okular::Document *m_document;
+    QPointF m_center;
+    QRect m_bounds;
+    bool m_down = false;
+    static constexpr int m_diameter = 24;
+};
+
 /** @short PickPointEngine */
 class PickPointEngine : public AnnotatorEngine
 {
@@ -153,6 +208,12 @@ public:
                 painter->drawLine(realrect.topLeft(), realrect.bottomLeft());
                 painter->drawLine(realrect.topRight(), realrect.bottomRight());
                 painter->drawLine(realrect.bottomLeft(), realrect.bottomRight());
+
+                if (m_annotElement.attribute(QStringLiteral("type")) == QLatin1String("GeomCircle")) {
+                    painter->setPen(QPen(m_engineColor, qMax<qreal>(1.0, penWidth)));
+                    painter->setBrush(Qt::NoBrush);
+                    painter->drawEllipse(realrect.normalized());
+                }
 
                 pen.setDashOffset(penWidth * 5);
                 pen.setColor(textColor);
@@ -552,6 +613,7 @@ public:
     explicit PolyLineEngine(const QDomElement &engineElement)
         : AnnotatorEngine(engineElement)
         , last(false)
+        , hasMovingPoint(false)
     {
         // parse engine specific attributes
         m_block = engineElement.attribute(QStringLiteral("block")) == QLatin1String("true");
@@ -596,6 +658,8 @@ public:
         if (type == Press) {
             newPoint.x = nX;
             newPoint.y = nY;
+            movingpoint = newPoint;
+            hasMovingPoint = true;
             if (button == Right) {
                 last = true;
             }
@@ -605,7 +669,12 @@ public:
             movingpoint.x = nX;
             movingpoint.y = nY;
             const QRect oldmovingrect = movingrect;
-            movingrect = rect | QRect((int)(movingpoint.x * xScale), (int)(movingpoint.y * yScale), 1, 1);
+            const Okular::NormalizedPoint anchor = points.isEmpty() ? newPoint : points.constLast();
+            movingrect = QRect(QPoint(qFloor(qMin(anchor.x, movingpoint.x) * xScale), qFloor(qMin(anchor.y, movingpoint.y) * yScale)),
+                               QPoint(qCeil(qMax(anchor.x, movingpoint.x) * xScale), qCeil(qMax(anchor.y, movingpoint.y) * yScale)))
+                                  .adjusted(-3, -3, 3, 3);
+            movingrect |= rect;
+            hasMovingPoint = true;
             return oldmovingrect | movingrect;
         } else if (type == Release) {
             const Okular::NormalizedPoint tmppoint(nX, nY);
@@ -619,6 +688,8 @@ public:
                 points.append(newPoint);
                 rect |= QRect((int)(newPoint.x * xScale), (int)(newPoint.y * yScale), 1, 1);
             }
+            movingpoint = newPoint;
+            hasMovingPoint = true;
             // end creation if we have constructed the last point of enough points
             if (last || points.count() == numofpoints) {
                 m_creationCompleted = true;
@@ -632,7 +703,7 @@ public:
 
     void paint(QPainter *painter, double xScale, double yScale, const QRect & /*clipRect*/) override
     {
-        if (points.count() < 1) {
+        if (points.count() < 1 && !hasMovingPoint) {
             return;
         }
 
@@ -643,13 +714,16 @@ public:
             painter->setPen(m_engineColor);
             painter->setBrush(QBrush(m_engineColor.lighter(), Qt::Dense4Pattern));
             painter->drawRect((int)(first.x * (double)xScale), (int)(first.y * (double)yScale), (int)((second.x - first.x) * (double)xScale), (int)((second.y - first.y) * (double)yScale));
-        } else {
+        } else if (!points.isEmpty()) {
             // draw a polyline that connects the constructed points
             painter->setPen(QPen(m_engineColor, 2));
             for (int i = 1; i < points.count(); ++i) {
                 painter->drawLine((int)(points[i - 1].x * (double)xScale), (int)(points[i - 1].y * (double)yScale), (int)(points[i].x * (double)xScale), (int)(points[i].y * (double)yScale));
             }
             painter->drawLine((int)(points.last().x * (double)xScale), (int)(points.last().y * (double)yScale), (int)(movingpoint.x * (double)xScale), (int)(movingpoint.y * (double)yScale));
+        } else {
+            painter->setPen(QPen(m_engineColor, 2));
+            painter->drawLine((int)(newPoint.x * (double)xScale), (int)(newPoint.y * (double)yScale), (int)(movingpoint.x * (double)xScale), (int)(movingpoint.y * (double)yScale));
         }
     }
 
@@ -730,6 +804,7 @@ private:
     bool m_block;
     bool last;
     int numofpoints;
+    bool hasMovingPoint;
 };
 
 /** @short TextSelectorEngine */
@@ -1068,6 +1143,31 @@ void PageViewAnnotator::startSigning(SignaturePartUtils::SigningInformation *inf
 bool PageViewAnnotator::active() const
 {
     return (m_engine != nullptr) || m_signatureMode;
+}
+
+void PageViewAnnotator::setEraserMode(bool enabled)
+{
+    if (eraserMode() == enabled) {
+        return;
+    }
+    if (m_engine) {
+        delete m_engine;
+        m_engine = nullptr;
+    }
+    m_lockedItem = nullptr;
+    if (m_lastDrawnRect.isValid()) {
+        m_pageView->viewport()->update(m_lastDrawnRect.translated(-m_pageView->contentAreaPosition()));
+        m_lastDrawnRect = {};
+    }
+    if (enabled) {
+        m_engine = new EraserEngine(m_document);
+    }
+    Q_EMIT toolActive(enabled || m_signatureMode);
+}
+
+bool PageViewAnnotator::eraserMode() const
+{
+    return dynamic_cast<EraserEngine *>(m_engine) != nullptr;
 }
 
 bool PageViewAnnotator::annotating() const

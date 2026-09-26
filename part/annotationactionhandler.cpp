@@ -63,6 +63,8 @@ public:
         , aHideToolBar(nullptr)
         , aShowToolBar(nullptr)
         , aToolBarVisibility(nullptr)
+        , aSelectTool(nullptr)
+        , aEraserTool(nullptr)
         , aCustomStamp(nullptr)
         , aCustomWidth(nullptr)
         , aCustomOpacity(nullptr)
@@ -111,6 +113,7 @@ public:
     QList<QAction *> quickTools;
     QList<QAction *> textTools;
     QList<QAction *> textQuickTools;
+    QList<QAction *> drawingTools;
     QActionGroup *agTools;
     QAction *agLastAction;
 
@@ -130,6 +133,8 @@ public:
     QAction *aHideToolBar;
     QAction *aShowToolBar;
     KToggleAction *aToolBarVisibility;
+    KToggleAction *aSelectTool;
+    KToggleAction *aEraserTool;
 
     QAction *aCustomStamp;
     QAction *aCustomWidth;
@@ -559,8 +564,10 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     KToggleAction *aStrikeout = new KToggleAction(QIcon::fromTheme(QStringLiteral("format-text-strikethrough")), i18nc("@action:intoolbar Annotation tool", "Strike Out"), this);
     // Notes actions
     KToggleAction *aTypewriter = new KToggleAction(QIcon::fromTheme(QStringLiteral("tool-text")), i18nc("@action:intoolbar Annotation tool", "Typewriter"), this);
-    KToggleAction *aInlineNote = new KToggleAction(QIcon::fromTheme(QStringLiteral("note")), i18nc("@action:intoolbar Annotation tool", "Inline Note"), this);
+    KToggleAction *aInlineNote = new KToggleAction(QIcon::fromTheme(QStringLiteral("tool-text")), i18nc("@action:intoolbar Annotation tool", "Text"), this);
     KToggleAction *aPopupNote = new KToggleAction(QIcon::fromTheme(QStringLiteral("edit-comment")), i18nc("@action:intoolbar Annotation tool", "Popup Note"), this);
+    d->aSelectTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("edit-select-all")), i18nc("@action:intoolbar Drawing tool", "Select"), this);
+    d->aEraserTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-eraser-delete-objects")), i18nc("@action:intoolbar Drawing tool", "Eraser"), this);
     KToggleAction *aFreehandLine = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18nc("@action:intoolbar Annotation tool", "Freehand Line"), this);
     // Geometrical shapes actions
     KToggleAction *aStraightLine = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-line")), i18nc("@action:intoolbar Annotation tool", "Straight line"), this);
@@ -568,6 +575,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     KToggleAction *aRectangle = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-rectangle")), i18nc("@action:intoolbar Annotation tool", "Rectangle"), this);
     KToggleAction *aEllipse = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-ellipse")), i18nc("@action:intoolbar Annotation tool", "Ellipse"), this);
     KToggleAction *aPolygon = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-polyline")), i18nc("@action:intoolbar Annotation tool", "Polygon"), this);
+    d->drawingTools = {d->aSelectTool, aFreehandLine, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aInlineNote};
     d->aGeomShapes = new ToggleActionMenu(i18nc("@action", "Geometrical shapes"), this);
     d->aGeomShapes->setEnabled(true); // Need to explicitly set this once, or refreshActions() in part.cpp will disable this action
     d->aGeomShapes->setPopupMode(QToolButton::MenuButtonPopup);
@@ -582,6 +590,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     // The order in which the actions are added is relevant to connect
     // them to the correct toolId defined in tools.xml
     d->agTools = new QActionGroup(this);
+    d->agTools->setExclusive(true);
     d->agTools->addAction(aHighlighter);
     d->agTools->addAction(aUnderline);
     d->agTools->addAction(aSquiggle);
@@ -607,11 +616,26 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         // action group workaround: connecting to toggled instead of triggered
         connect(ann, &QAction::toggled, this, [this, toolId](bool checked) {
             if (checked) {
+                d->annotator->setEraserMode(false);
                 d->selectTool(toolId);
             }
         });
         toolId++;
     }
+
+    d->agTools->addAction(d->aSelectTool);
+    d->agTools->addAction(d->aEraserTool);
+    connect(d->aSelectTool, &QAction::toggled, this, [this, ac](bool checked) {
+        if (!checked) {
+            return;
+        }
+        d->annotator->setEraserMode(false);
+        d->annotator->selectBuiltinTool(-1, PageViewAnnotator::ShowTip::No);
+        if (QAction *browseAction = ac->action(QStringLiteral("mouse_drag"))) {
+            browseAction->trigger();
+        }
+    });
+    connect(d->aEraserTool, &QAction::toggled, d->annotator, &PageViewAnnotator::setEraserMode);
 
     // Stamp action
     d->aStamp = new ToggleActionMenu(QIcon::fromTheme(QStringLiteral("tag")), i18nc("@action", "Stamp"), this);
@@ -729,6 +753,8 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     ac->addAction(QStringLiteral("annotation_typewriter"), aTypewriter);
     ac->addAction(QStringLiteral("annotation_inline_note"), aInlineNote);
     ac->addAction(QStringLiteral("annotation_popup_note"), aPopupNote);
+    ac->addAction(QStringLiteral("drawing_select"), d->aSelectTool);
+    ac->addAction(QStringLiteral("drawing_eraser"), d->aEraserTool);
     ac->addAction(QStringLiteral("annotation_freehand_line"), aFreehandLine);
     ac->addAction(QStringLiteral("annotation_arrow"), aArrow);
     ac->addAction(QStringLiteral("annotation_straight_line"), aStraightLine);
@@ -759,6 +785,11 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     ac->setDefaultShortcut(aFreehandLine, Qt::ALT | Qt::Key_8);
     ac->setDefaultShortcut(aArrow, Qt::ALT | Qt::Key_9);
     ac->setDefaultShortcut(aRectangle, Qt::ALT | Qt::Key_0);
+    ac->setDefaultShortcut(d->aSelectTool, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_S));
+    ac->setDefaultShortcut(d->aEraserTool, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_E));
+    ac->setDefaultShortcut(aStraightLine, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_L));
+    ac->setDefaultShortcut(aEllipse, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_O));
+    ac->setDefaultShortcut(aPolygon, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_P));
     ac->setDefaultShortcut(d->aAddToQuickTools, QKeySequence((Qt::CTRL | Qt::SHIFT) | Qt::Key_B));
     d->updateConfigActions();
 
@@ -782,6 +813,29 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
     // ensure that the annotation toolbars have been created
     d->assertToolBarExists(mw, QStringLiteral("annotationToolBar"));
     d->assertToolBarExists(mw, QStringLiteral("quickAnnotationToolBar"));
+    KToolBar *drawingToolBar = nullptr;
+    for (KToolBar *toolBar : mw->toolBars()) {
+        if (toolBar->objectName() == QLatin1String("drawingToolBar")) {
+            drawingToolBar = toolBar;
+            break;
+        }
+    }
+    if (!drawingToolBar) {
+        drawingToolBar = new KToolBar(QStringLiteral("drawingToolBar"), mw, Qt::LeftToolBarArea, false, false, false);
+        drawingToolBar->setWindowTitle(i18n("Drawing Tools"));
+        drawingToolBar->setOrientation(Qt::Vertical);
+        drawingToolBar->setIconSize(QSize(32, 32));
+        drawingToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        drawingToolBar->setMovable(false);
+        drawingToolBar->setFloatable(false);
+        drawingToolBar->setAllowedAreas(Qt::LeftToolBarArea);
+    }
+    if (drawingToolBar->actions().isEmpty()) {
+        for (QAction *action : std::as_const(d->drawingTools)) {
+            drawingToolBar->addAction(action);
+        }
+    }
+    drawingToolBar->show();
 
     KToolBar *annotationToolBar = mw->toolBar(QStringLiteral("annotationToolBar"));
     connect(annotationToolBar, &QToolBar::visibilityChanged, this, &AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged, Qt::UniqueConnection);
@@ -814,6 +868,8 @@ void AnnotationActionHandler::reparseQuickToolsConfig()
 
 void AnnotationActionHandler::setToolsEnabled(bool on)
 {
+    d->aSelectTool->setEnabled(on);
+    d->aEraserTool->setEnabled(on);
     const QList<QAction *> tools = d->agTools->actions();
     for (QAction *ann : tools) {
         ann->setEnabled(on);

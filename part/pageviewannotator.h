@@ -67,6 +67,8 @@ public:
     // methods used when creating the annotation
     // @return Is a tool currently selected?
     bool active() const;
+    void setEraserMode(bool enabled);
+    bool eraserMode() const;
     // @return Are we currently annotating (using the selected tool)?
     bool annotating() const;
 
