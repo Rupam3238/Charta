@@ -231,6 +231,12 @@ Shell::Shell(const QString &serializedOptions)
         m_tabWidget->tabBar()->hide();
         m_tabWidget->setDocumentMode(true);
         m_tabWidget->setMovable(true);
+        m_tabWidget->setStyleSheet(QStringLiteral(
+            "QTabWidget::pane { background: #171c24; border: 0; }"
+            "QTabBar { background: #171c24; }"
+            "QTabBar::tab { color: #9ba8b5; background: #222a34; border: 1px solid #343f4c; border-bottom: 0; border-top-left-radius: 7px; border-top-right-radius: 7px; padding: 6px 12px; margin: 3px 3px 0 0; }"
+            "QTabBar::tab:selected { color: #f0f4f7; background: #303a46; border-color: #4a5867; }"
+            "QTabBar::tab:hover:!selected { color: #d4dde5; background: #29333e; }"));
 
         m_tabWidget->setAcceptDrops(true);
         m_tabWidget->tabBar()->installEventFilter(this);
@@ -264,6 +270,14 @@ Shell::Shell(const QString &serializedOptions)
         connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &QObject::deleteLater);
         // and integrate the part's GUI with the shell's
         setupGUI(Keys | ToolBar | Save);
+        setStyleSheet(QStringLiteral(
+            "QMenuBar { color: #aeb9c4; background: #171c24; border: 0; padding: 2px 5px; spacing: 3px; }"
+            "QMenuBar::item { background: transparent; border-radius: 4px; padding: 4px 8px; }"
+            "QMenuBar::item:selected { color: #f1f5f8; background: #303a46; }"
+            "QMenu { color: #e2e8ee; background: #202630; border: 1px solid #3b4653; padding: 4px; }"
+            "QMenu::item { border-radius: 4px; padding: 5px 24px 5px 22px; }"
+            "QMenu::item:selected { color: #ffffff; background: #16414c; }"
+            "QMenu::separator { height: 1px; margin: 4px 8px; background: #3b4653; }"));
 
         // NOTE : apply default sidebar width only after calling setupGUI(...)
         resizeDocks({m_sidebar}, {200}, Qt::Horizontal);

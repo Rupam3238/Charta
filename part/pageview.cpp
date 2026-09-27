@@ -394,6 +394,14 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     connect(d->delayResizeEventTimer, &QTimer::timeout, this, &PageView::delayedResizeEvent);
 
     setFrameStyle(QFrame::NoFrame);
+    setStyleSheet(QStringLiteral(
+        "QScrollBar:vertical, QScrollBar:horizontal { background: transparent; border: 0; margin: 3px; }"
+        "QScrollBar:vertical { width: 8px; }"
+        "QScrollBar:horizontal { height: 8px; }"
+        "QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: #586574; border-radius: 4px; min-height: 32px; min-width: 32px; }"
+        "QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: #27bfd6; }"
+        "QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }"
+        "QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }"));
 
     setAttribute(Qt::WA_StaticContents);
 
@@ -3697,7 +3705,7 @@ void PageView::drawDocumentOnPainter(const QRect contentsRect, QPainter *p)
     if (Okular::Settings::useCustomBackgroundColor()) {
         backColor = Okular::Settings::backgroundColor();
     } else {
-        backColor = viewport()->palette().color(QPalette::Dark);
+        backColor = QColor(QStringLiteral("#171c24"));
     }
 
     // create a region from which we'll subtract painted rects
@@ -3741,13 +3749,12 @@ void PageView::drawDocumentOnPainter(const QRect contentsRect, QPainter *p)
 
     // take outline and shadow into account when testing whether a repaint is necessary
     const qreal dpr = devicePixelRatioF();
-    const QRect checkRect = contentsRect.adjusted(-3, -3, 1, 1);
+    // width of the shadow in device pixels
+    static const int shadowWidth = 9 * dpr;
+    const QRect checkRect = contentsRect.adjusted(-shadowWidth - 1, -shadowWidth - 1, shadowWidth, shadowWidth);
 
     // Method to linearly interpolate between black (=(0,0,0), omitted) and the background color
     auto interpolateColor = [&backColor](double t) { return QColor(t * backColor.red(), t * backColor.green(), t * backColor.blue()); };
-
-    // width of the shadow in device pixels
-    static const int shadowWidth = 2 * dpr;
 
     // iterate over all items painting a black outline and a simple bottom/right gradient
     for (const PageViewItem *item : std::as_const(d->items)) {
@@ -4097,8 +4104,8 @@ void PageView::selectionClear(const ClearMode mode)
 }
 
 // const to be used for both zoomFactorFitMode function and slotRelayoutPages.
-static const int kcolWidthMargin = 6;
-static const int krowHeightMargin = 12;
+static const int kcolWidthMargin = 180;
+static const int krowHeightMargin = 140;
 
 double PageView::zoomFactorFitMode(ZoomMode mode)
 {
