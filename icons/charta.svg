@@ -1,11 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
-  <title id="title">Charta logo — continuous C stroke and subtle page</title>
-  <desc id="desc">A continuous handwritten C-shaped stroke integrated with a subtle rounded document silhouette.</desc>
-
-  <g>
-    <path d="M 232 208 C 232 178 256 154 286 154 H 720 C 750 154 774 178 774 208 V 316 M 774 708 V 816 C 774 846 750 870 720 870 H 286 C 256 870 232 846 232 816 V 708" fill="none" stroke="#D9DDE4" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M 790 294 C 734 248 645 222 540 238 C 416 256 322 330 284 450 C 244 576 286 704 392 764 C 494 822 638 812 748 734 C 780 711 804 688 824 660" fill="none" stroke="#182233" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M 748 734 C 780 711 804 688 824 660" fill="none" stroke="#536DFE" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <path d="M 232 208 C 232 178 256 154 286 154 H 720 C 750 154 774 178 774 208 V 316 M 774 708 V 816 C 774 846 750 870 720 870 H 286 C 256 870 232 846 232 816 V 708" fill="none" stroke="#D9DDE4" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 790 294 C 734 248 645 222 540 238 C 416 256 322 330 284 450 C 244 576 286 704 392 764 C 494 822 638 812 748 734 C 780 711 804 688 824 660" fill="none" stroke="#182233" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 748 734 C 780 711 804 688 824 660" fill="none" stroke="#536DFE" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
