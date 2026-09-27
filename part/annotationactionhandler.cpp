@@ -262,11 +262,24 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
         "QSlider::handle:horizontal { width: 12px; margin: -5px 0; border-radius: 6px; background: #27bfd6; border: 1px solid #d6edf1; }"
         "QDoubleSpinBox, QComboBox, QToolButton { color: #edf1f5; background: #29323d; border: 1px solid #465361; border-radius: 4px; padding: 4px; }"
         "QDoubleSpinBox:focus, QComboBox:focus, QToolButton:focus { border: 1px solid #27bfd6; }"
-        "QToolButton:hover { background: #35414e; }"));
+        "QToolButton:hover { background: #35414e; }"
+        "QToolButton[chartaSwatch='true'] { background: transparent; border: 2px solid transparent; border-radius: 14px; padding: 2px; }"
+        "QToolButton[chartaSwatch='true']:checked { background: #35414e; border-color: #27bfd6; }"
+        "QLabel#toolSettingsTitle { color: #f3f6f8; font-size: 14px; font-weight: 600; }"
+        "QLabel#toolSettingsContext { color: #27bfd6; font-size: 9px; }"));
     auto *contents = new QWidget(&popup);
     auto *layout = new QVBoxLayout(contents);
     layout->setContentsMargins(12, 10, 12, 10);
     layout->setSpacing(8);
+    auto *header = new QHBoxLayout;
+    auto *title = new QLabel(action->text(), contents);
+    title->setObjectName(QStringLiteral("toolSettingsTitle"));
+    auto *context = new QLabel(i18n("TOOL SETTINGS"), contents);
+    context->setObjectName(QStringLiteral("toolSettingsContext"));
+    header->addWidget(title);
+    header->addStretch(1);
+    header->addWidget(context);
+    layout->addLayout(header);
 
     auto addWidthControl = [&](double minimum, double maximum, int decimals) {
         auto *row = new QHBoxLayout;
@@ -335,7 +348,54 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
         row->addStretch(1);
         row->addWidget(swatch);
         layout->addLayout(row);
-        QObject::connect(swatch, &QToolButton::clicked, q, [this, swatch, key, label, fillColor] {
+        QList<QToolButton *> colorPresets;
+        if (!fillColor) {
+            const QList<QColor> presetColors = {QColor(QStringLiteral("#ff5964")),
+                                                QColor(QStringLiteral("#ffad42")),
+                                                QColor(QStringLiteral("#f3d34a")),
+                                                QColor(QStringLiteral("#27bfd6")),
+                                                QColor(QStringLiteral("#568ee0")),
+                                                QColor(QStringLiteral("#a879d8")),
+                                                QColor(QStringLiteral("#f4f5f7")),
+                                                QColor(QStringLiteral("#151a20"))};
+            auto *presetRow = new QHBoxLayout;
+            presetRow->setSpacing(4);
+            for (const QColor &preset : presetColors) {
+                auto *button = new QToolButton(contents);
+                button->setCheckable(true);
+                button->setFixedSize(28, 28);
+                button->setProperty("chartaSwatch", true);
+                button->setAccessibleName(i18n("Set color to %1", preset.name(QColor::HexRgb)));
+                button->setToolTip(button->accessibleName());
+                QPixmap colorDot(20, 20);
+                colorDot.fill(Qt::transparent);
+                QPainter painter(&colorDot);
+                painter.setRenderHint(QPainter::Antialiasing);
+                painter.setPen(QPen(QColor(QStringLiteral("#0f151b")), 1));
+                painter.setBrush(preset);
+                painter.drawEllipse(QRect(2, 2, 16, 16));
+                button->setIcon(QIcon(colorDot));
+                button->setIconSize(QSize(20, 20));
+                button->setChecked(preset == color);
+                colorPresets.append(button);
+                presetRow->addWidget(button);
+            }
+            layout->addLayout(presetRow);
+            for (int index = 0; index < colorPresets.size(); ++index) {
+                QToolButton *button = colorPresets.at(index);
+                const QColor preset = presetColors.at(index);
+                QObject::connect(button, &QToolButton::clicked, q, [this, button, colorPresets, preset, swatch, setSwatch, key] {
+                    for (QToolButton *presetButton : colorPresets) {
+                        presetButton->setChecked(presetButton == button);
+                    }
+                    drawingToolSettings[key].color = preset;
+                    currentColor = preset;
+                    annotator->setAnnotationColor(preset);
+                    setSwatch(preset);
+                });
+            }
+        }
+        QObject::connect(swatch, &QToolButton::clicked, q, [this, swatch, colorPresets, key, label, fillColor] {
             const QColor initial = fillColor ? drawingToolSettings.value(key).fillColor : drawingToolSettings.value(key).color;
             QColorDialog colorDialog(initial, drawingToolBar ? drawingToolBar->window() : QApplication::activeWindow());
             colorDialog.setWindowTitle(label);
@@ -346,6 +406,9 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
             const QColor selected = colorDialog.selectedColor();
             if (!selected.isValid()) {
                 return;
+            }
+            for (QToolButton *presetButton : colorPresets) {
+                presetButton->setChecked(false);
             }
             if (fillColor) {
                 drawingToolSettings[key].fillColor = selected;
