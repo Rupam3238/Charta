@@ -18,6 +18,8 @@
 #include <QList>
 #include <QLoggingCategory>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPainterPathStroker>
 #include <QPixmap>
 #include <QSet>
 #include <QVariant>
@@ -32,6 +34,7 @@
 #include <QTabletEvent>
 #include <math.h>
 #include <memory>
+#include <optional>
 
 // local includes
 #include "annotationactionhandler.h"
@@ -88,6 +91,8 @@ public:
         const QRect oldRect = m_bounds;
         if (!page) {
             m_bounds = {};
+            m_previousCenter.reset();
+            m_previousPage = nullptr;
             if (type == Release) {
                 m_down = false;
             }
@@ -95,31 +100,42 @@ public:
         }
 
         m_center = QPointF(nX * xScale, nY * yScale);
+        if (type == Press && button == Left) {
+            m_previousCenter.reset();
+            m_down = true;
+        }
+        if (m_previousPage != page) {
+            m_previousCenter.reset();
+            m_previousPage = page;
+        }
         m_visualBounds = QRectF(m_center.x() - m_width / 2.0, m_center.y() - m_width / 2.0, m_width, m_width).toAlignedRect();
         m_bounds = m_visualBounds.adjusted(-2, -2, 2, 2);
 
-        if (type == Press && button == Left) {
-            m_down = true;
-        }
         if (m_down && button == Left && page) {
+            const QPointF start = m_previousCenter.value_or(m_center);
+            const QPainterPath sweptCircle = makeSweptCircle(start, m_center);
             const QList<Okular::Annotation *> annotations = page->annotations();
-            const qreal radius = m_width / 2.0;
-            const qreal radiusSquared = radius * radius;
             for (Okular::Annotation *annotation : annotations) {
-                const QRectF annotationBounds = Okular::AnnotationUtils::annotationGeometry(annotation, (int)xScale, (int)yScale);
-                const qreal nearestX = qBound(annotationBounds.left(), m_center.x(), annotationBounds.right());
-                const qreal nearestY = qBound(annotationBounds.top(), m_center.y(), annotationBounds.bottom());
-                const qreal dx = m_center.x() - nearestX;
-                const qreal dy = m_center.y() - nearestY;
-                if (dx * dx + dy * dy <= radiusSquared && m_document->canRemovePageAnnotation(annotation)) {
-                    m_document->removePageAnnotation(item()->pageNumber(), annotation);
+                if (m_document->canRemovePageAnnotation(annotation) && sweptCircleIntersectsAnnotation(sweptCircle, annotation, xScale, yScale, page)) {
+                    m_document->removePageAnnotation(page->number(), annotation);
                 }
             }
         }
+        if (m_down) {
+            m_previousCenter = m_center;
+        }
         if (type == Release) {
             m_down = false;
+            m_previousCenter.reset();
+            m_previousPage = nullptr;
         }
         return oldRect | m_bounds;
+    }
+
+    void resetSweep()
+    {
+        m_previousCenter.reset();
+        m_previousPage = nullptr;
     }
 
     void paint(QPainter *painter, double, double, const QRect &) override
@@ -153,10 +169,283 @@ public:
     }
 
 private:
+    QPainterPath makeSweptCircle(const QPointF &start, const QPointF &end) const
+    {
+        QPainterPath path;
+        path.moveTo(start);
+        path.lineTo(end);
+
+        QPainterPathStroker stroker;
+        stroker.setWidth(m_width);
+        stroker.setCapStyle(Qt::RoundCap);
+        stroker.setJoinStyle(Qt::RoundJoin);
+        QPainterPath swept = stroker.createStroke(path);
+        if (start == end) {
+            swept.addEllipse(start, m_width / 2.0, m_width / 2.0);
+        }
+        return swept;
+    }
+
+    static QPointF toPagePixels(const Okular::NormalizedPoint &point, double xScale, double yScale)
+    {
+        return QPointF(point.x * xScale, point.y * yScale);
+    }
+
+    static QPainterPath annotationPath(const Okular::Annotation *annotation, double xScale, double yScale, const Okular::Page *page)
+    {
+        const Okular::NormalizedRect bounds = annotation->transformedBoundingRectangle();
+        const QRectF rect(bounds.left * xScale, bounds.top * yScale, bounds.width() * xScale, bounds.height() * yScale);
+        QPainterPath path;
+
+        switch (annotation->subType()) {
+        case Okular::Annotation::AInk: {
+            const auto *ink = static_cast<const Okular::InkAnnotation *>(annotation);
+            for (const auto &inkPath : ink->transformedInkPaths()) {
+                if (inkPath.isEmpty()) {
+                    continue;
+                }
+                path.moveTo(toPagePixels(inkPath.first(), xScale, yScale));
+                for (qsizetype i = 1; i < inkPath.size(); ++i) {
+                    path.lineTo(toPagePixels(inkPath.at(i), xScale, yScale));
+                }
+            }
+            return path;
+        }
+        case Okular::Annotation::ALine: {
+            const auto *line = static_cast<const Okular::LineAnnotation *>(annotation);
+            const auto points = line->transformedLinePoints();
+            if (points.isEmpty()) {
+                return path;
+            }
+            const QPointF start = toPagePixels(points.first(), xScale, yScale);
+            path.moveTo(start);
+            for (qsizetype i = 1; i < points.size(); ++i) {
+                path.lineTo(toPagePixels(points.at(i), xScale, yScale));
+            }
+            if (line->lineClosed()) {
+                path.closeSubpath();
+            }
+
+            if (points.size() == 2) {
+                const QPointF end = toPagePixels(points.last(), xScale, yScale);
+                const QPointF delta = end - start;
+                const qreal length = std::hypot(delta.x(), delta.y());
+                if (length > 0.0) {
+                    const QPointF direction = delta / length;
+                    const QPointF perpendicular(-direction.y(), direction.x());
+                    const qreal pageScale = xScale / page->width();
+                    const qreal size = qMin<qreal>(6.0 * line->style().width() * pageScale, length / 2.0);
+                    const auto addEndStyle = [&path, &direction, &perpendicular, size](QPointF tip, Okular::LineAnnotation::TermStyle style, qreal insideDirection) {
+                        const QPointF along = direction * insideDirection;
+                        switch (style) {
+                        case Okular::LineAnnotation::Square: {
+                            const QPointF base = tip + along * size;
+                            path.moveTo(tip + perpendicular * (size / 2.0));
+                            path.lineTo(base + perpendicular * (size / 2.0));
+                            path.lineTo(base - perpendicular * (size / 2.0));
+                            path.lineTo(tip - perpendicular * (size / 2.0));
+                            path.closeSubpath();
+                            break;
+                        }
+                        case Okular::LineAnnotation::Circle:
+                            path.addEllipse(tip + along * (size / 2.0), size / 2.0, size / 2.0);
+                            break;
+                        case Okular::LineAnnotation::Diamond: {
+                            const QPointF middle = tip + along * (size / 2.0);
+                            const QPointF far = tip + along * size;
+                            path.moveTo(tip);
+                            path.lineTo(middle + perpendicular * (size / 2.0));
+                            path.lineTo(far);
+                            path.lineTo(middle - perpendicular * (size / 2.0));
+                            path.closeSubpath();
+                            break;
+                        }
+                        case Okular::LineAnnotation::OpenArrow:
+                        case Okular::LineAnnotation::ROpenArrow:
+                        case Okular::LineAnnotation::ClosedArrow:
+                        case Okular::LineAnnotation::RClosedArrow: {
+                            const QPointF base = tip + along * size;
+                            path.moveTo(base + perpendicular * (size / 2.0));
+                            path.lineTo(tip);
+                            path.lineTo(base - perpendicular * (size / 2.0));
+                            if (style == Okular::LineAnnotation::ClosedArrow || style == Okular::LineAnnotation::RClosedArrow) {
+                                path.closeSubpath();
+                            }
+                            break;
+                        }
+                        case Okular::LineAnnotation::Butt:
+                            path.moveTo(tip + perpendicular * (size / 2.0));
+                            path.lineTo(tip - perpendicular * (size / 2.0));
+                            break;
+                        case Okular::LineAnnotation::Slash: {
+                            const QPointF offset = along * (std::cos(M_PI / 3.0) * size / 2.0);
+                            path.moveTo(tip + offset + perpendicular * (size / 2.0));
+                            path.lineTo(tip - offset - perpendicular * (size / 2.0));
+                            break;
+                        }
+                        case Okular::LineAnnotation::None:
+                            break;
+                        }
+                    };
+                    addEndStyle(start, line->lineStartStyle(), 1.0);
+                    const qreal endDirection = line->lineEndStyle() == Okular::LineAnnotation::ROpenArrow || line->lineEndStyle() == Okular::LineAnnotation::RClosedArrow ? 1.0 : -1.0;
+                    addEndStyle(end, line->lineEndStyle(), endDirection);
+                }
+            }
+            return path;
+        }
+        case Okular::Annotation::AGeom: {
+            const auto *geom = static_cast<const Okular::GeomAnnotation *>(annotation);
+            if (geom->geometricalType() == Okular::GeomAnnotation::InscribedCircle) {
+                path.addEllipse(rect);
+            } else {
+                path.addRect(rect);
+            }
+            return path;
+        }
+        case Okular::Annotation::AHighlight: {
+            const auto *highlight = static_cast<const Okular::HighlightAnnotation *>(annotation);
+            for (const auto &quad : highlight->highlightQuads()) {
+                QPointF points[4];
+                for (int i = 0; i < 4; ++i) {
+                    points[i] = toPagePixels(quad.transformedPoint(i), xScale, yScale);
+                }
+                switch (highlight->highlightType()) {
+                case Okular::HighlightAnnotation::Highlight:
+                    path.moveTo(points[0]);
+                    path.lineTo(points[1]);
+                    path.lineTo(points[2]);
+                    path.lineTo(points[3]);
+                    path.closeSubpath();
+                    break;
+                case Okular::HighlightAnnotation::Squiggly:
+                    path.moveTo(points[0]);
+                    path.lineTo(points[1]);
+                    path.lineTo((points[1] + points[2]) / 2.0);
+                    path.lineTo((points[0] + points[3]) / 2.0);
+                    path.closeSubpath();
+                    break;
+                case Okular::HighlightAnnotation::Underline:
+                    path.moveTo((3.0 * points[0] + points[3]) / 4.0);
+                    path.lineTo((3.0 * points[1] + points[2]) / 4.0);
+                    break;
+                case Okular::HighlightAnnotation::StrikeOut:
+                    path.moveTo((points[0] + points[3]) / 2.0);
+                    path.lineTo((points[1] + points[2]) / 2.0);
+                    break;
+                }
+            }
+            return path;
+        }
+        default:
+            path.addRect(rect);
+            return path;
+        }
+    }
+
+    static bool sweptCircleIntersectsAnnotation(const QPainterPath &sweptCircle,
+                                                const Okular::Annotation *annotation,
+                                                double xScale,
+                                                double yScale,
+                                                const Okular::Page *page)
+    {
+        const QPainterPath geometry = annotationPath(annotation, xScale, yScale, page);
+        if (geometry.isEmpty()) {
+            return false;
+        }
+
+        switch (annotation->subType()) {
+        case Okular::Annotation::AInk: {
+            const auto *ink = static_cast<const Okular::InkAnnotation *>(annotation);
+            const auto paths = ink->transformedInkPaths();
+            const auto pressures = ink->sessionPressures();
+            const qreal pageScale = xScale / page->width();
+            const qreal baseWidth = qMax<qreal>(1.0, annotation->style().width() * pageScale);
+            const qreal storedPressureWidth = ink->sessionPressureStrokeWidth() > 0.0 ? ink->sessionPressureStrokeWidth() : annotation->style().width();
+            const qreal pressureWidth = storedPressureWidth * pageScale;
+
+            for (qsizetype pathIndex = 0; pathIndex < paths.size(); ++pathIndex) {
+                const auto &points = paths.at(pathIndex);
+                if (points.size() < 2) {
+                    continue;
+                }
+                const auto pressurePath = pressures.value(pathIndex);
+                if (pressurePath.size() == points.size() && pressurePath.size() > 1) {
+                    for (qsizetype i = 1; i < points.size(); ++i) {
+                        QPainterPath segment;
+                        segment.moveTo(toPagePixels(points.at(i - 1), xScale, yScale));
+                        segment.lineTo(toPagePixels(points.at(i), xScale, yScale));
+                        QPainterPathStroker stroker;
+                        stroker.setWidth(qBound<qreal>(0.5, pressurePath.at(i) * pressureWidth, 100.0));
+                        stroker.setCapStyle(Qt::RoundCap);
+                        if (sweptCircle.intersects(stroker.createStroke(segment))) {
+                            return true;
+                        }
+                    }
+                } else {
+                    QPainterPath path;
+                    path.moveTo(toPagePixels(points.first(), xScale, yScale));
+                    for (qsizetype i = 1; i < points.size(); ++i) {
+                        path.lineTo(toPagePixels(points.at(i), xScale, yScale));
+                    }
+                    QPainterPathStroker stroker;
+                    stroker.setWidth(baseWidth);
+                    stroker.setCapStyle(Qt::SquareCap);
+                    stroker.setJoinStyle(Qt::MiterJoin);
+                    if (sweptCircle.intersects(stroker.createStroke(path))) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        case Okular::Annotation::ALine: {
+            const auto *line = static_cast<const Okular::LineAnnotation *>(annotation);
+            if (line->lineInnerColor().isValid() && sweptCircle.intersects(geometry)) {
+                return true;
+            }
+            const qreal pageScale = ((xScale / page->width()) + (yScale / page->height())) / 2.0;
+            const qreal annotationWidth = qMax<qreal>(1.0, annotation->style().width() * pageScale);
+            QPainterPathStroker stroker;
+            stroker.setWidth(annotationWidth);
+            stroker.setCapStyle(Qt::SquareCap);
+            stroker.setJoinStyle(Qt::MiterJoin);
+            return sweptCircle.intersects(stroker.createStroke(geometry));
+        }
+        case Okular::Annotation::AHighlight: {
+            const auto *highlight = static_cast<const Okular::HighlightAnnotation *>(annotation);
+            if (highlight->highlightType() == Okular::HighlightAnnotation::Underline || highlight->highlightType() == Okular::HighlightAnnotation::StrikeOut) {
+                const qreal pageScale = ((xScale / page->width()) + (yScale / page->height())) / 2.0;
+                QPainterPathStroker stroker;
+                stroker.setWidth(2.0 * pageScale);
+                return sweptCircle.intersects(stroker.createStroke(geometry));
+            }
+            return sweptCircle.intersects(geometry);
+        }
+        case Okular::Annotation::AGeom: {
+            const auto *geom = static_cast<const Okular::GeomAnnotation *>(annotation);
+            if (!geom->geometricalInnerColor().isValid()) {
+                if (annotation->style().width() <= 0.0) {
+                    return false;
+                }
+                const qreal pageScale = ((xScale / page->width()) + (yScale / page->height())) / 2.0;
+                QPainterPathStroker stroker;
+                stroker.setWidth(annotation->style().width() * pageScale);
+                return sweptCircle.intersects(stroker.createStroke(geometry));
+            }
+            return sweptCircle.intersects(geometry);
+        }
+        default:
+            return sweptCircle.intersects(geometry);
+        }
+    }
+
     Okular::Document *m_document;
     QPointF m_center;
     QRect m_bounds;
     QRect m_visualBounds;
+    std::optional<QPointF> m_previousCenter;
+    const Okular::Page *m_previousPage = nullptr;
     bool m_down = false;
     double m_width;
 };
@@ -1245,6 +1534,7 @@ void PageViewAnnotator::setEraserMode(bool enabled)
         m_engine = nullptr;
     }
     m_lockedItem = nullptr;
+    m_lockedItem = nullptr;
     if (m_lastDrawnRect.isValid()) {
         m_pageView->viewport()->update(m_lastDrawnRect.translated(-m_pageView->contentAreaPosition()));
         m_lastDrawnRect = {};
@@ -1323,6 +1613,7 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
     if (isEraser && m_lockedItem != item) {
         m_lockedItem = item;
         m_engine->setItem(item);
+        static_cast<EraserEngine *>(m_engine)->resetSweep();
     }
     if (isEraser && !item) {
         const QRect oldRect = m_lastDrawnRect;
@@ -1579,6 +1870,19 @@ void PageViewAnnotator::cancelPendingFreehandHandoff()
     m_pendingFreehandItem = nullptr;
     m_pendingFreehandRect = QRect();
     m_pendingFreehandPainted = false;
+}
+
+void PageViewAnnotator::resetPageViewItems()
+{
+    if (m_engine) {
+        m_engine->setItem(nullptr);
+        if (auto *eraser = dynamic_cast<EraserEngine *>(m_engine)) {
+            eraser->resetSweep();
+        }
+    }
+    m_lockedItem = nullptr;
+    m_lastDrawnRect = {};
+    cancelPendingFreehandHandoff();
 }
 
 void PageViewAnnotator::selectBuiltinTool(int toolId, ShowTip showTip)

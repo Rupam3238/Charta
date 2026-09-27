@@ -92,6 +92,7 @@ public:
     void routePaint(QPainter *painter, const QRect paintRect);
     void finishPaintCycle();
     void cancelPendingFreehandHandoff();
+    void resetPageViewItems();
 
     void reparseConfig();
 

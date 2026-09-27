@@ -1219,6 +1219,7 @@ void PageView::notifySetup(const QList<Okular::Page *> &pageSet, int setupFlags)
 
         if (!documentChanged) {
             if (setupFlags & Okular::DocumentObserver::UrlChanged) {
+                d->annotator->resetPageViewItems();
                 // Here with UrlChanged and no document changed it means we
                 // need to update all the Annotation* and Form* otherwise
                 // they still point to the old document ones, luckily the old ones are still
@@ -1268,6 +1269,7 @@ void PageView::notifySetup(const QList<Okular::Page *> &pageSet, int setupFlags)
     }
 
     // mouseAnnotation must not access our PageViewItem widgets any longer
+    d->annotator->resetPageViewItems();
     d->mouseAnnotation->reset();
     d->annotationAreaSelectionDragging = false;
     d->annotationAreaSelectionItem = nullptr;
