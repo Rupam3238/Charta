@@ -12,6 +12,7 @@
 #include <QBitmap>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QCursor>
 #include <QDialog>
 #include <QDoubleSpinBox>
 #include <QEvent>
@@ -149,6 +150,7 @@ public:
     QHash<QObject *, QAction *> settingsButtonActions;
     QAction *pendingMousePopupAction = nullptr;
     bool deselectingTools = false;
+    bool freeformHighlightActive = false;
     QActionGroup *agTools;
     QAction *agLastAction;
 
@@ -231,6 +233,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
     if (kindIt == drawingToolKinds.cend()) {
         return false;
     }
+    const bool isFreeformHighlight = drawingToolIds.value(action, -1) == 15;
 
     const QString key = action->objectName().isEmpty() ? action->text() : action->objectName();
     DrawingToolSettings &initialSettings = drawingToolSettings[key];
@@ -297,21 +300,46 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
     header->addWidget(context);
     layout->addLayout(header);
 
+    QWidget *controlParent = contents;
+    QVBoxLayout *controlLayout = layout;
+    QWidget *freeformControls = nullptr;
+    if (isFreeformHighlight) {
+        auto *mode = new QComboBox(contents);
+        mode->addItems({i18n("Text Highlight"), i18n("Freeform Highlight")});
+        mode->setCurrentIndex(freeformHighlightActive ? 1 : 0);
+        layout->addWidget(mode);
+
+        freeformControls = new QWidget(contents);
+        controlLayout = new QVBoxLayout(freeformControls);
+        controlLayout->setContentsMargins(0, 0, 0, 0);
+        layout->addWidget(freeformControls);
+        freeformControls->setEnabled(freeformHighlightActive);
+        QObject::connect(mode, &QComboBox::currentIndexChanged, q, [this, mode, freeformControls](int index) {
+            freeformHighlightActive = index == 1;
+            freeformControls->setEnabled(freeformHighlightActive);
+            aBrowseTool->setChecked(false);
+            annotator->setAnnotationSelectionMode(false);
+            agLastAction = drawingTools.at(3);
+            selectTool(freeformHighlightActive ? 15 : 1);
+        });
+        controlParent = freeformControls;
+    }
+
     auto addWidthControl = [&](double minimum, double maximum, int decimals) {
         auto *row = new QHBoxLayout;
-        auto *title = new QLabel(i18n("Width"), contents);
-        auto *currentValue = new QLabel(contents);
+        auto *title = new QLabel(i18n("Width"), controlParent);
+        auto *currentValue = new QLabel(controlParent);
         row->addWidget(title);
         row->addStretch(1);
         row->addWidget(currentValue);
-        layout->addLayout(row);
+        controlLayout->addLayout(row);
 
-        auto *slider = new QSlider(Qt::Horizontal, contents);
+        auto *slider = new QSlider(Qt::Horizontal, controlParent);
         const int scale = decimals == 0 ? 1 : 2;
         slider->setRange(qRound(minimum * scale), qRound(maximum * scale));
         slider->setSingleStep(1);
 
-        auto *spinBox = new QDoubleSpinBox(contents);
+        auto *spinBox = new QDoubleSpinBox(controlParent);
         spinBox->setRange(minimum, maximum);
         spinBox->setDecimals(decimals);
         spinBox->setSingleStep(decimals == 0 ? 1.0 : 0.5);
@@ -321,7 +349,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
         controlRow->setSpacing(8);
         controlRow->addWidget(slider, 1);
         controlRow->addWidget(spinBox);
-        layout->addLayout(controlRow);
+        controlLayout->addLayout(controlRow);
 
         const double initialWidth = drawingToolSettings.value(key).width;
         spinBox->setValue(initialWidth);
@@ -343,8 +371,8 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
 
     auto addColorControl = [&](const QString &label, bool fillColor) {
         auto *row = new QHBoxLayout;
-        auto *title = new QLabel(label, contents);
-        auto *swatch = new QToolButton(contents);
+        auto *title = new QLabel(label, controlParent);
+        auto *swatch = new QToolButton(controlParent);
         swatch->setMinimumWidth(92);
         swatch->setMinimumHeight(28);
         swatch->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
@@ -363,7 +391,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
         row->addWidget(title);
         row->addStretch(1);
         row->addWidget(swatch);
-        layout->addLayout(row);
+        controlLayout->addLayout(row);
         QList<QToolButton *> colorPresets;
         if (!fillColor) {
             const QList<QColor> presetColors = {QColor(QStringLiteral("#ff5964")),
@@ -377,7 +405,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
             auto *presetRow = new QHBoxLayout;
             presetRow->setSpacing(4);
             for (const QColor &preset : presetColors) {
-                auto *button = new QToolButton(contents);
+                auto *button = new QToolButton(controlParent);
                 button->setCheckable(true);
                 button->setFixedSize(28, 28);
                 button->setProperty("chartaSwatch", true);
@@ -396,7 +424,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
                 colorPresets.append(button);
                 presetRow->addWidget(button);
             }
-            layout->addLayout(presetRow);
+            controlLayout->addLayout(presetRow);
             for (int index = 0; index < colorPresets.size(); ++index) {
                 QToolButton *button = colorPresets.at(index);
                 const QColor preset = presetColors.at(index);
@@ -446,7 +474,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
         });
     };
 
-    addWidthControl(*kindIt == DrawingToolKind::Eraser ? 1.0 : 0.5, *kindIt == DrawingToolKind::Eraser ? 64.0 : 20.0, *kindIt == DrawingToolKind::Eraser ? 0 : 1);
+    addWidthControl(*kindIt == DrawingToolKind::Eraser ? 1.0 : 0.5, *kindIt == DrawingToolKind::Eraser ? 64.0 : (isFreeformHighlight ? 48.0 : 20.0), *kindIt == DrawingToolKind::Eraser ? 0 : 1);
 
     if (*kindIt != DrawingToolKind::Eraser) {
         addColorControl(i18n("Color"), false);
@@ -915,7 +943,6 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->aDrawingBrowse = new KToggleAction(QIcon::fromTheme(QStringLiteral("transform-browse")), i18nc("@action:intoolbar Drawing tool", "Browse"), this);
     d->aDrawingBrowse->setChecked(d->aBrowseTool->isChecked());
     KToggleAction *aFreehandLine = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18nc("@action:intoolbar Drawing tool", "Pen / Freehand"), this);
-    auto *aFreeformHighlight = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-highlight")), i18nc("@action:intoolbar Annotation tool", "Freeform Highlight"), this);
     // Geometrical shapes actions
     KToggleAction *aStraightLine = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-line")), i18nc("@action:intoolbar Annotation tool", "Straight line"), this);
     KToggleAction *aArrow = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-arrow")), i18nc("@action:intoolbar Annotation tool", "Arrow"), this);
@@ -923,6 +950,8 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     KToggleAction *aEllipse = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-ellipse")), i18nc("@action:intoolbar Annotation tool", "Ellipse"), this);
     KToggleAction *aPolygon = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-polyline")), i18nc("@action:intoolbar Annotation tool", "Polygon"), this);
     d->drawingToolKinds.insert(aFreehandLine, AnnotationActionHandlerPrivate::DrawingToolKind::Pen);
+    d->drawingToolKinds.insert(aHighlighter, AnnotationActionHandlerPrivate::DrawingToolKind::Pen);
+    d->drawingToolIds.insert(aHighlighter, 15);
     d->drawingToolKinds.insert(d->aEraserTool, AnnotationActionHandlerPrivate::DrawingToolKind::Eraser);
     d->drawingToolKinds.insert(aStraightLine, AnnotationActionHandlerPrivate::DrawingToolKind::Line);
     d->drawingToolKinds.insert(aArrow, AnnotationActionHandlerPrivate::DrawingToolKind::Arrow);
@@ -1050,21 +1079,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     }
     connect(d->aStamp->menu(), &QMenu::triggered, d->aStamp, &ToggleActionMenu::setDefaultAction);
 
-    auto *aHighlightTools = new ToggleActionMenu(QIcon::fromTheme(QStringLiteral("draw-highlight")), i18nc("@action:intoolbar Annotation tool", "Highlight"), this);
-    aHighlightTools->setPopupMode(QToolButton::MenuButtonPopup);
-    aHighlightTools->addAction(aHighlighter);
-    aHighlightTools->addAction(aFreeformHighlight);
-    aHighlightTools->setDefaultAction(aHighlighter);
-    connect(aHighlightTools->menu(), &QMenu::triggered, aHighlightTools, &ToggleActionMenu::setDefaultAction);
-    d->drawingTools = {d->aDrawingBrowse, d->aSelectTool, aFreehandLine, aHighlightTools, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aTypewriter};
-    d->agTools->addAction(aFreeformHighlight);
-    connect(aFreeformHighlight, &QAction::toggled, this, [this](bool checked) {
-        if (checked) {
-            d->aBrowseTool->setChecked(false);
-            d->annotator->setAnnotationSelectionMode(false);
-            d->selectTool(15);
-        }
-    });
+    d->drawingTools = {d->aDrawingBrowse, d->aSelectTool, aFreehandLine, aHighlighter, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aTypewriter};
 
     // Quick annotations action
     d->aQuickTools = new ToggleActionMenu(i18nc("@action:intoolbar Show list of quick annotation tools", "Quick Annotations"), this);
@@ -1141,7 +1156,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
 
     // action group workaround: allows unchecking the currently selected annotation action.
     // Other parts of code dependent to this workaround are marked with "action group workaround".
-    connect(d->agTools, &QActionGroup::triggered, this, [this](QAction *action) {
+    connect(d->agTools, &QActionGroup::triggered, this, [this, aHighlighter](QAction *action) {
         if (action == d->agLastAction) {
             const bool mouseRepeat = d->pendingMousePopupAction == action;
             d->pendingMousePopupAction = nullptr;
@@ -1159,6 +1174,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         } else {
             d->pendingMousePopupAction = nullptr;
             d->agLastAction = action;
+            if (action == aHighlighter) {
+                d->freeformHighlightActive = false;
+            }
             // Show the annotation toolbar whenever builtin tool actions are triggered (e.g using shortcuts)
             if (!d->isQuickToolAction(action)) {
                 d->aToolBarVisibility->setChecked(true);
@@ -1170,7 +1188,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     drawingToolCategory->addAction(QStringLiteral("drawing_browse"), d->aDrawingBrowse);
     drawingToolCategory->addAction(QStringLiteral("drawing_select"), d->aSelectTool);
     drawingToolCategory->addAction(QStringLiteral("annotation_freehand_line"), aFreehandLine);
-    drawingToolCategory->addAction(QStringLiteral("annotation_highlight_tools"), aHighlightTools);
+    drawingToolCategory->addAction(QStringLiteral("annotation_highlight_tools"), aHighlighter);
     drawingToolCategory->addAction(QStringLiteral("drawing_eraser"), d->aEraserTool);
     drawingToolCategory->addAction(QStringLiteral("annotation_straight_line"), aStraightLine);
     drawingToolCategory->addAction(QStringLiteral("annotation_arrow"), aArrow);
@@ -1183,7 +1201,6 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     ac->addAction(QStringLiteral("hide_annotation_toolbar"), d->aHideToolBar);
     ac->addAction(QStringLiteral("quick_annotation_action_bar"), d->aQuickToolsBar);
     ac->addAction(QStringLiteral("annotation_highlighter"), aHighlighter);
-    ac->addAction(QStringLiteral("annotation_freeform_highlighter"), aFreeformHighlight);
     ac->addAction(QStringLiteral("annotation_underline"), aUnderline);
     ac->addAction(QStringLiteral("annotation_squiggle"), aSquiggle);
     ac->addAction(QStringLiteral("annotation_strike_out"), aStrikeout);
