@@ -915,6 +915,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->aDrawingBrowse = new KToggleAction(QIcon::fromTheme(QStringLiteral("transform-browse")), i18nc("@action:intoolbar Drawing tool", "Browse"), this);
     d->aDrawingBrowse->setChecked(d->aBrowseTool->isChecked());
     KToggleAction *aFreehandLine = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18nc("@action:intoolbar Drawing tool", "Pen / Freehand"), this);
+    auto *aFreeformHighlight = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-highlight")), i18nc("@action:intoolbar Annotation tool", "Freeform Highlight"), this);
     // Geometrical shapes actions
     KToggleAction *aStraightLine = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-line")), i18nc("@action:intoolbar Annotation tool", "Straight line"), this);
     KToggleAction *aArrow = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-arrow")), i18nc("@action:intoolbar Annotation tool", "Arrow"), this);
@@ -934,7 +935,6 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->drawingToolIds.insert(aRectangle, 11);
     d->drawingToolIds.insert(aEllipse, 12);
     d->drawingToolIds.insert(aPolygon, 13);
-    d->drawingTools = {d->aDrawingBrowse, d->aSelectTool, aFreehandLine, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aTypewriter};
     d->aGeomShapes = new ToggleActionMenu(i18nc("@action", "Geometrical shapes"), this);
     d->aGeomShapes->setEnabled(true); // Need to explicitly set this once, or refreshActions() in part.cpp will disable this action
     d->aGeomShapes->setPopupMode(QToolButton::MenuButtonPopup);
@@ -1050,6 +1050,22 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     }
     connect(d->aStamp->menu(), &QMenu::triggered, d->aStamp, &ToggleActionMenu::setDefaultAction);
 
+    auto *aHighlightTools = new ToggleActionMenu(QIcon::fromTheme(QStringLiteral("draw-highlight")), i18nc("@action:intoolbar Annotation tool", "Highlight"), this);
+    aHighlightTools->setPopupMode(QToolButton::MenuButtonPopup);
+    aHighlightTools->addAction(aHighlighter);
+    aHighlightTools->addAction(aFreeformHighlight);
+    aHighlightTools->setDefaultAction(aHighlighter);
+    connect(aHighlightTools->menu(), &QMenu::triggered, aHighlightTools, &ToggleActionMenu::setDefaultAction);
+    d->drawingTools = {d->aDrawingBrowse, d->aSelectTool, aFreehandLine, aHighlightTools, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aTypewriter};
+    d->agTools->addAction(aFreeformHighlight);
+    connect(aFreeformHighlight, &QAction::toggled, this, [this](bool checked) {
+        if (checked) {
+            d->aBrowseTool->setChecked(false);
+            d->annotator->setAnnotationSelectionMode(false);
+            d->selectTool(15);
+        }
+    });
+
     // Quick annotations action
     d->aQuickTools = new ToggleActionMenu(i18nc("@action:intoolbar Show list of quick annotation tools", "Quick Annotations"), this);
     d->aQuickTools->setPopupMode(QToolButton::MenuButtonPopup);
@@ -1154,6 +1170,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     drawingToolCategory->addAction(QStringLiteral("drawing_browse"), d->aDrawingBrowse);
     drawingToolCategory->addAction(QStringLiteral("drawing_select"), d->aSelectTool);
     drawingToolCategory->addAction(QStringLiteral("annotation_freehand_line"), aFreehandLine);
+    drawingToolCategory->addAction(QStringLiteral("annotation_highlight_tools"), aHighlightTools);
     drawingToolCategory->addAction(QStringLiteral("drawing_eraser"), d->aEraserTool);
     drawingToolCategory->addAction(QStringLiteral("annotation_straight_line"), aStraightLine);
     drawingToolCategory->addAction(QStringLiteral("annotation_arrow"), aArrow);
@@ -1166,6 +1183,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     ac->addAction(QStringLiteral("hide_annotation_toolbar"), d->aHideToolBar);
     ac->addAction(QStringLiteral("quick_annotation_action_bar"), d->aQuickToolsBar);
     ac->addAction(QStringLiteral("annotation_highlighter"), aHighlighter);
+    ac->addAction(QStringLiteral("annotation_freeform_highlighter"), aFreeformHighlight);
     ac->addAction(QStringLiteral("annotation_underline"), aUnderline);
     ac->addAction(QStringLiteral("annotation_squiggle"), aSquiggle);
     ac->addAction(QStringLiteral("annotation_strike_out"), aStrikeout);
@@ -1269,14 +1287,16 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
     d->drawingToolBar = drawingToolBar;
     if (drawingToolBar->actions().isEmpty()) {
         for (qsizetype index = 0; index < d->drawingTools.size(); ++index) {
-            if (index == 2 || index == 4 || index == 9) {
+            if (index == 2 || index == 5 || index == 10) {
                 drawingToolBar->addSeparator();
             }
-            drawingToolBar->addAction(d->drawingTools.at(index));
+            if (QAction *action = d->drawingTools.at(index)) {
+                drawingToolBar->addAction(action);
+            }
         }
     }
     for (qsizetype index = 0; index < d->drawingTools.size(); ++index) {
-        const QString role = index == 3 ? QStringLiteral("erase") : (index >= 4 && index <= 8 ? QStringLiteral("shape") : (index == 9 ? QStringLiteral("text") : QStringLiteral("navigation")));
+        const QString role = index == 3 ? QStringLiteral("highlight") : (index == 4 ? QStringLiteral("erase") : (index >= 5 && index <= 9 ? QStringLiteral("shape") : (index == 10 ? QStringLiteral("text") : QStringLiteral("navigation"))));
         if (QWidget *toolButton = drawingToolBar->widgetForAction(d->drawingTools.at(index))) {
             toolButton->setProperty("chartaRole", role);
             toolButton->style()->unpolish(toolButton);

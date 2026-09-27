@@ -53,13 +53,24 @@ static QCursor penToolCursor()
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(Qt::black, 5, Qt::SolidLine, Qt::RoundCap));
-    painter.drawLine(4, 20, 18, 6);
-    painter.setPen(QPen(Qt::white, 2, Qt::SolidLine, Qt::RoundCap));
-    painter.drawLine(4, 20, 18, 6);
-    painter.setPen(Qt::black);
-    painter.drawLine(2, 22, 4, 17);
-    return QCursor(pixmap, 2, 22);
+    const QLineF arms[] = {
+        QLineF(12, 2, 12, 8),
+        QLineF(12, 16, 12, 22),
+        QLineF(2, 12, 8, 12),
+        QLineF(16, 12, 22, 12),
+    };
+    painter.setPen(QPen(Qt::white, 5, Qt::SolidLine, Qt::RoundCap));
+    for (const QLineF &arm : arms) {
+        painter.drawLine(arm);
+    }
+    painter.setPen(QPen(Qt::black, 3, Qt::SolidLine, Qt::RoundCap));
+    for (const QLineF &arm : arms) {
+        painter.drawLine(arm);
+    }
+    painter.setPen(QPen(Qt::white, 1));
+    painter.setBrush(Qt::black);
+    painter.drawEllipse(QPointF(12, 12), 2, 2);
+    return QCursor(pixmap, 12, 12);
 }
 
 class EraserEngine : public AnnotatorEngine
@@ -1168,6 +1179,11 @@ void PageViewAnnotator::reparseBuiltinToolsConfig()
         m_builtinToolsDefinition = new AnnotationTools();
     }
     m_builtinToolsDefinition->setTools(Okular::Settings::builtinAnnotationTools());
+    if (m_builtinToolsDefinition->tool(15).isNull()) {
+        QDomDocument toolDocument;
+        toolDocument.setContent(QStringLiteral("<tool type=\"ink\" name=\"Freeform Highlighter\"><engine type=\"SmoothLine\" color=\"#ffff00\"><annotation type=\"Ink\" color=\"#ffff00\" opacity=\"0.35\" width=\"16\"/></engine></tool>"));
+        m_builtinToolsDefinition->appendTool(toolDocument.documentElement());
+    }
 
     if (m_actionHandler) {
         m_actionHandler->reparseBuiltinToolsConfig();

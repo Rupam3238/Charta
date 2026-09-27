@@ -130,4 +130,9 @@ Annotation
             <annotation type="Stamp"/>
         </engine>
     </tool>
+    <tool id="15" type="ink" name="Freeform Highlighter">
+        <engine type="SmoothLine" color="#ffff00">
+            <annotation type="Ink" color="#ffff00" opacity="0.35" width="16" />
+        </engine>
+    </tool>
 </annotatingTools>
