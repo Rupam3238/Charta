@@ -3,4 +3,7 @@
     <qresource prefix="/kxmlgui5/okular">
         <file>shell.rc</file>
     </qresource>
+    <qresource prefix="/branding">
+        <file alias="charta.svg">../icons/charta.svg</file>
+    </qresource>
 </RCC>

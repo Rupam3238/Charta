@@ -152,7 +152,7 @@ WelcomeScreen::~WelcomeScreen()
 void WelcomeScreen::showEvent(QShowEvent *e)
 {
     if (appIcon->pixmap(Qt::ReturnByValue).isNull()) {
-        appIcon->setPixmap(QIcon::fromTheme(QStringLiteral("charta")).pixmap(KIconLoader::SizeEnormous));
+        appIcon->setPixmap(QIcon(QStringLiteral(":/branding/charta.svg")).pixmap(KIconLoader::SizeEnormous));
     }
 
     QWidget::showEvent(e);
