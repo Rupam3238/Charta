@@ -253,6 +253,16 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
     }
 
     QMenu popup;
+    popup.setStyleSheet(QStringLiteral(
+        "QMenu { background: #202630; color: #edf1f5; border: 1px solid #3b4653; padding: 4px; }"
+        "QWidget { background: #202630; color: #edf1f5; }"
+        "QLabel { color: #c8d1db; background: transparent; }"
+        "QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: #3a4552; }"
+        "QSlider::sub-page:horizontal { border-radius: 2px; background: #27bfd6; }"
+        "QSlider::handle:horizontal { width: 12px; margin: -5px 0; border-radius: 6px; background: #27bfd6; border: 1px solid #d6edf1; }"
+        "QDoubleSpinBox, QComboBox, QToolButton { color: #edf1f5; background: #29323d; border: 1px solid #465361; border-radius: 4px; padding: 4px; }"
+        "QDoubleSpinBox:focus, QComboBox:focus, QToolButton:focus { border: 1px solid #27bfd6; }"
+        "QToolButton:hover { background: #35414e; }"));
     auto *contents = new QWidget(&popup);
     auto *layout = new QVBoxLayout(contents);
     layout->setContentsMargins(12, 10, 12, 10);
@@ -1167,10 +1177,26 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
         drawingToolBar->setFloatable(false);
         drawingToolBar->setAllowedAreas(Qt::LeftToolBarArea);
     }
+    drawingToolBar->setStyleSheet(QStringLiteral(
+        "QToolBar { background: #1d242d; border: 0; border-right: 1px solid #394451; spacing: 4px; padding: 7px 4px; }"
+        "QToolButton { color: #e8edf2; background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 5px; margin: 1px; }"
+        "QToolButton:hover { background: #303a46; }"
+        "QToolButton:checked { background: #16414c; border-color: #27bfd6; }"
+        "QToolButton:focus { border-color: #27bfd6; }"
+        "QToolButton[chartaRole='erase']:checked { background: #393541; border-color: #b59ad8; }"
+        "QToolButton[chartaRole='shape']:checked { background: #403725; border-color: #e6b45d; }"
+        "QToolButton[chartaRole='text']:checked { background: #402d38; border-color: #e58ca9; }"
+        "QToolBar::separator { height: 1px; margin: 5px 7px; background: #45515e; }"));
     d->drawingToolBar = drawingToolBar;
     if (drawingToolBar->actions().isEmpty()) {
         for (QAction *action : std::as_const(d->drawingTools)) {
             drawingToolBar->addAction(action);
+        }
+    }
+    for (qsizetype index = 0; index < d->drawingTools.size(); ++index) {
+        const QString role = index == 3 ? QStringLiteral("erase") : (index >= 4 && index <= 8 ? QStringLiteral("shape") : (index == 9 ? QStringLiteral("text") : QStringLiteral("navigation")));
+        if (QWidget *toolButton = drawingToolBar->widgetForAction(d->drawingTools.at(index))) {
+            toolButton->setProperty("chartaRole", role);
         }
     }
     for (auto it = d->drawingToolKinds.cbegin(); it != d->drawingToolKinds.cend(); ++it) {
@@ -1190,6 +1216,13 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
     KToolBar *quickAnnotationToolBar = mw->toolBar(QStringLiteral("quickAnnotationToolBar"));
     if (KToolBar *mainToolBar = mw->toolBar(QStringLiteral("mainToolBar"))) {
         mainToolBar->removeAction(d->aQuickTools);
+        mainToolBar->setStyleSheet(QStringLiteral(
+            "QToolBar { background: #1d242d; border: 0; border-bottom: 1px solid #394451; spacing: 5px; padding: 4px 7px; }"
+            "QToolButton { color: #e8edf2; background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 5px; }"
+            "QToolButton:hover { background: #303a46; }"
+            "QToolButton:checked { background: #16414c; border-color: #27bfd6; }"
+            "QToolButton:focus { border-color: #27bfd6; }"
+            "QToolBar::separator { width: 1px; margin: 5px 6px; background: #45515e; }"));
     }
     annotationToolBar->hide();
     quickAnnotationToolBar->hide();
