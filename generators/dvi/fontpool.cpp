@@ -191,7 +191,7 @@ void fontPool::locateFonts()
     // present an error message to the user.
     if (!areFontsLocated()) {
         markFontsAsLocated();
-        Q_EMIT error(i18n("<qt><p>Okular was not able to locate all the font files "
+        Q_EMIT error(i18n("<qt><p>Charta was not able to locate all the font files "
                           "which are necessary to display the current DVI file. "
                           "Your document might be unreadable.</p>"
                           "<p><small><b>PATH:</b> %1</small></p>"

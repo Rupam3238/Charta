@@ -25,7 +25,7 @@ DlgEditor::DlgEditor(QWidget *parent)
     // BEGIN "Editor" row: Combo box with a list of preset editors
     m_editorChooser = new QComboBox(this);
     m_editorChooser->setObjectName(QStringLiteral("kcfg_ExternalEditor"));
-    m_editorChooser->setWhatsThis(i18nc("@info:whatsthis Config dialog, editor page", "Choose the editor you want to launch when Okular wants to open a source file."));
+    m_editorChooser->setWhatsThis(i18nc("@info:whatsthis Config dialog, editor page", "Choose the editor you want to launch when Charta opens a source file."));
     m_editorChooser->addItem(i18nc("@item:inlistbox Config dialog, editor page", "Custom Text Editor"), 0);
     m_editorChooser->addItem(i18nc("@item:inlistbox Config dialog, editor page", "Kate"), 1);
     m_editorChooser->addItem(i18nc("@item:inlistbox Config dialog, editor page", "Kile"), 2);

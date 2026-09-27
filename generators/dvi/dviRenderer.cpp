@@ -562,7 +562,7 @@ Anchor dviRenderer::parseReference(const QString &reference)
         QString refFileName = splitter.filePath();
 
         if (sourceHyperLinkAnchors.isEmpty()) {
-            Q_EMIT warning(i18n("You have asked Okular to locate the place in the DVI file which corresponds to "
+            Q_EMIT warning(i18n("You have asked Charta to locate the place in the DVI file which corresponds to "
                                 "line %1 in the TeX-file %2. It seems, however, that the DVI file "
                                 "does not contain the necessary source file information. ",
                                 refLineNumber,
@@ -601,7 +601,7 @@ Anchor dviRenderer::parseReference(const QString &reference)
         if (bestMatch != sourceHyperLinkAnchors.end()) {
             return Anchor(bestMatch->page, bestMatch->distance_from_top);
         } else if (anchorForRefFileFound == false) {
-            Q_EMIT warning(i18n("Okular was not able to locate the place in the DVI file which corresponds to "
+            Q_EMIT warning(i18n("Charta was not able to locate the place in the DVI file which corresponds to "
                                 "line %1 in the TeX-file %2.",
                                 refLineNumber,
                                 refFileName),

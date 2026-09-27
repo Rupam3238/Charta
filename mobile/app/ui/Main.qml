@@ -22,8 +22,8 @@ Kirigami.ApplicationWindow {
     visible: true
 
     globalDrawer: Kirigami.GlobalDrawer {
-        title: i18n("Okular")
-        titleIcon: "okular"
+        title: i18n("Charta")
+        titleIcon: "charta"
         drawerOpen: false
         isMenu: true
 
@@ -63,7 +63,7 @@ Kirigami.ApplicationWindow {
         handleVisible: enabled && pageStack.layers.depth < 2
     }
 
-    title: documentItem.windowTitleForDocument ? documentItem.windowTitleForDocument : i18n("Okular")
+    title: documentItem.windowTitleForDocument ? documentItem.windowTitleForDocument : i18n("Charta")
     Okular.DocumentItem {
         id: documentItem
         onUrlChanged: { currentPage = 0 }

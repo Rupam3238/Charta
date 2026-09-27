@@ -433,7 +433,7 @@ Part::Part(QObject *parent, const QVariantList &args)
     m_migrationMessage->setMessageType(KMessageWidget::Warning);
     m_migrationMessage->setPosition(KMessageWidget::Position::Header);
     m_migrationMessage->setText(
-        i18n("This document contains annotations or form data that were saved internally by a previous Okular version. Internal storage is <b>no longer supported</b>.<br/>Please save to a file in order to move them if you want to continue "
+        i18n("This document contains annotations or form data that were saved internally by an earlier version of this application. Internal storage is <b>no longer supported</b>.<br/>Please save to a file in order to move them if you want to continue "
              "to edit the document."));
     rightLayout->addWidget(m_migrationMessage);
     m_topMessage = new KMessageWidget(rightContainer);
@@ -733,7 +733,7 @@ void Part::setupViewerActions()
 
     QAction *prefs = KStandardAction::preferences(this, SLOT(slotPreferences()), ac);
     if (m_embedMode == NativeShellMode) {
-        prefs->setText(i18n("Configure Okular…"));
+        prefs->setText(i18n("Configure Charta…"));
     } else {
         // TODO: improve this message
         prefs->setText(i18n("Configure Viewer…"));
@@ -1115,7 +1115,7 @@ void Part::setModified(bool modified)
         if (!m_warnedAboutModifyingUnsaveableDocument) {
             m_warnedAboutModifyingUnsaveableDocument = true;
             KMessageBox::information(widget(),
-                                     i18n("You have just modified the open document, but this kind of document can not be saved.\nAny modification will be lost once Okular is closed."),
+                                     i18n("You have just modified the open document, but this kind of document can not be saved.\nAny modification will be lost once Charta is closed."),
                                      i18n("Document can't be saved"),
                                      QStringLiteral("warnAboutUnsaveableDocuments"));
         }
@@ -1308,7 +1308,7 @@ bool Part::slotImportPSFile()
     QString app = QStandardPaths::findExecutable(QStringLiteral("ps2pdf"));
     if (app.isEmpty()) {
         // TODO point the user to their distro packages?
-        KMessageBox::error(widget(), i18n("The program \"ps2pdf\" was not found, so Okular can not import PS files using it."), i18n("ps2pdf not found"));
+        KMessageBox::error(widget(), i18n("The program \"ps2pdf\" was not found, so Charta cannot import PS files using it."), i18n("ps2pdf not found"));
         return false;
     }
 
@@ -2639,7 +2639,7 @@ bool Part::slotSaveFileAs(bool showOkularArchiveAsDefaultFormat)
         const QString wantedExtension = QLatin1Char('.') + okularArchiveMimeType.preferredSuffix();
         if (!saveUrl.path().endsWith(wantedExtension)) {
             const auto button = KMessageBox::questionTwoActions(widget(),
-                                                                i18n("You have chosen to save an Okular Archive without the file name ending with the '%1' extension. That is not allowed, do you want to choose a new name?", wantedExtension),
+                                                                i18n("You have chosen to save a Charta document archive without the file name ending with the '%1' extension. That is not allowed, do you want to choose a new name?", wantedExtension),
                                                                 i18n("Unsupported extension"),
                                                                 KGuiItem(i18nc("@action:button", "Choose New Name"), QStringLiteral("edit-rename")),
                                                                 KStandardGuiItem::cancel());
@@ -2793,12 +2793,12 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
         if (!listOfwontSaves.isEmpty()) {
             if (saveUrl == url()) {
                 // Save
-                const QString warningMessageString = i18n("You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Okular document archive</i> format to preserve them.");
+                const QString warningMessageString = i18n("You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Charta document archive</i> format to preserve them.");
                 const int result = KMessageBox::warningContinueCancelList(widget(),
                                                                           warningMessageString,
                                                                           listOfwontSaves,
                                                                           i18n("Warning"),
-                                                                          KGuiItem(i18n("Save as Okular document archive…"), QStringLiteral("document-save-as")), // <- KMessageBox::Continue
+                                                                          KGuiItem(i18n("Save as Charta document archive…"), QStringLiteral("document-save-as")), // <- KMessageBox::Continue
                                                                           KStandardGuiItem::cancel());
 
                 switch (result) {
@@ -2810,17 +2810,17 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
             } else {
                 // Save as
                 const QString warningMessageString = m_document->canSwapBackingFile() ? i18n(
-                                                                                            "You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Okular document "
+                                                                                            "You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Charta document "
                                                                                             "archive</i> format to preserve them. Click <i>Continue</i> to save the document and discard these elements.")
                                                                                       : i18n(
-                                                                                            "You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Okular document "
+                                                                                            "You are about to save changes, but the current file format does not support saving the following elements. Please use the <i>Charta document "
                                                                                             "archive</i> format to preserve them. Click <i>Continue</i> to save, but you will lose these elements as well as the undo/redo history.");
                 const QString continueMessage = m_document->canSwapBackingFile() ? i18n("Continue") : i18n("Continue losing changes");
                 const int result = KMessageBox::warningTwoActionsCancelList(widget(),
                                                                             warningMessageString,
                                                                             listOfwontSaves,
                                                                             i18n("Warning"),
-                                                                            KGuiItem(i18n("Save as Okular document archive…"), QStringLiteral("document-save-as")), // <- KMessageBox::PrimaryAction
+                                                                            KGuiItem(i18n("Save as Charta document archive…"), QStringLiteral("document-save-as")), // <- KMessageBox::PrimaryAction
                                                                             KGuiItem(continueMessage, QStringLiteral("arrow-right")));                              // <- KMessageBox::SecondaryAction
 
                 switch (result) {
@@ -2882,7 +2882,7 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
                         if (tempFile)
                             srcUrl = KUrl::fromPath(tempFile->fileName());
 #else
-                        const QString msg = i18n("Okular cannot copy %1 to the specified location.\n\nThe document does not exist anymore.", localFilePath());
+                        const QString msg = i18n("Charta cannot copy %1 to the specified location.\n\nThe document does not exist anymore.", localFilePath());
                         KMessageBox::error(widget(), msg);
                         return false;
 #endif

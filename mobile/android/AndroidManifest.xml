@@ -3,10 +3,10 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <supports-screens android:largeScreens="true" android:normalScreens="true" android:anyDensity="true" android:smallScreens="true"/>
-    <application android:name="org.qtproject.qt.android.bindings.QtApplication" android:label="Okular" android:icon="@drawable/icon" android:extractNativeLibs="true">
+    <application android:name="org.qtproject.qt.android.bindings.QtApplication" android:label="Charta" android:icon="@drawable/charta" android:extractNativeLibs="true">
         <activity android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|locale|fontScale|keyboard|keyboardHidden|navigation"
                   android:name="org.kde.something.OpenFileActivity"
-                  android:label="Okular"
+                  android:label="Charta"
                   android:hardwareAccelerated="true"
                   android:screenOrientation="unspecified"
                   android:exported="true">
@@ -15,7 +15,7 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <intent-filter android:label="Okular">
+            <intent-filter android:label="Charta">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>

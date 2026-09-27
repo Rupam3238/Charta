@@ -4120,13 +4120,13 @@ void Document::processAction(const Action *action)
                 if (KIO::OpenUrlJob::isExecutableFile(url, mime.name())) {
                     // this case is a link pointing to an executable with a parameter
                     // that also is an executable, possibly a hand-crafted pdf
-                    Q_EMIT error(i18n("The document is trying to execute an external application and, for your safety, Okular does not allow that."), -1);
+                    Q_EMIT error(i18n("The document is trying to execute an external application and, for your safety, Charta does not allow that."), -1);
                     break;
                 }
             } else {
                 // this case is a link pointing to an executable with no parameters
                 // core developers find unacceptable executing it even after asking the user
-                Q_EMIT error(i18n("The document is trying to execute an external application and, for your safety, Okular does not allow that."), -1);
+                Q_EMIT error(i18n("The document is trying to execute an external application and, for your safety, Charta does not allow that."), -1);
                 break;
             }
         }

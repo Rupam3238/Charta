@@ -31,7 +31,7 @@ public class OpenFileActivity extends QtActivity
             ParcelFileDescriptor fdObject = resolver.openFileDescriptor(Uri.parse(url), "r");
             return "fd:///" + fdObject.detachFd();
         } catch (FileNotFoundException e) {
-            Log.e("Okular", "Cannot find file", e);
+            Log.e("Charta", "Cannot find file", e);
         }
         return "";
     }
@@ -51,12 +51,12 @@ public class OpenFileActivity extends QtActivity
                 e.printStackTrace();
 
                 //TODO: emit warning that couldn't be opened
-                Log.e("Okular", "failed to open");
+                Log.e("Charta", "failed to open");
                 return;
             }
         }
 
-        Log.e("Okular", "opening url: " + uri.toString());
+        Log.e("Charta", "opening url: " + uri.toString());
         FileClass.openUri(uri.toString());
     }
 
@@ -66,7 +66,7 @@ public class OpenFileActivity extends QtActivity
             return;
 
         final String action = bundleIntent.getAction();
-        Log.v("Okular", "Starting action: " + action);
+        Log.v("Charta", "Starting action: " + action);
         if (action == "android.intent.action.VIEW") {
             displayUri(bundleIntent.getData());
         }

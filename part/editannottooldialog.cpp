@@ -316,7 +316,7 @@ void EditAnnotToolDialog::createStubAnnotation()
         m_stubann = ga;
     } else if (toolType == ToolStamp) {
         Okular::StampAnnotation *sa = new Okular::StampAnnotation();
-        sa->setStampIconName(QStringLiteral("okular"));
+        sa->setStampIconName(QStringLiteral("charta"));
         m_stubann = sa;
     } else if (toolType == ToolTypewriter) {
         Okular::TextAnnotation *ta = new Okular::TextAnnotation();

@@ -28,17 +28,17 @@ Q_DECL_EXPORT
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("okularkirigami"));
+    app.setApplicationName(QStringLiteral("charta"));
 
     KLocalizedString::setApplicationDomain("org.kde.active.documentviewer");
 
     KAboutData aboutData = okularAboutData();
     KAboutData::setApplicationData(aboutData);
 
-    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("okular")));
+    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("charta")));
 
     QCommandLineParser parser;
-    // parser.setApplicationDescription(i18n("Okular mobile"));
+    // parser.setApplicationDescription(i18n("Charta mobile"));
     aboutData.setupCommandLine(&parser);
     parser.process(app);
     aboutData.processCommandLine(&parser);

@@ -3,55 +3,55 @@
   <id>org.kde.okular.kirigami</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-2.0+ and GFDL-1.3</project_license>
-  <name>Okular Mobile</name>
-  <name xml:lang="ar">اوكلار محمول</name>
-  <name xml:lang="az">Okular Mobil</name>
-  <name xml:lang="be">Okular Mobile</name>
-  <name xml:lang="bg">Okular за мобилни устройства</name>
-  <name xml:lang="ca">Okular Mobile</name>
-  <name xml:lang="ca-valencia">Okular Mobile</name>
-  <name xml:lang="cs">Okular Mobile</name>
-  <name xml:lang="da">Okular Mobile</name>
-  <name xml:lang="de">Okular Mobile</name>
-  <name xml:lang="el">Okular για κινητά</name>
-  <name xml:lang="en-GB">Okular Mobile</name>
-  <name xml:lang="eo">Okulara Poŝtelefono</name>
-  <name xml:lang="es">Okular Mobile</name>
-  <name xml:lang="et">Okular Mobile</name>
-  <name xml:lang="eu">Okular Mugikorra</name>
-  <name xml:lang="fi">Okular Mobile</name>
-  <name xml:lang="fr">Okular Mobile</name>
-  <name xml:lang="ga">Soghluaiste Okular</name>
-  <name xml:lang="gl">Okular Mobile</name>
-  <name xml:lang="he">Okular לניידים</name>
-  <name xml:lang="hi">ऑकुलर मोबाइल</name>
-  <name xml:lang="hu">Okular Mobile</name>
-  <name xml:lang="ia">Okular Mobile</name>
-  <name xml:lang="id">Okular Mobile</name>
-  <name xml:lang="is">Okular fyrir farsíma</name>
-  <name xml:lang="it">Okular Mobile</name>
-  <name xml:lang="ka">Okular მობილურზე</name>
-  <name xml:lang="ko">Okular 모바일</name>
-  <name xml:lang="lt">Okular mobilioji</name>
-  <name xml:lang="lv">Okular Mobile</name>
-  <name xml:lang="nl">Okular mobiel</name>
-  <name xml:lang="nn">Okular mobil</name>
-  <name xml:lang="pa">ਓਕਲਾਰ ਮੋਬਾਈਲ</name>
-  <name xml:lang="pl">Okular Mobile</name>
-  <name xml:lang="pt">Okular Móvel</name>
-  <name xml:lang="pt-BR">Okular móvel</name>
-  <name xml:lang="ro">Okular Mobil</name>
-  <name xml:lang="ru">Okular Mobile</name>
-  <name xml:lang="sa">ओकुलर मोबाईल</name>
-  <name xml:lang="sk">Okular Mobile</name>
-  <name xml:lang="sl">Okular Mobile</name>
-  <name xml:lang="sv">Okular Mobil</name>
-  <name xml:lang="ta">கைபேசிக்கான ஆக்குலர்</name>
-  <name xml:lang="tr">Okular Mobile</name>
-  <name xml:lang="uk">Мобільний Okular</name>
-  <name xml:lang="vi">Okular Di động</name>
-  <name xml:lang="zh-CN">Okular 文档查看器手机版</name>
-  <name xml:lang="zh-TW">Okular 行動版</name>
+  <name>Charta</name>
+  <name xml:lang="ar">Charta</name>
+  <name xml:lang="az">Charta</name>
+  <name xml:lang="be">Charta</name>
+  <name xml:lang="bg">Charta</name>
+  <name xml:lang="ca">Charta</name>
+  <name xml:lang="ca-valencia">Charta</name>
+  <name xml:lang="cs">Charta</name>
+  <name xml:lang="da">Charta</name>
+  <name xml:lang="de">Charta</name>
+  <name xml:lang="el">Charta</name>
+  <name xml:lang="en-GB">Charta</name>
+  <name xml:lang="eo">Charta</name>
+  <name xml:lang="es">Charta</name>
+  <name xml:lang="et">Charta</name>
+  <name xml:lang="eu">Charta</name>
+  <name xml:lang="fi">Charta</name>
+  <name xml:lang="fr">Charta</name>
+  <name xml:lang="ga">Charta</name>
+  <name xml:lang="gl">Charta</name>
+  <name xml:lang="he">Charta</name>
+  <name xml:lang="hi">Charta</name>
+  <name xml:lang="hu">Charta</name>
+  <name xml:lang="ia">Charta</name>
+  <name xml:lang="id">Charta</name>
+  <name xml:lang="is">Charta</name>
+  <name xml:lang="it">Charta</name>
+  <name xml:lang="ka">Charta</name>
+  <name xml:lang="ko">Charta</name>
+  <name xml:lang="lt">Charta</name>
+  <name xml:lang="lv">Charta</name>
+  <name xml:lang="nl">Charta</name>
+  <name xml:lang="nn">Charta</name>
+  <name xml:lang="pa">Charta</name>
+  <name xml:lang="pl">Charta</name>
+  <name xml:lang="pt">Charta</name>
+  <name xml:lang="pt-BR">Charta</name>
+  <name xml:lang="ro">Charta</name>
+  <name xml:lang="ru">Charta</name>
+  <name xml:lang="sa">Charta</name>
+  <name xml:lang="sk">Charta</name>
+  <name xml:lang="sl">Charta</name>
+  <name xml:lang="sv">Charta</name>
+  <name xml:lang="ta">Charta</name>
+  <name xml:lang="tr">Charta</name>
+  <name xml:lang="uk">Charta</name>
+  <name xml:lang="vi">Charta</name>
+  <name xml:lang="zh-CN">Charta</name>
+  <name xml:lang="zh-TW">Charta</name>
   <summary>Document Viewer</summary>
   <summary xml:lang="ar">عارض المستندات</summary>
   <summary xml:lang="az">Sənədə baxış vasitısi</summary>
@@ -102,13 +102,12 @@
   <summary xml:lang="vi">Trình xem tài liệu</summary>
   <summary xml:lang="zh-CN">文档查看器</summary>
   <summary xml:lang="zh-TW">文件檢視器</summary>
-  <developer id="org.kde">
-    <name>KDE</name>
-    <url>https://kde.org</url>
+  <developer id="org.charta">
+    <name>Charta</name>
   </developer>
   <description>
     <p>
-   Okular is a universal document viewer developed by KDE. Okular works on multiple platforms, including but not limited to Linux, Windows, macOS, *BSD, etc.
+      Charta is a focused document reader for opening, navigating, and annotating files across devices.
   </p>
     <p>Features:</p>
     <p xml:lang="ar">الميزات:</p>
@@ -297,72 +296,16 @@
       <li xml:lang="zh-TW">支援註釋功能</li>
     </ul>
   </description>
-  <screenshots>
-    <screenshot type="default">
-      <caption>Reading manual in Okular</caption>
-      <caption xml:lang="ar">قراءة دليل في اوكلار</caption>
-      <caption xml:lang="az">Okular'da oxumaq təlimatı</caption>
-      <caption xml:lang="be">Дапаможнік па чытанні ў Okular</caption>
-      <caption xml:lang="bg">Ръководство за четене в Okular</caption>
-      <caption xml:lang="ca">Lectura de manuals a l'Okular</caption>
-      <caption xml:lang="ca-valencia">Lectura de manuals en Okular</caption>
-      <caption xml:lang="cs">Čtení manuálu v Okularu</caption>
-      <caption xml:lang="de">Lesen eines Handbuchs in Okular</caption>
-      <caption xml:lang="el">Ανάγνωση οδηγού χρήσης στο Okular</caption>
-      <caption xml:lang="en-GB">Reading manual in Okular</caption>
-      <caption xml:lang="eo">Legomanlibro en Okular</caption>
-      <caption xml:lang="es">Lectura del manual en Okular</caption>
-      <caption xml:lang="et">Käsiraamatu lugemine Okularis</caption>
-      <caption xml:lang="eu">Eskuliburua Okularren irakurtzea</caption>
-      <caption xml:lang="fi">Oppaan lukeminen Okularissa</caption>
-      <caption xml:lang="fr">Lecture d'un manuel dans Okular</caption>
-      <caption xml:lang="ga">Lámhleabhar a léamh in Okular</caption>
-      <caption xml:lang="gl">Ler o manual en Okular.</caption>
-      <caption xml:lang="he">קריאת מדריך ב־Okular</caption>
-      <caption xml:lang="hi">ओकुलर में सहाय्य पुस्तिका पढ़ना</caption>
-      <caption xml:lang="hu">Kézikönyv olvasása Okularban</caption>
-      <caption xml:lang="ia">Legente manual in Okular</caption>
-      <caption xml:lang="id">Petunjuk di Okular</caption>
-      <caption xml:lang="is">Handbókin lesin í Okular</caption>
-      <caption xml:lang="it">Consultazione di un manuale in Okular</caption>
-      <caption xml:lang="ka">კითხვის სახელმძღვანელო Okular- ში</caption>
-      <caption xml:lang="ko">Okular로 설명서 읽기</caption>
-      <caption xml:lang="lt">Vadovo skaitymas programoje Okular</caption>
-      <caption xml:lang="lv">Rokasgrāmatas lasīšana programmā „Okular“</caption>
-      <caption xml:lang="nl">Handleiding wordt gelezen in Okular</caption>
-      <caption xml:lang="nn">Lesing av brukarhandbok i Okular</caption>
-      <caption xml:lang="pa">ਓਕੁਲਾਰ ਵਿੱਚ ਦਸਤਾਵੇਜ਼ ਪੜ੍ਹੋ</caption>
-      <caption xml:lang="pl">Instrukcja czytania w Okularze</caption>
-      <caption xml:lang="pt">Leitura de manual no Okular</caption>
-      <caption xml:lang="pt-BR">Lendo manual no Okular</caption>
-      <caption xml:lang="ro">Citirea unui manual în Okular</caption>
-      <caption xml:lang="ru">Документация, открытая в Okular</caption>
-      <caption xml:lang="sa">ओकुलरभाषायां पठनपुस्तिका</caption>
-      <caption xml:lang="sk">Čítanie návodu v Okular</caption>
-      <caption xml:lang="sl">Branje priročnikov v Okularju</caption>
-      <caption xml:lang="sv">Läsa handbok i Okular</caption>
-      <caption xml:lang="ta">ஆக்குலரில் ஓர் கையேடை படித்தல்</caption>
-      <caption xml:lang="tr">Belgelendirmeyi Okular ile oku</caption>
-      <caption xml:lang="uk">Читання підручника в Okular</caption>
-      <caption xml:lang="vi">Đọc sổ tay trong Okular</caption>
-      <caption xml:lang="zh-CN">使用 Okular 阅读产品说明书</caption>
-      <caption xml:lang="zh-TW">在 Okular 中閱讀文件</caption>
-      <image>https://cdn.kde.org/screenshots/okular/okular-mobile.png</image>
-    </screenshot>
-  </screenshots>
   <categories>
     <category>Qt</category>
     <category>KDE</category>
     <category>Office</category>
     <category>Viewer</category>
   </categories>
-  <url type="homepage">https://okular.kde.org/</url>
-  <url type="bugtracker">https://bugs.kde.org/enter_bug.cgi?format=guided&amp;product=okular</url>
-  <url type="donation">https://www.kde.org/community/donations/?app=okular&amp;source=appdata</url>
-  <url type="translate">https://community.kde.org/Get_Involved/translation</url>
-  <url type="vcs-browser">https://invent.kde.org/graphics/okular</url>
-  <url type="contribute">https://community.kde.org/Get_Involved</url>
-  <project_group>KDE</project_group>
+  <branding>
+    <color type="primary" scheme_preference="light">#176f67</color>
+    <color type="primary" scheme_preference="dark">#55b6a7</color>
+  </branding>
   <provides>
     <binary>okularkirigami</binary>
     <id>org.kde.okular.kirigami.desktop</id>

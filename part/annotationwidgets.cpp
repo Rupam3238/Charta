@@ -428,7 +428,7 @@ const QList<QPair<QString, QString>> &StampAnnotationWidget::defaultStamps()
                                                                      {i18n("Bookmark"), QStringLiteral("bookmark-new")},
                                                                      {i18n("Information"), QStringLiteral("help-about")},
                                                                      {i18n("KDE"), QStringLiteral("kde")},
-                                                                     {i18n("Okular"), QStringLiteral("okular")}};
+                                                                     {i18n("Charta"), QStringLiteral("charta")}};
 
     return defaultStampsList;
 }

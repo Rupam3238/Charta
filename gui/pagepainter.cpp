@@ -33,7 +33,7 @@
 #include "settings.h"
 #include "settings_core.h"
 
-Q_GLOBAL_STATIC_WITH_ARGS(QPixmap, busyPixmap, (QIcon::fromTheme(QLatin1String("okular")).pixmap(48)))
+Q_GLOBAL_STATIC_WITH_ARGS(QPixmap, busyPixmap, (QIcon::fromTheme(QLatin1String("charta")).pixmap(48)))
 
 #define TEXTANNOTATION_ICONSIZE 24
 

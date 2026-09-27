@@ -127,16 +127,16 @@ DVIExportToPS::DVIExportToPS(dviRenderer &parent, const QString &output_name, co
 
     if (dvi.numberOfExternalNONPSFiles != 0) {
         Q_EMIT error(i18n("<qt>This DVI file refers to external graphic files which are not in PostScript format, and cannot be handled by the "
-                          "<em>dvips</em> program that Okular uses internally to print or to export to PostScript. The functionality that "
-                          "you require is therefore unavailable in this version of Okular.</qt>"),
+                          "<em>dvips</em> program that Charta uses internally to print or to export to PostScript. The functionality that "
+                          "you require is therefore unavailable in this version of Charta.</qt>"),
                      -1);
         return;
     }
 
     if (QStandardPaths::findExecutable(QStringLiteral("dvips")).isEmpty()) {
-        Q_EMIT error(i18n("<qt><p>Okular could not locate the program <em>dvips</em> on your computer. "
+        Q_EMIT error(i18n("<qt><p>Charta could not locate the program <em>dvips</em> on your computer. "
                           "That program is essential for the export function to work.</p>"
-                          "<p>Hint to the perplexed system administrator: Okular uses the PATH environment "
+                          "<p>Hint to the perplexed system administrator: Charta uses the PATH environment "
                           "variable when looking for programs.</p></qt>"),
                      -1);
         return;

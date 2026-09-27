@@ -113,7 +113,7 @@ PDFSettingsWidget::PDFSettingsWidget(QWidget *parent)
             bool wasAllowed = Poppler::arePgpSignaturesAllowed();
             if (!wasAllowed && checked) {
                 KMessageBox::information(this,
-                                         i18nc("@info Kind of a notice/warning", "These signatures only work between modern versions of Okular with the GnuPG based backend activated"),
+                                         i18nc("@info Kind of a notice/warning", "These signatures only work between modern versions of Charta with the GnuPG based backend activated"),
                                          i18nc("@title:dialog", "Enable PGP Signatures"),
                                          QStringLiteral("enablePgpWarningShown"));
             }
@@ -219,7 +219,7 @@ void PDFSettingsWidget::warnRestartNeeded()
             return;
         }
         m_warnedAboutRestart = true;
-        QMessageBox::information(this, i18n("Restart needed"), i18n("You need to restart Okular after changing the NSS directory settings"));
+        QMessageBox::information(this, i18n("Restart needed"), i18n("You need to restart Charta after changing the NSS directory settings"));
     }
 }
 

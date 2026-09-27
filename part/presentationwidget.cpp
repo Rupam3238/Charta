@@ -1162,7 +1162,7 @@ void PresentationWidget::generateIntroPage(QPainter &p)
     }
 
     // draw okular logo in the four corners
-    QPixmap logo = QIcon::fromTheme(QStringLiteral("okular")).pixmap(64 * dpr);
+    QPixmap logo = QIcon::fromTheme(QStringLiteral("charta")).pixmap(64 * dpr);
     logo.setDevicePixelRatio(dpr);
     if (!logo.isNull()) {
         p.drawPixmap(5, 5, logo);

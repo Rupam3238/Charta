@@ -131,7 +131,7 @@ void dvifile::find_postamble()
         command_pointer--;
     }
     if (command_pointer == dvi_Data()) {
-        errorMsg = i18n("The DVI file is badly corrupted. Okular was not able to find the postamble.");
+        errorMsg = i18n("The DVI file is badly corrupted. Charta was not able to find the postamble.");
         return;
     }
 

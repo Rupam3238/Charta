@@ -142,7 +142,7 @@ AnnotationInfo getAnnotationInfo(const Okular::Annotation *ann)
     // If no specific info was set, use fallback
     if (info.caption.isEmpty()) {
         info.caption = i18n("Annotation");
-        info.iconName = QStringLiteral("okular");
+        info.iconName = QStringLiteral("charta");
     }
 
     return info;

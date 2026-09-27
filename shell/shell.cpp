@@ -201,7 +201,7 @@ Shell::Shell(const QString &serializedOptions)
         // if we couldn't find our Part, we exit since the Shell by
         // itself can't do anything useful
         m_isValid = false;
-        KMessageBox::error(this, i18n("Unable to find the Okular component: %1", result.errorString));
+        KMessageBox::error(this, i18n("Unable to find the Charta component: %1", result.errorString));
         return;
     } else {
         m_partFactory = result.plugin;
@@ -280,7 +280,7 @@ Shell::Shell(const QString &serializedOptions)
         if (m_unique) {
             m_unique = QDBusConnection::sessionBus().registerService(QStringLiteral("org.kde.okular"));
             if (!m_unique) {
-                KMessageBox::information(this, i18n("There is already a unique Okular instance running. This instance won't be the unique one."));
+                KMessageBox::information(this, i18n("There is already a unique Charta instance running. This instance won't be the unique one."));
             }
         } else {
             // TODO When porting to KF7 Remove
@@ -309,7 +309,7 @@ Shell::Shell(const QString &serializedOptions)
         showWelcomeScreen();
     } else {
         m_isValid = false;
-        KMessageBox::error(this, i18n("Unable to find the Okular component."));
+        KMessageBox::error(this, i18n("Unable to find the Charta component."));
     }
 
     connect(guiFactory(), &KXMLGUIFactory::shortcutsSaved, this, &Shell::reloadAllXML);

@@ -558,11 +558,11 @@ VideoWidget::VideoWidget(const Okular::Annotation *annotation, Okular::Movie *mo
             poster->setPixmap(QPixmap::fromImage(posterImage));
         }
     }
-    Q_EMIT document->warning(i18n("Videos not supported in this okular"), 5000);
+    Q_EMIT document->warning(i18n("Videos are not supported in Charta"), 5000);
     poster->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
     layout->addWidget(poster, 2);
 
-    auto label = new QLabel(i18n("Videos not supported in this Okular"));
+    auto label = new QLabel(i18n("Videos are not supported in Charta"));
     label->setAutoFillBackground(true);
     label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     layout->addWidget(label, 1, Qt::AlignCenter);

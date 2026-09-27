@@ -63,7 +63,7 @@ static bool attachUniqueInstance(const QStringList &paths, const QString &serial
 
     if (!ShellUtils::editorCmd(serializedOptions).isEmpty()) {
         QString message =
-            i18n("You cannot set the editor command in an already running okular instance. Please disable the tabs and try again. Please note, that unique is also not supported when setting the editor command at the commandline.\n");
+            i18n("You cannot set the editor command in an already running Charta instance. Please disable the tabs and try again. Please note, that unique is also not supported when setting the editor command at the commandline.\n");
         std::cerr << message.toStdString();
         exit(1);
     }
@@ -168,7 +168,7 @@ static bool attachExistingInstance(const QStringList &paths, const QString &seri
 
     if (!ShellUtils::editorCmd(serializedOptions).isEmpty()) {
         QString message(
-            i18n("You cannot set the editor command in an already running okular instance. Please disable the tabs and try again. Please note, that unique is also not supported when setting the editor command at the commandline.\n"));
+            i18n("You cannot set the editor command in an already running Charta instance. Please disable the tabs and try again. Please note, that unique is also not supported when setting the editor command at the commandline.\n"));
         std::cerr << message.toStdString();
         exit(1);
     }
