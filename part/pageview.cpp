@@ -444,7 +444,9 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
         "QScrollBar:vertical { width: 8px; }"
         "QScrollBar:horizontal { height: 8px; }"
         "QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: #586574; border-radius: 4px; min-height: 32px; min-width: 32px; }"
-        "QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: #27bfd6; }"
+        "QScrollBar::handle:vertical { margin: 0px 1px; }"
+        "QScrollBar::handle:vertical:hover { background: #27bfd6; margin: 0px; }"
+        "QScrollBar::handle:horizontal:hover { background: #27bfd6; }"
         "QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }"
         "QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }"));
 

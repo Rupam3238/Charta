@@ -164,6 +164,7 @@ Q_SIGNALS:
     void requestOpenNewlySignedFile(const QString &filePath, int pageNumber);
 
 private:
+    void endTemporaryEraser(bool cancel);
     void reparseBuiltinToolsConfig();
     void reparseQuickToolsConfig();
     // save the builtin annotation tools to Okular settings
@@ -196,6 +197,10 @@ private:
     PageViewItem *m_pendingFreehandItem = nullptr;
     QRect m_pendingFreehandRect;
     bool m_pendingFreehandPainted = false;
+    std::unique_ptr<AnnotatorEngine> m_temporaryPreviousEngine;
+    PageViewItem *m_temporaryPreviousLockedItem = nullptr;
+    QRect m_temporaryPreviousDrawnRect;
+    bool m_temporaryRightButtonHeld = false;
     // selected annotation name
     // QString m_selectedAnnotationName;
 };

@@ -1654,6 +1654,9 @@ bool PageViewAnnotator::active() const
 
 void PageViewAnnotator::setEraserMode(bool enabled)
 {
+    if (m_temporaryPreviousEngine) {
+        endTemporaryEraser(true);
+    }
     if (eraserMode() == enabled) {
         return;
     }
@@ -1727,12 +1730,35 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
         return QRect();
     }
 
+    if (button == AnnotatorEngine::Right && eventType == AnnotatorEngine::Press && !m_temporaryRightButtonHeld && dynamic_cast<SmoothPathEngine *>(m_engine)) {
+        if (!m_lockedItem) {
+            m_temporaryPreviousEngine.reset(m_engine);
+            m_temporaryPreviousLockedItem = m_lockedItem;
+            m_temporaryPreviousDrawnRect = m_lastDrawnRect;
+            m_engine = new EraserEngine(m_document, m_eraserWidth);
+            m_lockedItem = nullptr;
+            m_lastDrawnRect = {};
+            m_pageView->updateCursor();
+        }
+        m_temporaryRightButtonHeld = true;
+    }
+
+    if (m_temporaryRightButtonHeld && !m_temporaryPreviousEngine && button == AnnotatorEngine::Right) {
+        if (eventType == AnnotatorEngine::Release) {
+            m_temporaryRightButtonHeld = false;
+        }
+        return QRect();
+    }
+
+    const bool temporaryEraserRelease = m_temporaryPreviousEngine && button == AnnotatorEngine::Right && eventType == AnnotatorEngine::Release;
+    const AnnotatorEngine::Button routedButton = m_temporaryPreviousEngine && button == AnnotatorEngine::Right ? AnnotatorEngine::Left : button;
+
     // if the right mouse button was pressed, we simply do nothing. In this way, we are still editing the annotation
     // and so this function will receive and process the right mouse button release event too. If we detach now the annotation tool,
     // the release event will be processed by the PageView class which would create the annotation property widget, and we do not want this.
-    if (button == AnnotatorEngine::Right && eventType == AnnotatorEngine::Press) {
+    if (button == AnnotatorEngine::Right && eventType == AnnotatorEngine::Press && !m_temporaryPreviousEngine) {
         return QRect();
-    } else if (button == AnnotatorEngine::Right && eventType == AnnotatorEngine::Release) {
+    } else if (button == AnnotatorEngine::Right && eventType == AnnotatorEngine::Release && !m_temporaryPreviousEngine) {
         detachAnnotation();
         return QRect();
     }
@@ -1756,11 +1782,15 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
     }
     if (isEraser && !item) {
         const QRect oldRect = m_lastDrawnRect;
-        m_engine->event(eventType, button, modifiers, 0.0, 0.0, 0.0, 0.0, nullptr);
+        m_engine->event(eventType, routedButton, modifiers, 0.0, 0.0, 0.0, 0.0, nullptr);
         repaintClearedEraser();
         m_lastDrawnRect = {};
         if (oldRect.isValid()) {
             m_pageView->viewport()->update(oldRect.translated(-m_pageView->contentAreaPosition()));
+        }
+        if (temporaryEraserRelease) {
+            endTemporaryEraser(false);
+            m_temporaryRightButtonHeld = false;
         }
         return oldRect;
     }
@@ -1771,6 +1801,10 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
         m_engine->setItem(m_lockedItem);
     }
     if (!m_lockedItem) {
+        if (temporaryEraserRelease) {
+            endTemporaryEraser(false);
+            m_temporaryRightButtonHeld = false;
+        }
         return QRect();
     }
 
@@ -1783,7 +1817,7 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
     QRect modifiedRect;
 
     // 2. use engine to perform operations
-    const QRect paintRect = m_engine->event(eventType, button, modifiers, nX, nY, itemRect.width(), itemRect.height(), m_lockedItem->page());
+    const QRect paintRect = m_engine->event(eventType, routedButton, modifiers, nX, nY, itemRect.width(), itemRect.height(), m_lockedItem->page());
     if (isEraser && eventType == AnnotatorEngine::Release) {
         repaintClearedEraser();
     }
@@ -1902,6 +1936,10 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
         }
     }
 
+    if (temporaryEraserRelease) {
+        endTemporaryEraser(false);
+        m_temporaryRightButtonHeld = false;
+    }
     return modifiedRect;
 }
 
@@ -1948,6 +1986,10 @@ QRect PageViewAnnotator::routeTabletEvent(QTabletEvent *e, PageViewItem *item, c
 bool PageViewAnnotator::routeKeyEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) {
+        if (m_temporaryPreviousEngine) {
+            endTemporaryEraser(true);
+            return true;
+        }
         detachAnnotation();
         return true;
     }
@@ -2058,6 +2100,10 @@ void PageViewAnnotator::selectQuickTool(int toolId)
 
 void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId, ShowTip showTip)
 {
+    if (m_temporaryPreviousEngine) {
+        endTemporaryEraser(true);
+    }
+
     // ask for Author's name if not already set
     if (toolId > 0 && Okular::Settings::identityAuthor().isEmpty()) {
         // get default username from the kdelibs/kdecore/KUser
@@ -2189,6 +2235,36 @@ void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId,
     }
 
     Q_EMIT toolActive(true);
+}
+
+void PageViewAnnotator::endTemporaryEraser(bool cancel)
+{
+    if (!m_temporaryPreviousEngine) {
+        return;
+    }
+
+    const QRect eraserRect = m_lastDrawnRect;
+    if (cancel) {
+        if (auto *eraser = dynamic_cast<EraserEngine *>(m_engine)) {
+            for (const auto &[pageItem, rect] : eraser->cancelGesture()) {
+                if (pageItem) {
+                    m_pageView->viewport()->update(rect.translated(pageItem->uncroppedGeometry().topLeft()).translated(-m_pageView->contentAreaPosition()));
+                }
+            }
+        }
+    }
+
+    delete m_engine;
+    m_engine = m_temporaryPreviousEngine.release();
+    m_lockedItem = m_temporaryPreviousLockedItem;
+    m_lastDrawnRect = m_temporaryPreviousDrawnRect;
+    m_temporaryPreviousLockedItem = nullptr;
+    m_temporaryPreviousDrawnRect = {};
+
+    if (eraserRect.isValid()) {
+        m_pageView->viewport()->update(eraserRect.translated(-m_pageView->contentAreaPosition()));
+    }
+    m_pageView->updateCursor();
 }
 
 void PageViewAnnotator::selectLastTool()
