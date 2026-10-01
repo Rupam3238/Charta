@@ -8,13 +8,21 @@
 #define _ANNOTATIONACTIONHANDLER_H_
 
 #include <QObject>
+#include <QList>
 
 class QAction;
 class QColor;
 class QFont;
+class QWidget;
 class KActionCollection;
 class PageViewAnnotator;
 class AnnotationActionHandlerPrivate;
+
+namespace Okular
+{
+class Annotation;
+class Document;
+}
 
 /**
  * @short Handles all the actions of the annotation toolbar
@@ -41,6 +49,7 @@ public:
     void setToolsEnabled(bool on);
     void setTextToolsEnabled(bool on);
     void deselectAllAnnotationActions();
+    bool showAnnotationSettings(Okular::Document *document, const QList<Okular::Annotation *> &annotations, int pageNumber, QWidget *anchorWidget);
 
 private Q_SLOTS:
     void slotAnnotationToolBarVisibilityChanged(bool visible);

@@ -128,8 +128,10 @@ public:
     Okular::Annotation *focusedAnnotation() const;
     int focusedAnnotationPageNumber() const;
     void copyFocusedAnnotation();
+    bool copySelectedAnnotations();
     void deleteSelectedAnnotations();
     void selectAnnotation(Okular::Annotation *annotation, int pageNumber);
+    void selectAnnotations(const QList<Okular::Annotation *> &annotations, int pageNumber);
 
     bool areSourceLocationsShownGraphically() const;
     void setShowSourceLocationsGraphically(bool show);

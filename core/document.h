@@ -540,6 +540,10 @@ public:
      */
     void translatePageAnnotation(int page, Annotation *annotation, const Okular::NormalizedPoint &delta);
 
+    /** Group subsequent annotation edits into a single undo step. */
+    void beginUndoMacro(const QString &text);
+    void endUndoMacro();
+
     /**
      * Adjusts the position of the top-left and bottom-right corners of given @p annotation on the given @p page.
      *

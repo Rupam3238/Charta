@@ -2361,6 +2361,11 @@ void PageViewAnnotator::setAnnotationFont(const QFont &font)
     selectLastTool();
 }
 
+bool PageViewAnnotator::showAnnotationSettings(const QList<Okular::Annotation *> &annotations, int pageNumber, QWidget *anchorWidget)
+{
+    return m_actionHandler && m_actionHandler->showAnnotationSettings(m_document, annotations, pageNumber, anchorWidget);
+}
+
 void PageViewAnnotator::addToQuickAnnotations()
 {
     QDomElement sourceToolElement = m_builtinToolsDefinition->tool(m_lastToolId);

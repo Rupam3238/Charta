@@ -3957,14 +3957,12 @@ void Part::slotOpenContainingFolder()
 
 void Part::slotCopyAnnotation()
 {
-    m_pageView->copyFocusedAnnotation();
+    m_pageView->copySelectedAnnotations();
 }
 
 void Part::slotCopyTextSelectionOrAnnotation()
 {
-    Okular::Annotation *annotation = m_pageView->focusedAnnotation();
-    if (annotation) {
-        slotCopyAnnotation();
+    if (m_pageView->copySelectedAnnotations()) {
         return;
     }
 
@@ -3991,9 +3989,10 @@ void Part::slotPasteAnnotation()
     }
 
     AnnotationPopup annotPopup(m_document, AnnotationPopup::SingleAnnotationMode, widget());
-    Okular::Annotation *pastedAnnotation = annotPopup.pasteAnnotationToPage(pageNumber, targetPointPtr);
-    if (pastedAnnotation) {
-        m_pageView->selectAnnotation(pastedAnnotation, pageNumber);
+    const QList<Okular::Annotation *> pastedAnnotations = annotPopup.pasteAnnotationToPage(pageNumber, targetPointPtr);
+    if (!pastedAnnotations.isEmpty()) {
+        m_pageView->setAnnotationSelectionMode(true);
+        m_pageView->selectAnnotations(pastedAnnotations, pageNumber);
     }
 }
 

@@ -3482,6 +3482,16 @@ void Document::translatePageAnnotation(int page, Annotation *annotation, const N
     d->m_undoStack->push(uc);
 }
 
+void Document::beginUndoMacro(const QString &text)
+{
+    d->m_undoStack->beginMacro(text);
+}
+
+void Document::endUndoMacro()
+{
+    d->m_undoStack->endMacro();
+}
+
 void Document::adjustPageAnnotation(int page, Annotation *annotation, const Okular::NormalizedPoint &delta1, const Okular::NormalizedPoint &delta2)
 {
     const bool complete = (annotation->flags() & Okular::Annotation::BeingResized) == 0;

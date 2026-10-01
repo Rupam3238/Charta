@@ -97,7 +97,7 @@ void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPo
     /* Is there a selected annotation? */
     if (m_focusedAnnotation.isValid()) {
         m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
-        m_handle = getHandleAt(m_mousePosition, m_focusedAnnotation);
+        m_handle = m_areaSelectedAnnotations.size() > 1 && selectOnHit ? RH_None : getHandleAt(m_mousePosition, m_focusedAnnotation);
         if (m_handle != RH_None) {
             /* Returning here means, the selection-rectangle gets control, unconditionally.
              * Even if it overlaps with another annotation. */
@@ -116,7 +116,21 @@ void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPo
             /* qDebug() << "routeMousePressEvent: select for modification"; */
             m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
             m_handle = getHandleAt(m_mousePosition, ad);
-            if (m_handle != RH_None || selectOnHit) {
+            if (selectOnHit) {
+                const bool alreadySelected = std::any_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [&ad](const AnnotationDescription &selected) {
+                    return selected.annotation == ad.annotation;
+                });
+                if (!alreadySelected) {
+                    m_areaSelectedAnnotations.clear();
+                    m_areaSelectedAnnotations.append(ad);
+                    m_handle = getHandleAt(m_mousePosition, ad);
+                } else if (m_areaSelectedAnnotations.size() > 1) {
+                    m_handle = ad.annotation->canBeMoved() ? RH_Content : RH_None;
+                } else {
+                    m_handle = getHandleAt(m_mousePosition, ad);
+                }
+                setState(StateFocused, ad);
+            } else if (m_handle != RH_None) {
                 setState(StateFocused, ad);
             }
         }
@@ -139,6 +153,18 @@ void MouseAnnotation::selectAnnotation(PageViewItem *pageViewItem, Okular::Annot
     selected.pageNumber = pageViewItem->pageNumber();
     m_handle = RH_None;
     setState(StateFocused, selected);
+    m_pageView->viewport()->update();
+}
+
+void MouseAnnotation::selectAnnotations(const QList<AnnotationDescription> &annotations)
+{
+    m_areaSelectedAnnotations = annotations;
+    if (m_areaSelectedAnnotations.isEmpty()) {
+        setState(StateInactive, {});
+    } else {
+        m_handle = RH_None;
+        setState(StateFocused, m_areaSelectedAnnotations.constFirst());
+    }
     m_pageView->viewport()->update();
 }
 
@@ -242,6 +268,7 @@ void MouseAnnotation::routeKeyPressEvent(const QKeyEvent *e)
     switch (e->key()) {
     case Qt::Key_Escape:
         cancel();
+        m_areaSelectedAnnotations.clear();
         break;
     case Qt::Key_Delete:
         deleteSelectedAnnotations();
@@ -251,22 +278,38 @@ void MouseAnnotation::routeKeyPressEvent(const QKeyEvent *e)
 
 void MouseAnnotation::deleteSelectedAnnotations()
 {
-    if (!m_areaSelectedAnnotations.isEmpty()) {
-        const QList<AnnotationDescription> selectedAnnotations = std::exchange(m_areaSelectedAnnotations, {});
+    const QList<AnnotationDescription> selected = selectedAnnotations();
+    if (selected.size() > 1) {
         cancel();
-        for (const AnnotationDescription &selected : selectedAnnotations) {
-            if (selected.isValid() && selected.isContainedInPage(m_document, selected.pageNumber) && m_document->canRemovePageAnnotation(selected.annotation)) {
-                m_document->removePageAnnotation(selected.pageNumber, selected.annotation);
+        m_areaSelectedAnnotations.clear();
+        QHash<int, QList<Okular::Annotation *>> annotationsByPage;
+        for (const AnnotationDescription &description : selected) {
+            if (description.isValid() && description.isContainedInPage(m_document, description.pageNumber) && m_document->canRemovePageAnnotation(description.annotation)) {
+                annotationsByPage[description.pageNumber].append(description.annotation);
             }
         }
+        for (auto it = annotationsByPage.cbegin(); it != annotationsByPage.cend(); ++it) {
+            m_document->removePageAnnotations(it.key(), it.value());
+        }
         m_pageView->viewport()->update();
-    } else if (m_focusedAnnotation.isValid()) {
+    } else if (!selected.isEmpty()) {
         AnnotationDescription adToBeDeleted = m_focusedAnnotation;
         cancel();
         if (m_document->canRemovePageAnnotation(adToBeDeleted.annotation)) {
             m_document->removePageAnnotation(adToBeDeleted.pageNumber, adToBeDeleted.annotation);
         }
     }
+}
+
+QList<AnnotationDescription> MouseAnnotation::selectedAnnotations() const
+{
+    if (!m_areaSelectedAnnotations.isEmpty()) {
+        return m_areaSelectedAnnotations;
+    }
+    if (m_focusedAnnotation.isValid()) {
+        return {m_focusedAnnotation};
+    }
+    return {};
 }
 
 void MouseAnnotation::routeTooltipEvent(const QHelpEvent *helpEvent)
@@ -505,7 +548,13 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
     switch (state) {
     case StateMoving:
         m_focusedAnnotation = ad;
-        m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() | Okular::Annotation::BeingMoved);
+        if (m_areaSelectedAnnotations.size() > 1 && !m_selectionMoveUndoMacroOpen) {
+            m_document->beginUndoMacro(i18n("move annotations"));
+            m_selectionMoveUndoMacroOpen = true;
+        }
+        for (const AnnotationDescription &selected : selectedAnnotations()) {
+            selected.annotation->setFlags(selected.annotation->flags() | Okular::Annotation::BeingMoved);
+        }
         updateViewport(m_focusedAnnotation);
         break;
     case StateResizing:
@@ -520,8 +569,10 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
         break;
     case StateInactive:
     default:
-        if (m_focusedAnnotation.isValid()) {
-            m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() & ~(Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized));
+        for (const AnnotationDescription &selected : selectedAnnotations()) {
+            if (selected.annotation) {
+                selected.annotation->setFlags(selected.annotation->flags() & ~(Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized));
+            }
         }
         m_focusedAnnotation.invalidate();
         m_handle = RH_None;
@@ -553,23 +604,29 @@ void MouseAnnotation::performCommand(const QPoint newPos)
 
     if (isMoved()) {
         Okular::NormalizedPoint delta(normalizedRotatedMouseDelta.x(), normalizedRotatedMouseDelta.y());
-        const Okular::NormalizedRect annotRect = m_focusedAnnotation.annotation->boundingRectangle();
-
-        // if moving annot to the left && delta.x is big enough to move annot outside the page
-        if (delta.x < 0 && (annotRect.left + delta.x) < 0) {
-            delta.x = -annotRect.left; // update delta.x to move annot only to the left edge of the page
+        const QList<AnnotationDescription> selected = selectedAnnotations();
+        Okular::NormalizedRect groupRect;
+        bool hasGroupRect = false;
+        for (const AnnotationDescription &description : selected) {
+            const Okular::NormalizedRect rect = description.annotation->boundingRectangle();
+            groupRect = hasGroupRect ? groupRect | rect : rect;
+            hasGroupRect = true;
         }
-        // similar checks for right, top and bottom
-        if (delta.x > 0 && (annotRect.right + delta.x) > 1) {
-            delta.x = 1 - annotRect.right;
+        if (delta.x < 0 && groupRect.left + delta.x < 0) {
+            delta.x = -groupRect.left;
         }
-        if (delta.y < 0 && (annotRect.top + delta.y) < 0) {
-            delta.y = -annotRect.top;
+        if (delta.x > 0 && groupRect.right + delta.x > 1) {
+            delta.x = 1 - groupRect.right;
         }
-        if (delta.y > 0 && (annotRect.bottom + delta.y) > 1) {
-            delta.y = 1 - annotRect.bottom;
+        if (delta.y < 0 && groupRect.top + delta.y < 0) {
+            delta.y = -groupRect.top;
         }
-        m_document->translatePageAnnotation(m_focusedAnnotation.pageNumber, m_focusedAnnotation.annotation, delta);
+        if (delta.y > 0 && groupRect.bottom + delta.y > 1) {
+            delta.y = 1 - groupRect.bottom;
+        }
+        for (const AnnotationDescription &description : selected) {
+            m_document->translatePageAnnotation(description.pageNumber, description.annotation, delta);
+        }
 
     } else if (isResized()) {
         QPointF delta1, delta2;
@@ -588,8 +645,17 @@ void MouseAnnotation::finishCommand()
      * setFlags before translatePageAnnotation-/adjustPageAnnotation.
      */
     if (isMoved()) {
-        m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() & ~Okular::Annotation::BeingMoved);
-        m_document->translatePageAnnotation(m_focusedAnnotation.pageNumber, m_focusedAnnotation.annotation, Okular::NormalizedPoint(0.0, 0.0));
+        const QList<AnnotationDescription> selected = selectedAnnotations();
+        for (const AnnotationDescription &description : selected) {
+            description.annotation->setFlags(description.annotation->flags() & ~Okular::Annotation::BeingMoved);
+        }
+        for (const AnnotationDescription &description : selected) {
+            m_document->translatePageAnnotation(description.pageNumber, description.annotation, Okular::NormalizedPoint(0.0, 0.0));
+        }
+        if (m_selectionMoveUndoMacroOpen) {
+            m_document->endUndoMacro();
+            m_selectionMoveUndoMacroOpen = false;
+        }
     } else if (isResized()) {
         m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() & ~Okular::Annotation::BeingResized);
         m_document->adjustPageAnnotation(m_focusedAnnotation.pageNumber, m_focusedAnnotation.annotation, Okular::NormalizedPoint(0.0, 0.0), Okular::NormalizedPoint(0.0, 0.0));

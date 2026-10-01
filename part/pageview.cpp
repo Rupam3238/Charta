@@ -72,7 +72,6 @@
 
 // local includes
 #include "annotationpopup.h"
-#include "annotationwidgets.h"
 #include "annotwindow.h"
 #include "colormodemenu.h"
 #include "core/annotations.h"
@@ -191,8 +190,6 @@ public:
     QToolButton *annotationStrokesButton = nullptr;
     QToolButton *annotationCopyButton = nullptr;
     QToolButton *annotationDeleteButton = nullptr;
-    QFrame *annotationPropertiesPopup = nullptr;
-    AnnotationWidget *annotationPropertyWidget = nullptr;
     Okular::Annotation *annotationPanelAnnotation = nullptr;
 
     // table selection
@@ -387,46 +384,18 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     annotationPanelLayout->addWidget(d->annotationDeleteButton);
     d->annotationSelectionPanel->hide();
 
-    connect(d->annotationCopyButton, &QToolButton::clicked, this, &PageView::copyFocusedAnnotation);
+    connect(d->annotationCopyButton, &QToolButton::clicked, this, &PageView::copySelectedAnnotations);
     connect(d->annotationDeleteButton, &QToolButton::clicked, this, &PageView::deleteSelectedAnnotations);
     connect(d->annotationStrokesButton, &QToolButton::clicked, this, [this] {
-        Okular::Annotation *annotation = focusedAnnotation();
-        const int pageNumber = focusedAnnotationPageNumber();
-        if (!annotation || !d->document->canModifyPageAnnotation(annotation)) {
-            return;
+        const QList<AnnotationDescription> descriptions = d->mouseAnnotation->selectedAnnotations();
+        const int pageNumber = descriptions.isEmpty() ? -1 : descriptions.constFirst().pageNumber;
+        QList<Okular::Annotation *> annotations;
+        for (const AnnotationDescription &description : descriptions) {
+            annotations.append(description.annotation);
         }
-
-        delete d->annotationPropertiesPopup;
-        delete d->annotationPropertyWidget;
-        d->annotationPropertiesPopup = new QFrame(this, Qt::Popup);
-        d->annotationPropertyWidget = AnnotationWidgetFactory::widgetFor(annotation);
-        d->annotationPropertyWidget->setAnnotTypeEditable(false);
-        auto *popupLayout = new QVBoxLayout(d->annotationPropertiesPopup);
-        popupLayout->addWidget(d->annotationPropertyWidget->appearanceWidget());
-        auto *buttonLayout = new QHBoxLayout;
-        buttonLayout->addStretch();
-        auto *applyButton = new QPushButton(i18n("Apply"), d->annotationPropertiesPopup);
-        auto *cancelButton = new QPushButton(i18n("Cancel"), d->annotationPropertiesPopup);
-        applyButton->setEnabled(false);
-        buttonLayout->addWidget(cancelButton);
-        buttonLayout->addWidget(applyButton);
-        popupLayout->addLayout(buttonLayout);
-
-        connect(d->annotationPropertyWidget, &AnnotationWidget::dataChanged, applyButton, [applyButton] { applyButton->setEnabled(true); });
-        connect(applyButton, &QPushButton::clicked, this, [this, annotation, pageNumber] {
-            if (focusedAnnotation() != annotation || focusedAnnotationPageNumber() != pageNumber || !d->annotationPropertyWidget) {
-                return;
-            }
-            d->document->prepareToModifyAnnotationProperties(annotation);
-            d->annotationPropertyWidget->applyChanges();
-            d->document->modifyPageAnnotationProperties(pageNumber, annotation);
-            d->annotationPropertiesPopup->hide();
-        });
-        connect(cancelButton, &QPushButton::clicked, d->annotationPropertiesPopup, &QWidget::hide);
-
-        d->annotationPropertiesPopup->adjustSize();
-        d->annotationPropertiesPopup->move(d->annotationStrokesButton->mapToGlobal(QPoint(0, d->annotationStrokesButton->height())));
-        d->annotationPropertiesPopup->show();
+        if (!annotations.isEmpty() && d->annotator) {
+            d->annotator->showAnnotationSettings(annotations, pageNumber, d->annotationStrokesButton);
+        }
     });
     d->setting_viewCols = Okular::Settings::viewColumns();
     d->rtl_Mode = Okular::Settings::rtlReadingDirection();
@@ -563,14 +532,13 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
 
 PageView::~PageView()
 {
+        updateAnnotationSelectionPanel();
 #if HAVE_SPEECH
     if (d->m_tts) {
         d->m_tts->stopAllSpeechs();
     }
 #endif
 
-    delete d->annotationPropertiesPopup;
-    delete d->annotationPropertyWidget;
     delete d->mouseAnnotation;
 
     // delete the local storage structure
@@ -600,15 +568,32 @@ int PageView::focusedAnnotationPageNumber() const
 
 void PageView::copyFocusedAnnotation()
 {
-    Okular::Annotation *annotation = focusedAnnotation();
-    const int pageNumber = focusedAnnotationPageNumber();
-    if (!annotation || pageNumber < 0 || !d->document->isAllowed(Okular::AllowCopy)) {
-        return;
+    copySelectedAnnotations();
+}
+
+bool PageView::copySelectedAnnotations()
+{
+    if (!d->document->isAllowed(Okular::AllowCopy)) {
+        return false;
+    }
+    const QList<AnnotationDescription> selected = d->mouseAnnotation->selectedAnnotations();
+    if (selected.isEmpty()) {
+        return false;
+    }
+    const auto supportsCopy = [](const Okular::Annotation *annotation) {
+        return annotation->subType() == Okular::Annotation::AText || annotation->subType() == Okular::Annotation::ALine || annotation->subType() == Okular::Annotation::AGeom
+            || annotation->subType() == Okular::Annotation::AInk;
+    };
+    if (!std::all_of(selected.cbegin(), selected.cend(), [&supportsCopy](const AnnotationDescription &description) { return supportsCopy(description.annotation); })) {
+        return false;
     }
 
-    AnnotationPopup popup(d->document, AnnotationPopup::SingleAnnotationMode, this);
-    popup.addAnnotation(annotation, pageNumber);
-    popup.doCopyAnnotation({annotation, pageNumber});
+    AnnotationPopup popup(d->document, AnnotationPopup::MultiAnnotationMode, this);
+    for (const AnnotationDescription &description : selected) {
+        popup.addAnnotation(description.annotation, description.pageNumber);
+    }
+    popup.doCopyAnnotations();
+    return true;
 }
 
 void PageView::deleteSelectedAnnotations()
@@ -619,9 +604,22 @@ void PageView::deleteSelectedAnnotations()
 
 void PageView::selectAnnotation(Okular::Annotation *annotation, int pageNumber)
 {
+    selectAnnotations({annotation}, pageNumber);
+}
+
+void PageView::selectAnnotations(const QList<Okular::Annotation *> &annotations, int pageNumber)
+{
     for (PageViewItem *item : std::as_const(d->items)) {
         if (item->pageNumber() == pageNumber) {
-            d->mouseAnnotation->selectAnnotation(item, annotation);
+            QList<AnnotationDescription> selected;
+            for (Okular::Annotation *annotation : annotations) {
+                AnnotationDescription description;
+                description.annotation = annotation;
+                description.pageViewItem = item;
+                description.pageNumber = pageNumber;
+                selected.append(description);
+            }
+            d->mouseAnnotation->selectAnnotations(selected);
             updateAnnotationSelectionPanel();
             return;
         }
@@ -630,12 +628,9 @@ void PageView::selectAnnotation(Okular::Annotation *annotation, int pageNumber)
 
 void PageView::updateAnnotationSelectionPanel()
 {
-    Okular::Annotation *annotation = d->annotationSelectionMode ? focusedAnnotation() : nullptr;
+    const QList<AnnotationDescription> selected = d->mouseAnnotation->selectedAnnotations();
+    Okular::Annotation *annotation = d->annotationSelectionMode && !selected.isEmpty() ? selected.constFirst().annotation : nullptr;
     if (annotation != d->annotationPanelAnnotation) {
-        delete d->annotationPropertiesPopup;
-        d->annotationPropertiesPopup = nullptr;
-        delete d->annotationPropertyWidget;
-        d->annotationPropertyWidget = nullptr;
         d->annotationPanelAnnotation = annotation;
     }
 
@@ -644,11 +639,49 @@ void PageView::updateAnnotationSelectionPanel()
         return;
     }
 
-    d->annotationStrokesButton->setEnabled(d->document->canModifyPageAnnotation(annotation));
-    d->annotationCopyButton->setEnabled(d->document->isAllowed(Okular::AllowCopy));
-    d->annotationDeleteButton->setEnabled(d->document->canRemovePageAnnotation(annotation));
+    const auto settingsToolId = [](const Okular::Annotation *candidate) {
+        switch (candidate->subType()) {
+        case Okular::Annotation::AInk:
+            return 15;
+        case Okular::Annotation::AGeom:
+            return static_cast<const Okular::GeomAnnotation *>(candidate)->geometricalType() == Okular::GeomAnnotation::InscribedCircle ? 12 : 11;
+        case Okular::Annotation::ALine: {
+            const auto *line = static_cast<const Okular::LineAnnotation *>(candidate);
+            return line->linePoints().size() > 2 ? 13 : (line->lineIntent() == Okular::LineAnnotation::Arrow ? 9 : 10);
+        }
+        default:
+            return -1;
+        }
+    };
+    const int commonSettingsTool = settingsToolId(annotation);
+    const bool compatibleSettings = commonSettingsTool >= 0 && std::all_of(selected.cbegin(), selected.cend(), [this, commonSettingsTool, &settingsToolId](const AnnotationDescription &description) {
+        return settingsToolId(description.annotation) == commonSettingsTool && d->document->canModifyPageAnnotation(description.annotation);
+    });
+    d->annotationStrokesButton->setEnabled(compatibleSettings);
+    const bool allCopyable = std::all_of(selected.cbegin(), selected.cend(), [](const AnnotationDescription &description) {
+        const Okular::Annotation::SubType type = description.annotation->subType();
+        return type == Okular::Annotation::AText || type == Okular::Annotation::ALine || type == Okular::Annotation::AGeom || type == Okular::Annotation::AInk;
+    });
+    d->annotationCopyButton->setEnabled(d->document->isAllowed(Okular::AllowCopy) && allCopyable);
+    d->annotationDeleteButton->setEnabled(std::any_of(selected.cbegin(), selected.cend(), [this](const AnnotationDescription &description) {
+        return d->document->canRemovePageAnnotation(description.annotation);
+    }));
     d->annotationSelectionPanel->adjustSize();
-    d->annotationSelectionPanel->move(qMax(8, viewport()->width() - d->annotationSelectionPanel->width() - 8), 8);
+    QRect selectionRect;
+    for (const AnnotationDescription &description : selected) {
+        QRect annotationRect = Okular::AnnotationUtils::annotationGeometry(description.annotation, description.pageViewItem->uncroppedWidth(), description.pageViewItem->uncroppedHeight());
+        annotationRect.translate(description.pageViewItem->uncroppedGeometry().topLeft() - contentAreaPosition());
+        selectionRect = selectionRect.isNull() ? annotationRect : selectionRect.united(annotationRect);
+    }
+    const int margin = 8;
+    const int availableX = qMax(margin, viewport()->width() - d->annotationSelectionPanel->width() - margin);
+    const int x = qBound(margin, selectionRect.center().x() - d->annotationSelectionPanel->width() / 2, availableX);
+    int y = selectionRect.top() - d->annotationSelectionPanel->height() - margin;
+    if (y < margin) {
+        y = selectionRect.bottom() + margin;
+    }
+    const int availableY = qMax(margin, viewport()->height() - d->annotationSelectionPanel->height() - margin);
+    d->annotationSelectionPanel->move(x, qBound(margin, y, availableY));
     d->annotationSelectionPanel->raise();
 }
 
@@ -2517,6 +2550,7 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
     }
     if (d->annotationSelectionMode) {
         d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton);
+        updateAnnotationSelectionPanel();
         updateCursor();
         return;
     }
@@ -2647,13 +2681,13 @@ void PageView::mousePressEvent(QMouseEvent *e)
         if (e->button() == Qt::LeftButton) {
             PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
             if (pageItem) {
-                d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                 d->mouseAnnotation->routeMousePressEvent(pageItem, eventPos, true);
                 if (d->mouseAnnotation->isActive()) {
                     d->scroller->stop();
                     updateAnnotationSelectionPanel();
                     return;
                 }
+                d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                 updateAnnotationSelectionPanel();
                 d->annotationAreaSelectionDragging = true;
                 d->annotationAreaSelectionItem = pageItem;

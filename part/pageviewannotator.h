@@ -139,6 +139,7 @@ public:
     void setAnnotationInnerColor(const QColor &color);
     void setAnnotationOpacity(double opacity);
     void setAnnotationFont(const QFont &font);
+    bool showAnnotationSettings(const QList<Okular::Annotation *> &annotations, int pageNumber, QWidget *anchorWidget);
 
 public Q_SLOTS:
     void setContinuousMode(bool enabled);

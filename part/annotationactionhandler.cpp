@@ -46,6 +46,8 @@
 #include "actionbar.h"
 #include "annotationwidgets.h"
 #include "core/annotations.h"
+#include "core/document.h"
+#include "core/page.h"
 #include "gui/guiutils.h"
 #include "pageview.h"
 #include "pageviewannotator.h"
@@ -131,7 +133,7 @@ public:
     void slotQuickToolSelected(int favToolId);
     void slotSetColor(AnnotationColor colorType, const QColor &color = QColor());
     void slotSelectAnnotationFont();
-    bool showToolSettings(QAction *action);
+    bool showToolSettings(QAction *action, Okular::Document *document = nullptr, const QList<Okular::Annotation *> &annotations = {}, int pageNumber = -1, QWidget *anchorWidget = nullptr);
     bool isQuickToolAction(QAction *aTool);
     bool isQuickToolStamp(int toolId);
     void assertToolBarExists(KParts::MainWindow *mw, const QString &toolBarName);
@@ -227,16 +229,29 @@ QAction *AnnotationActionHandlerPrivate::selectActionItem(KSelectAction *aList, 
     return aCustom;
 }
 
-bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
+bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::Document *document, const QList<Okular::Annotation *> &selectedAnnotations, int pageNumber, QWidget *anchorWidget)
 {
     const auto kindIt = drawingToolKinds.constFind(action);
     if (kindIt == drawingToolKinds.cend()) {
         return false;
     }
     const bool isFreeformHighlight = drawingToolIds.value(action, -1) == 15;
+    Okular::Annotation *selectedAnnotation = selectedAnnotations.isEmpty() ? nullptr : selectedAnnotations.constFirst();
 
     const QString key = action->objectName().isEmpty() ? action->text() : action->objectName();
     DrawingToolSettings &initialSettings = drawingToolSettings[key];
+    if (selectedAnnotation) {
+        initialSettings.width = selectedAnnotation->style().width() / 0.75;
+        initialSettings.color = selectedAnnotation->style().color();
+        initialSettings.fillColor = QColor();
+        initialSettings.fillOpacity = 0;
+        if (selectedAnnotation->subType() == Okular::Annotation::AGeom) {
+            const auto *geometry = static_cast<const Okular::GeomAnnotation *>(selectedAnnotation);
+            initialSettings.fillColor = geometry->geometricalInnerColor();
+            initialSettings.fillOpacity = geometry->geometricalInnerColor().isValid() ? geometry->geometricalInnerColor().alpha() * 100 / 255 : 0;
+        }
+        initialSettings.initialized = true;
+    }
     if (!initialSettings.initialized) {
         if (*kindIt == DrawingToolKind::Eraser) {
             initialSettings.width = annotator->eraserWidth();
@@ -255,6 +270,18 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
         }
         initialSettings.initialized = true;
     }
+
+    QStringList selectedAnnotationNames;
+    for (Okular::Annotation *annotation : selectedAnnotations) {
+        selectedAnnotationNames.append(annotation->uniqueName());
+    }
+    bool selectedAnnotationChanged = false;
+    bool selectedWidthChanged = false;
+    bool selectedColorChanged = false;
+    bool selectedFillColorChanged = false;
+    bool selectedFillOpacityChanged = false;
+    bool selectedOpacityChanged = false;
+    double selectedOpacity = selectedAnnotation ? selectedAnnotation->style().opacity() : 1.0;
 
     QDialog popup;
     popup.setObjectName(QStringLiteral("toolSettingsPanel"));
@@ -303,7 +330,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
     QWidget *controlParent = contents;
     QVBoxLayout *controlLayout = layout;
     QWidget *freeformControls = nullptr;
-    if (isFreeformHighlight) {
+    if (isFreeformHighlight && !selectedAnnotation) {
         auto *mode = new QComboBox(contents);
         mode->addItems({i18n("Text Highlight"), i18n("Freeform Highlight")});
         mode->setCurrentIndex(freeformHighlightActive ? 1 : 0);
@@ -359,8 +386,13 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
         QObject::connect(slider, &QSlider::valueChanged, spinBox, [spinBox, scale](int value) { spinBox->setValue(static_cast<double>(value) / scale); });
         QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, slider, [slider, scale](double value) { slider->setValue(qRound(value * scale)); });
         QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, currentValue, [currentValue](double value) { currentValue->setText(i18n("%1 px", value)); });
-        QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, q, [this, key, kind = *kindIt](double value) {
+        QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, q, [this, key, kind = *kindIt, selectedAnnotation, &selectedAnnotationChanged, &selectedWidthChanged](double value) {
             drawingToolSettings[key].width = value;
+            if (selectedAnnotation) {
+                selectedAnnotationChanged = true;
+            selectedWidthChanged = true;
+                return;
+            }
             if (kind == DrawingToolKind::Eraser) {
                 annotator->setEraserWidth(value);
             } else if (kind != DrawingToolKind::Line && kind != DrawingToolKind::Arrow) {
@@ -428,18 +460,24 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
             for (int index = 0; index < colorPresets.size(); ++index) {
                 QToolButton *button = colorPresets.at(index);
                 const QColor preset = presetColors.at(index);
-                QObject::connect(button, &QToolButton::clicked, q, [this, button, colorPresets, preset, swatch, setSwatch, key] {
+                QObject::connect(button, &QToolButton::clicked, q, [this, button, colorPresets, preset, swatch, setSwatch, key, selectedAnnotation, &selectedAnnotationChanged, &selectedColorChanged] {
                     for (QToolButton *presetButton : colorPresets) {
                         presetButton->setChecked(presetButton == button);
                     }
                     drawingToolSettings[key].color = preset;
+                    if (selectedAnnotation) {
+                        selectedAnnotationChanged = true;
+                        selectedColorChanged = true;
+                        setSwatch(preset);
+                        return;
+                    }
                     currentColor = preset;
                     annotator->setAnnotationColor(preset);
                     setSwatch(preset);
                 });
             }
         }
-        QObject::connect(swatch, &QToolButton::clicked, q, [this, swatch, colorPresets, key, label, fillColor] {
+        QObject::connect(swatch, &QToolButton::clicked, q, [this, swatch, colorPresets, key, label, fillColor, selectedAnnotation, &selectedAnnotationChanged, &selectedColorChanged, &selectedFillColorChanged] {
             const QColor initial = fillColor ? drawingToolSettings.value(key).fillColor : drawingToolSettings.value(key).color;
             QColorDialog colorDialog(initial, drawingToolBar ? drawingToolBar->window() : QApplication::activeWindow());
             colorDialog.setWindowTitle(label);
@@ -456,14 +494,25 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
             }
             if (fillColor) {
                 drawingToolSettings[key].fillColor = selected;
+                if (selectedAnnotation) {
+                    selectedAnnotationChanged = true;
+                    selectedFillColorChanged = true;
+                }
                 QColor effectiveFillColor = selected;
                 effectiveFillColor.setAlphaF(drawingToolSettings[key].fillOpacity / 100.0);
-                currentInnerColor = effectiveFillColor;
-                annotator->setAnnotationInnerColor(effectiveFillColor);
+                if (!selectedAnnotation) {
+                    currentInnerColor = effectiveFillColor;
+                    annotator->setAnnotationInnerColor(effectiveFillColor);
+                }
             } else {
                 drawingToolSettings[key].color = selected;
-                currentColor = selected;
-                annotator->setAnnotationColor(selected);
+                if (selectedAnnotation) {
+                    selectedAnnotationChanged = true;
+                    selectedColorChanged = true;
+                } else {
+                    currentColor = selected;
+                    annotator->setAnnotationColor(selected);
+                }
             }
             QPixmap pixmap(18, 18);
             pixmap.fill(fillColor ? drawingToolSettings.value(key).fillColor : selected);
@@ -478,6 +527,31 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
 
     if (*kindIt != DrawingToolKind::Eraser) {
         addColorControl(i18n("Color"), false);
+    }
+    if (selectedAnnotation && selectedAnnotation->subType() == Okular::Annotation::AInk) {
+        auto *row = new QHBoxLayout;
+        row->addWidget(new QLabel(i18n("Opacity"), contents));
+        auto *opacity = new QComboBox(contents);
+        int currentIndex = -1;
+        for (double value : opacityStandardValues) {
+            opacity->addItem(GuiUtils::createOpacityIcon(value), i18n("%1%", qRound(value * 100)), value);
+            if (qFuzzyCompare(value, selectedOpacity)) {
+                currentIndex = opacity->count() - 1;
+            }
+        }
+        if (currentIndex < 0) {
+            opacity->insertItem(0, GuiUtils::createOpacityIcon(selectedOpacity), i18n("%1%", qRound(selectedOpacity * 100)), selectedOpacity);
+            currentIndex = 0;
+        }
+        opacity->setCurrentIndex(currentIndex);
+        row->addStretch(1);
+        row->addWidget(opacity);
+        layout->addLayout(row);
+        QObject::connect(opacity, &QComboBox::currentIndexChanged, q, [opacity, selectedAnnotation, &selectedAnnotationChanged, &selectedOpacityChanged, &selectedOpacity](int index) {
+            selectedOpacity = opacity->itemData(index).toDouble();
+            selectedAnnotationChanged = true;
+            selectedOpacityChanged = true;
+        });
     }
     if (*kindIt == DrawingToolKind::Rectangle || *kindIt == DrawingToolKind::Ellipse) {
         addColorControl(i18n("Fill color"), true);
@@ -494,8 +568,13 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
         layout->addWidget(opacitySlider);
         opacityValue->setText(i18n("%1%", opacitySlider->value()));
         QObject::connect(opacitySlider, &QSlider::valueChanged, opacityValue, [opacityValue](int value) { opacityValue->setText(i18n("%1%", value)); });
-        QObject::connect(opacitySlider, &QSlider::valueChanged, q, [this, key](int value) {
+        QObject::connect(opacitySlider, &QSlider::valueChanged, q, [this, key, selectedAnnotation, &selectedAnnotationChanged, &selectedFillOpacityChanged](int value) {
             drawingToolSettings[key].fillOpacity = value;
+            if (selectedAnnotation) {
+                selectedAnnotationChanged = true;
+            selectedFillOpacityChanged = true;
+                return;
+            }
             QColor fill = drawingToolSettings[key].fillColor;
             fill.setAlphaF(value / 100.0);
             currentInnerColor = fill;
@@ -517,7 +596,9 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
     popup.ensurePolished();
     popup.adjustSize();
     QPoint popupPosition = QCursor::pos();
-    if (drawingToolBar) {
+    if (anchorWidget) {
+        popupPosition = anchorWidget->mapToGlobal(QPoint(0, anchorWidget->height() + 4));
+    } else if (drawingToolBar) {
         if (QWidget *toolButton = drawingToolBar->widgetForAction(action)) {
             popupPosition = toolButton->mapToGlobal(QPoint(toolButton->width() + 6, 0));
         }
@@ -531,6 +612,55 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action)
     }
     popup.move(popupPosition);
     popup.exec();
+
+    if (document && selectedAnnotation && selectedAnnotationChanged) {
+        const Okular::Page *page = document->page(pageNumber);
+        QList<Okular::Annotation *> annotationsToModify;
+        if (page) {
+            for (const QString &name : std::as_const(selectedAnnotationNames)) {
+                Okular::Annotation *annotation = page->annotation(name);
+                if (annotation && document->canModifyPageAnnotation(annotation)) {
+                    annotationsToModify.append(annotation);
+                }
+            }
+        }
+        if (annotationsToModify.size() > 1) {
+            document->beginUndoMacro(i18n("modify annotation properties"));
+        }
+        for (Okular::Annotation *annotation : std::as_const(annotationsToModify)) {
+            document->prepareToModifyAnnotationProperties(annotation);
+            if (selectedWidthChanged) {
+                annotation->style().setWidth(drawingToolSettings.value(key).width * 0.75);
+            }
+            if (selectedColorChanged) {
+                annotation->style().setColor(drawingToolSettings.value(key).color);
+            }
+            if (selectedOpacityChanged && annotation->subType() == Okular::Annotation::AInk) {
+                annotation->style().setOpacity(selectedOpacity);
+            }
+            if (annotation->subType() == Okular::Annotation::AGeom) {
+                auto *geometry = static_cast<Okular::GeomAnnotation *>(annotation);
+                if (selectedFillColorChanged || selectedFillOpacityChanged) {
+                    QColor fill = geometry->geometricalInnerColor();
+                    if (selectedFillColorChanged) {
+                        const QColor selectedFill = drawingToolSettings.value(key).fillColor;
+                        fill = selectedFill;
+                        if (fill.isValid() && !selectedFillOpacityChanged) {
+                            fill.setAlpha(geometry->geometricalInnerColor().isValid() ? geometry->geometricalInnerColor().alpha() : 0);
+                        }
+                    }
+                    if (selectedFillOpacityChanged && fill.isValid()) {
+                        fill.setAlpha(qRound(drawingToolSettings.value(key).fillOpacity * 2.55));
+                    }
+                    geometry->setGeometricalInnerColor(fill);
+                }
+            }
+            document->modifyPageAnnotationProperties(pageNumber, annotation);
+        }
+        if (annotationsToModify.size() > 1) {
+            document->endUndoMacro();
+        }
+    }
     return true;
 }
 
@@ -1247,6 +1377,50 @@ AnnotationActionHandler::~AnnotationActionHandler()
 {
     // delete the private data storage structure
     delete d;
+}
+
+bool AnnotationActionHandler::showAnnotationSettings(Okular::Document *document, const QList<Okular::Annotation *> &annotations, int pageNumber, QWidget *anchorWidget)
+{
+    if (!document || annotations.isEmpty() || pageNumber < 0) {
+        return false;
+    }
+
+    const auto toolIdForAnnotation = [](const Okular::Annotation *annotation) {
+        switch (annotation->subType()) {
+        case Okular::Annotation::AInk:
+            return 15;
+        case Okular::Annotation::AGeom: {
+            const auto *geometry = static_cast<const Okular::GeomAnnotation *>(annotation);
+            return geometry->geometricalType() == Okular::GeomAnnotation::InscribedCircle ? 12 : 11;
+        }
+        case Okular::Annotation::ALine: {
+            const auto *line = static_cast<const Okular::LineAnnotation *>(annotation);
+            if (line->linePoints().size() > 2) {
+                return 13;
+            }
+            return line->lineIntent() == Okular::LineAnnotation::Arrow ? 9 : 10;
+        }
+        default:
+            return -1;
+        }
+    };
+
+    const int toolId = toolIdForAnnotation(annotations.constFirst());
+    if (toolId < 0) {
+        return false;
+    }
+    for (Okular::Annotation *annotation : annotations) {
+        if (toolIdForAnnotation(annotation) != toolId || !document->canModifyPageAnnotation(annotation)) {
+            return false;
+        }
+    }
+
+    for (auto it = d->drawingToolIds.cbegin(); it != d->drawingToolIds.cend(); ++it) {
+        if (it.value() == toolId) {
+            return d->showToolSettings(it.key(), document, annotations, pageNumber, anchorWidget);
+        }
+    }
+    return false;
 }
 
 bool AnnotationActionHandler::eventFilter(QObject *watched, QEvent *event)

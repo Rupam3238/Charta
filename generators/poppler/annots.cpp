@@ -296,6 +296,13 @@ static void setSharedAnnotationPropertiesToPopplerAnnotation(const Okular::Annot
     popplerAnnotation->setModificationDate(okularAnnotation->modificationDate());
 }
 
+static bool sameStyle(const Okular::Annotation::Style &okularStyle, const Poppler::Annotation::Style &popplerStyle)
+{
+    return okularStyle.color() == popplerStyle.color() && qFuzzyCompare(okularStyle.opacity(), popplerStyle.opacity()) && qFuzzyCompare(okularStyle.width(), popplerStyle.width())
+        && okularToPoppler(okularStyle.lineStyle()) == popplerStyle.lineStyle() && okularToPoppler(okularStyle.lineEffect()) == popplerStyle.lineEffect()
+        && qFuzzyCompare(okularStyle.effectIntensity(), popplerStyle.effectIntensity()) && okularStyle.xCorners() == popplerStyle.xCorners() && okularStyle.yCorners() == popplerStyle.yCorners();
+}
+
 static void setPopplerStampAnnotationCustomImage(const Poppler::Page *page, Poppler::StampAnnotation *pStampAnnotation, const Okular::StampAnnotation *oStampAnnotation)
 {
     const QString iconName = oStampAnnotation->stampIconName();
@@ -661,13 +668,8 @@ void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int pag
         }
 
         ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::StampAnnotation *>(okl_ann), ppl_page.get());
-        if (deletedStampsAnnotationAppearance.find(static_cast<Okular::StampAnnotation *>(okl_ann)) != deletedStampsAnnotationAppearance.end()) {
-            ppl_ann->setAnnotationAppearance(*deletedStampsAnnotationAppearance[static_cast<Okular::StampAnnotation *>(okl_ann)].get());
-            deletedStampsAnnotationAppearance.erase(static_cast<Okular::StampAnnotation *>(okl_ann));
-
-            if (wasDenyWriteEnabled) {
-                okl_ann->setFlags(okl_ann->flags() | Okular::Annotation::DenyWrite);
-            }
+        if (wasDenyWriteEnabled) {
+            okl_ann->setFlags(okl_ann->flags() | Okular::Annotation::DenyWrite);
         }
     } break;
     case Okular::Annotation::AInk:
@@ -694,6 +696,13 @@ void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int pag
         return;
     }
 
+    if (auto appearance = deletedAnnotationAppearances.find(okl_ann); appearance != deletedAnnotationAppearances.end()) {
+        if (appearance->second) {
+            ppl_ann->setAnnotationAppearance(*appearance->second);
+        }
+        deletedAnnotationAppearances.erase(appearance);
+    }
+
     okl_ann->setFlags(okl_ann->flags() | Okular::Annotation::ExternallyDrawn);
 
     // Bind poppler object to page
@@ -718,6 +727,15 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
     }
 
     QMutexLocker ml(mutex);
+
+    const QRectF newBoundary = normRectToRectF(okl_ann->boundingRectangle());
+    std::unique_ptr<Poppler::AnnotationAppearance> savedAppearance;
+    const bool positionOnlyGeomChange = ppl_ann->boundary() != newBoundary && sameStyle(okl_ann->style(), ppl_ann->style()) && okl_ann->subType() == Okular::Annotation::AGeom
+        && static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalInnerColor() == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomInnerColor()
+        && okularToPoppler(static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalType()) == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomType();
+    if (positionOnlyGeomChange) {
+        savedAppearance = ppl_ann->annotationAppearance();
+    }
 
     if (okl_ann->flags() & (Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized)) {
         // Okular ui already renders the annotation on its own
@@ -802,6 +820,10 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
         break;
     }
 
+    if (savedAppearance) {
+        ppl_ann->setAnnotationAppearance(*savedAppearance);
+    }
+
     qCDebug(OkularPdfDebug) << okl_ann->uniqueName();
 }
 
@@ -817,9 +839,7 @@ void PopplerAnnotationProxy::notifyRemoval(Okular::Annotation *okl_ann, int page
 
     std::unique_ptr<Poppler::Page> ppl_page = ppl_doc->page(page);
     annotationsOnOpenHash->remove(okl_ann);
-    if (okl_ann->subType() == Okular::Annotation::AStamp) {
-        deletedStampsAnnotationAppearance[static_cast<Okular::StampAnnotation *>(okl_ann)] = ppl_ann->annotationAppearance();
-    }
+    deletedAnnotationAppearances[okl_ann] = ppl_ann->annotationAppearance();
     ppl_page->removeAnnotation(ppl_ann); // Also destroys ppl_ann
 
     okl_ann->setNativeId(QVariant::fromValue(0)); // So that we don't double-free in disposeAnnotation

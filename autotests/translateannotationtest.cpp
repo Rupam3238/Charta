@@ -9,6 +9,7 @@
 #include "../settings_core.h"
 #include "core/annotations.h"
 #include "core/document.h"
+#include "core/page.h"
 #include "testingutils.h"
 #include <QMimeDatabase>
 #include <QMimeType>
@@ -40,6 +41,8 @@ private Q_SLOTS:
     void testSequentialTranslationsMergedIfBeingMovedIsSet();
     void testSequentialTranslationsNotMergedIfBeingMovedIsNotSet();
     void testAlternateTranslationsNotMerged();
+    void testGroupedTranslationsUndoTogether();
+    void testGeometryAppearanceSurvivesTranslateAndDeleteUndo();
 
 private:
     Okular::Document *m_document;
@@ -120,7 +123,6 @@ void TranslateAnnotationTest::testTranslateAnnotation()
     // undo and ensure m_annot1 is back to where it started
     m_document->undo();
     QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot1->linePoints(), m_origPoints1));
-
     // redo then translate m_annot1 by m_deltaB
     m_document->redo();
     QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot1->linePoints(), m_points1DeltaA));
@@ -207,6 +209,58 @@ void TranslateAnnotationTest::testAlternateTranslationsNotMerged()
     m_document->undo();
     QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot1->linePoints(), m_origPoints1));
     QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot2->linePoints(), m_origPoints2));
+}
+
+void TranslateAnnotationTest::testGroupedTranslationsUndoTogether()
+{
+    m_annot1->setFlags(m_annot1->flags() | Okular::Annotation::BeingMoved);
+    m_annot2->setFlags(m_annot2->flags() | Okular::Annotation::BeingMoved);
+    m_document->beginUndoMacro(QStringLiteral("move annotations"));
+    m_document->translatePageAnnotation(0, m_annot1, m_deltaA);
+    m_document->translatePageAnnotation(0, m_annot2, m_deltaA);
+    m_annot1->setFlags(m_annot1->flags() & ~Okular::Annotation::BeingMoved);
+    m_annot2->setFlags(m_annot2->flags() & ~Okular::Annotation::BeingMoved);
+    m_document->translatePageAnnotation(0, m_annot1, Okular::NormalizedPoint(0.0, 0.0));
+    m_document->translatePageAnnotation(0, m_annot2, Okular::NormalizedPoint(0.0, 0.0));
+    m_document->endUndoMacro();
+
+    QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot1->linePoints(), m_points1DeltaA));
+    QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot2->linePoints(), m_points2DeltaA));
+    m_document->undo();
+    QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot1->linePoints(), m_origPoints1));
+    QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot2->linePoints(), m_origPoints2));
+}
+
+void TranslateAnnotationTest::testGeometryAppearanceSurvivesTranslateAndDeleteUndo()
+{
+    auto *annotation = new Okular::GeomAnnotation;
+    annotation->setBoundingRectangle(Okular::NormalizedRect(0.1, 0.1, 0.4, 0.4));
+    annotation->style().setColor(QColor(20, 40, 60));
+    annotation->style().setWidth(4.5);
+    annotation->style().setOpacity(0.75);
+    annotation->setGeometricalType(Okular::GeomAnnotation::InscribedSquare);
+    annotation->setGeometricalInnerColor(QColor(210, 80, 40, 96));
+    const Okular::NormalizedRect originalRect = annotation->boundingRectangle();
+    const QColor originalFill = annotation->geometricalInnerColor();
+    m_document->addPageAnnotation(0, annotation);
+
+    m_document->translatePageAnnotation(0, annotation, m_deltaA);
+    QCOMPARE(annotation->geometricalInnerColor(), originalFill);
+    QCOMPARE(annotation->style().color(), QColor(20, 40, 60));
+    QCOMPARE(annotation->style().width(), 4.5);
+    QCOMPARE(annotation->style().opacity(), 0.75);
+    m_document->undo();
+    QCOMPARE(annotation->boundingRectangle().left, originalRect.left);
+    QCOMPARE(annotation->geometricalInnerColor(), originalFill);
+
+    m_document->removePageAnnotation(0, annotation);
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotation(annotation->uniqueName()), annotation);
+    QCOMPARE(annotation->geometricalInnerColor(), originalFill);
+    QCOMPARE(annotation->style().color(), QColor(20, 40, 60));
+    QCOMPARE(annotation->style().width(), 4.5);
+    QCOMPARE(annotation->style().opacity(), 0.75);
+    QCOMPARE(annotation->boundingRectangle().left, originalRect.left);
 }
 
 QTEST_MAIN(TranslateAnnotationTest)
