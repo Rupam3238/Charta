@@ -1,6 +1,9 @@
 /* Defines if force the use DRM in okular */
 #define OKULAR_FORCE_DRM ${_OKULAR_FORCE_DRM}
 
+/* KDE plugin directory used by the installed Charta application */
+#define CHARTA_PLUGIN_INSTALL_DIR "@KDE_INSTALL_FULL_PLUGINDIR@"
+
 /* Defines if the purpose framework is available */
 #cmakedefine01 HAVE_PURPOSE
 

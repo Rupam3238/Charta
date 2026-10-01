@@ -22,8 +22,11 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QDir>
+#include <QFileInfo>
 #include <QFileOpenEvent>
 #include <QObject>
+#include <QStandardPaths>
 #include <QStringList>
 #include <QTextStream>
 #include <QtGlobal>
@@ -65,6 +68,16 @@ protected:
 
 int main(int argc, char **argv)
 {
+    QStringList pluginPaths;
+    const QString executablePath = QStandardPaths::findExecutable(QString::fromLocal8Bit(argv[0]));
+    if (!executablePath.isEmpty()) {
+        pluginPaths.append(QFileInfo(executablePath).absolutePath());
+    }
+    pluginPaths.append(QStringLiteral(CHARTA_PLUGIN_INSTALL_DIR));
+    pluginPaths.append(qEnvironmentVariable("QT_PLUGIN_PATH").split(QDir::listSeparator(), Qt::SkipEmptyParts));
+    pluginPaths.removeDuplicates();
+    qputenv("QT_PLUGIN_PATH", pluginPaths.join(QDir::listSeparator()).toLocal8Bit());
+
     /**
      * trigger initialisation of proper icon theme
      */
