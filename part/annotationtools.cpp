@@ -6,6 +6,8 @@
 
 #include "annotationtools.h"
 
+#include <cmath>
+
 // qt / kde includes
 #include <QColor>
 #include <QCursor>
@@ -126,37 +128,54 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
         m_pageWidth = page->width();
     }
     m_lastXScale = xScale;
-    const qreal screenPenWidth = basePenWidth * xScale / m_pageWidth;
     if (button != Left) {
         return QRect();
     }
 
     if (type == Press && points.isEmpty()) {
         const qreal pressure = qBound(0.0, modifiers.pressure, 1.0);
+        m_liveStroke.clear();
+        m_pressureSum = 0.0;
+        m_allDefaultPressure = true;
+        smoothingWindow.clear();
+        pressureWindow.clear();
+        smoothingSum = {};
         lastPoint = processPoint(Okular::NormalizedPoint(nX, nY), pressure);
+        const qreal processedPressure = pressureWindow.last();
         totalRect.left = totalRect.right = lastPoint.x;
         totalRect.top = totalRect.bottom = lastPoint.y;
         points.append(lastPoint);
-        pressures.append(pressureWindow.last());
+        pressures.append(processedPressure);
+        m_pressureSum += processedPressure;
+        m_allDefaultPressure = m_allDefaultPressure && qFuzzyCompare(processedPressure, 1.0);
+        QPen pen(m_engineColor, representativeStrokeWidth(m_pressureSum, pressures.size(), m_allDefaultPressure, basePenWidth) * xScale / m_pageWidth);
+        pen.setJoinStyle(Qt::RoundJoin);
+        pen.setCapStyle(Qt::RoundCap);
+        return m_liveStroke.addSegment(QPointF(lastPoint.x * xScale, lastPoint.y * yScale), QPointF(lastPoint.x * xScale, lastPoint.y * yScale), pen,
+                                       m_annotElement.attribute(QStringLiteral("opacity"), QStringLiteral("1.0")).toDouble());
     } else if (type == Move && points.count() > 0) {
         const qreal pressure = qBound(0.0, modifiers.pressure, 1.0);
+        const Okular::NormalizedPoint previousPoint = lastPoint;
         const Okular::NormalizedPoint nextPoint = processPoint(Okular::NormalizedPoint(nX, nY), pressure);
         points.append(nextPoint);
-        pressures.append(pressureWindow.last());
+        const qreal processedPressure = pressureWindow.last();
+        pressures.append(processedPressure);
+        m_pressureSum += processedPressure;
+        m_allDefaultPressure = m_allDefaultPressure && qFuzzyCompare(processedPressure, 1.0);
 
         totalRect.left = qMin(totalRect.left, nX);
         totalRect.top = qMin(totalRect.top, nY);
         totalRect.right = qMax(nX, totalRect.right);
         totalRect.bottom = qMax(nY, totalRect.bottom);
 
-        Okular::NormalizedRect incrementalRect;
-        incrementalRect.left = qMin(nextPoint.x, lastPoint.x);
-        incrementalRect.right = qMax(nextPoint.x, lastPoint.x);
-        incrementalRect.top = qMin(nextPoint.y, lastPoint.y);
-        incrementalRect.bottom = qMax(nextPoint.y, lastPoint.y);
         lastPoint = nextPoint;
-        const qreal radius = qMax<qreal>(1.0, pressures.last() * screenPenWidth * 2.0);
-        return incrementalRect.geometry((int)xScale, (int)yScale).adjusted(-qCeil(radius), -qCeil(radius), qCeil(radius), qCeil(radius));
+        const qreal representativeWidth = representativeStrokeWidth(m_pressureSum, pressures.size(), m_allDefaultPressure, basePenWidth);
+        QPen pen(m_engineColor, qBound<qreal>(0.5, processedPressure * representativeWidth * xScale / m_pageWidth, 100.0));
+        pen.setJoinStyle(Qt::RoundJoin);
+        pen.setCapStyle(Qt::RoundCap);
+        const QRect segmentRect = m_liveStroke.addSegment(QPointF(previousPoint.x * xScale, previousPoint.y * yScale), QPointF(nextPoint.x * xScale, nextPoint.y * yScale), pen,
+                                   m_annotElement.attribute(QStringLiteral("opacity"), QStringLiteral("1.0")).toDouble());
+        return segmentRect;
     } else if (type == Release && points.count() > 0) {
         if (points.count() < 2) {
             points.clear();
@@ -169,20 +188,11 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
     return QRect();
 }
 
-void SmoothPathEngine::paint(QPainter *painter, double xScale, double yScale, const QRect & /*clipRect*/)
+void SmoothPathEngine::paint(QPainter *painter, double xScale, double yScale, const QRect &clipRect)
 {
-    const double penWidth = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("1")).toInt();
-    const qreal opacity = m_annotElement.attribute(QStringLiteral("opacity"), QStringLiteral("1.0")).toDouble();
-
-    const QList<Okular::NormalizedPoint> &processedPoints = points;
-    const QList<qreal> &processedPressures = pressures;
-    QPen pen(m_engineColor, representativeStrokeWidth(processedPressures, penWidth) * xScale / m_pageWidth);
-    pen.setJoinStyle(Qt::RoundJoin);
-    pen.setCapStyle(Qt::RoundCap);
-    pen.setColor(m_engineColor);
-
-    const SmoothPath path(processedPoints, processedPressures, pen, opacity, compositionMode);
-    path.paint(painter, xScale, yScale);
+    Q_UNUSED(xScale);
+    Q_UNUSED(yScale);
+    m_liveStroke.paint(painter, clipRect);
 }
 
 void SmoothPath::paint(QPainter *painter, double xScale, double yScale) const
@@ -201,6 +211,75 @@ void SmoothPath::paint(QPainter *painter, double xScale, double yScale) const
                               QPointF(points[index].x * xScale, points[index].y * yScale));
         }
     }
+}
+
+QRect LiveStroke::addSegment(const QPointF &start, const QPointF &end, const QPen &pen, qreal opacity)
+{
+    const qreal margin = pen.widthF() / 2.0 + 2.0;
+    const QRect dirtyRect = QRectF(start, end).normalized().adjusted(-margin, -margin, margin, margin).toAlignedRect();
+    const int firstTileX = qFloor(static_cast<qreal>(dirtyRect.left()) / tileSize);
+    const int lastTileX = qFloor(static_cast<qreal>(dirtyRect.right()) / tileSize);
+    const int firstTileY = qFloor(static_cast<qreal>(dirtyRect.top()) / tileSize);
+    const int lastTileY = qFloor(static_cast<qreal>(dirtyRect.bottom()) / tileSize);
+
+    for (int tileY = firstTileY; tileY <= lastTileY; ++tileY) {
+        for (int tileX = firstTileX; tileX <= lastTileX; ++tileX) {
+            const QPoint key(tileX, tileY);
+            QImage &image = m_tiles[key];
+            if (image.isNull()) {
+                image = QImage(tileSize, tileSize, QImage::Format_ARGB32_Premultiplied);
+                image.fill(Qt::transparent);
+            }
+
+            const QPoint origin(tileX * tileSize, tileY * tileSize);
+            QPainter tilePainter(&image);
+            tilePainter.setRenderHint(QPainter::Antialiasing, true);
+            tilePainter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+            tilePainter.setOpacity(opacity);
+            tilePainter.setPen(pen);
+            tilePainter.drawLine(start - origin, end - origin);
+        }
+    }
+
+    m_bounds = m_bounds.isNull() ? dirtyRect : m_bounds.united(dirtyRect);
+    return dirtyRect;
+}
+
+void LiveStroke::paint(QPainter *painter, const QRect &clipRect) const
+{
+    if (m_tiles.isEmpty() || !m_bounds.intersects(clipRect)) {
+        return;
+    }
+
+    const int firstTileX = qFloor(static_cast<qreal>(clipRect.left()) / tileSize);
+    const int lastTileX = qFloor(static_cast<qreal>(clipRect.right()) / tileSize);
+    const int firstTileY = qFloor(static_cast<qreal>(clipRect.top()) / tileSize);
+    const int lastTileY = qFloor(static_cast<qreal>(clipRect.bottom()) / tileSize);
+    for (int tileY = firstTileY; tileY <= lastTileY; ++tileY) {
+        for (int tileX = firstTileX; tileX <= lastTileX; ++tileX) {
+            const QPoint key(tileX, tileY);
+            const auto image = m_tiles.constFind(key);
+            if (image != m_tiles.cend()) {
+                painter->drawImage(QPoint(tileX * tileSize, tileY * tileSize), image.value());
+            }
+        }
+    }
+}
+
+void LiveStroke::clear()
+{
+    m_tiles.clear();
+    m_bounds = {};
+}
+
+QRect LiveStroke::bounds() const
+{
+    return m_bounds;
+}
+
+QRect LiveStroke::tileRect(const QPoint &tile)
+{
+    return {tile.x() * tileSize, tile.y() * tileSize, tileSize, tileSize};
 }
 
 QList<Okular::Annotation *> SmoothPathEngine::end()
@@ -252,6 +331,11 @@ SmoothPath SmoothPathEngine::endSmoothPath()
     return SmoothPath(points, pressures, QPen(color, representativeStrokeWidth(pressures, width) * m_lastXScale / m_pageWidth), opacity, compositionMode);
 }
 
+QRect SmoothPathEngine::liveBounds() const
+{
+    return m_liveStroke.bounds();
+}
+
 Okular::NormalizedPoint SmoothPathEngine::processPoint(const Okular::NormalizedPoint &point, qreal pressure)
 {
     constexpr int smoothingWindowSize = 7;
@@ -285,6 +369,14 @@ qreal SmoothPathEngine::representativeStrokeWidth(const QList<qreal> &pressures,
     if (constantMousePressure) {
         return baseWidth;
     }
-    const qreal averagePressure = sum / pressures.size();
+    return representativeStrokeWidth(sum, pressures.size(), constantMousePressure, baseWidth);
+}
+
+qreal SmoothPathEngine::representativeStrokeWidth(qreal pressureSum, qsizetype pressureCount, bool allDefaultPressure, qreal baseWidth)
+{
+    if (pressureCount <= 0 || allDefaultPressure) {
+        return baseWidth;
+    }
+    const qreal averagePressure = pressureSum / pressureCount;
     return qBound(0.5, baseWidth * (0.75 + averagePressure), 12.0);
 }

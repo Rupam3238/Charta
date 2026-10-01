@@ -24,6 +24,7 @@ private Q_SLOTS:
     void testAddAnnotations();
     void testAddAnnotationUndoWithRotate_Bug318091();
     void testRemoveAnnotations();
+    void testRemoveAnnotationGroupUndoOnce();
 
 private:
     Okular::Document *m_document;
@@ -182,6 +183,33 @@ void AddRemoveAnnotationTest::testRemoveAnnotations()
     QVERIFY(TestingUtils::AnnotationDisposeWatcher::disposedAnnotationName().isEmpty());
     m_document->closeDocument();
     QVERIFY(TestingUtils::AnnotationDisposeWatcher::disposedAnnotationName() == annot1Name);
+}
+
+void AddRemoveAnnotationTest::testRemoveAnnotationGroupUndoOnce()
+{
+    QList<Okular::Annotation *> annotations;
+    for (int index = 0; index < 3; ++index) {
+        auto *annotation = new Okular::TextAnnotation;
+        annotation->setBoundingRectangle(Okular::NormalizedRect(0.1 + index * 0.1, 0.1, 0.2 + index * 0.1, 0.2));
+        annotation->setContents(QString::number(index));
+        m_document->addPageAnnotation(0, annotation);
+        annotations.append(annotation);
+    }
+    QCOMPARE(m_document->page(0)->annotations().size(), 3);
+
+    m_document->beginUndoMacro(QStringLiteral("erase gesture"));
+    m_document->removePageAnnotations(0, annotations);
+    m_document->endUndoMacro();
+    QVERIFY(m_document->page(0)->annotations().isEmpty());
+
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotations().size(), 3);
+    for (Okular::Annotation *annotation : annotations) {
+        QVERIFY(m_document->page(0)->annotations().contains(annotation));
+    }
+
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotations().size(), 2);
 }
 
 QTEST_MAIN(AddRemoveAnnotationTest)

@@ -10,6 +10,8 @@
 #include <QPainter>
 #include <QPen>
 #include <QCursor>
+#include <QHash>
+#include <QImage>
 #include <QRect>
 #include <qdom.h>
 
@@ -105,6 +107,22 @@ private:
     const QPainter::CompositionMode compositionMode;
 };
 
+class LiveStroke
+{
+public:
+    QRect addSegment(const QPointF &start, const QPointF &end, const QPen &pen, qreal opacity = 1.0);
+    void paint(QPainter *painter, const QRect &clipRect) const;
+    void clear();
+    QRect bounds() const;
+
+private:
+    static constexpr int tileSize = 256;
+    static QRect tileRect(const QPoint &tile);
+
+    QHash<QPoint, QImage> m_tiles;
+    QRect m_bounds;
+};
+
 /** @short SmoothPathEngine */
 class SmoothPathEngine : public AnnotatorEngine
 {
@@ -118,6 +136,7 @@ public:
     // These are two alternative ways to get the resulting path. Don't call them both!
     QList<Okular::Annotation *> end() override;
     SmoothPath endSmoothPath();
+    QRect liveBounds() const;
 
 private:
     Okular::NormalizedPoint processPoint(const Okular::NormalizedPoint &point, qreal pressure);
@@ -129,11 +148,16 @@ private:
     QList<Okular::NormalizedPoint> smoothingWindow;
     QList<qreal> pressureWindow;
     Okular::NormalizedPoint smoothingSum;
+    qreal m_pressureSum = 0.0;
+    bool m_allDefaultPressure = true;
+    LiveStroke m_liveStroke;
     Okular::NormalizedRect totalRect;
     Okular::NormalizedPoint lastPoint;
     QPainter::CompositionMode compositionMode;
     double m_pageWidth = 1.0;
     double m_lastXScale = 1.0;
+
+    static qreal representativeStrokeWidth(qreal pressureSum, qsizetype pressureCount, bool allDefaultPressure, qreal baseWidth);
 };
 
 #endif

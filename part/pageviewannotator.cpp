@@ -14,6 +14,7 @@
 #include <QEvent>
 #include <QFile>
 #include <QFileDialog>
+#include <QHash>
 #include <QInputDialog>
 #include <QList>
 #include <QLoggingCategory>
@@ -95,6 +96,8 @@ public:
             m_previousPage = nullptr;
             if (type == Release) {
                 m_down = false;
+                commitPendingDeletions();
+                retireLiveStrokes();
             }
             return oldRect;
         }
@@ -110,14 +113,38 @@ public:
         }
         m_visualBounds = QRectF(m_center.x() - m_width / 2.0, m_center.y() - m_width / 2.0, m_width, m_width).toAlignedRect();
         m_bounds = m_visualBounds.adjusted(-2, -2, 2, 2);
+        const int pageNumber = page->number();
+        PageViewItem *pageItem = item();
+        QRect strokeDirtyRect;
 
         if (m_down && button == Left && page) {
             const QPointF start = m_previousCenter.value_or(m_center);
+            QPen previewPen(QApplication::palette().color(QPalette::Active, QPalette::Highlight), qMax<qreal>(2.0, m_width * 0.65), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+            QColor previewColor = previewPen.color();
+            previewColor.setAlpha(110);
+            previewPen.setColor(previewColor);
+            if (pageItem) {
+                strokeDirtyRect = m_liveStrokes[pageNumber].addSegment(start, m_center, previewPen);
+                m_strokeItems.insert(pageNumber, pageItem);
+            }
+
             const QPainterPath sweptCircle = makeSweptCircle(start, m_center);
             const QList<Okular::Annotation *> annotations = page->annotations();
+            QSet<Okular::Annotation *> &pendingOnPage = m_pendingAnnotations[pageNumber];
+            const QRectF sweptBounds = sweptCircle.boundingRect();
             for (Okular::Annotation *annotation : annotations) {
-                if (m_document->canRemovePageAnnotation(annotation) && sweptCircleIntersectsAnnotation(sweptCircle, annotation, xScale, yScale, page)) {
-                    m_document->removePageAnnotation(page->number(), annotation);
+                if (pendingOnPage.contains(annotation) || !m_document->canRemovePageAnnotation(annotation)) {
+                    continue;
+                }
+                const qreal pageScale = ((xScale / page->width()) + (yScale / page->height())) / 2.0;
+                const qreal margin = m_width / 2.0 + annotation->style().width() * pageScale;
+                const QRect candidateBounds = Okular::AnnotationUtils::annotationGeometry(annotation, qRound(xScale), qRound(yScale))
+                                                  .adjusted(-qCeil(margin), -qCeil(margin), qCeil(margin), qCeil(margin));
+                if (!sweptBounds.intersects(candidateBounds)) {
+                    continue;
+                }
+                if (sweptCircleIntersectsAnnotation(sweptCircle, annotation, xScale, yScale, page)) {
+                    pendingOnPage.insert(annotation);
                 }
             }
         }
@@ -128,14 +155,61 @@ public:
             m_down = false;
             m_previousCenter.reset();
             m_previousPage = nullptr;
+            commitPendingDeletions();
+            retireLiveStrokes();
         }
-        return oldRect | m_bounds;
+        return oldRect | m_bounds | strokeDirtyRect;
     }
 
     void resetSweep()
     {
         m_previousCenter.reset();
         m_previousPage = nullptr;
+    }
+
+    bool hasLiveStrokes(const QRect &contentRect) const
+    {
+        for (auto it = m_liveStrokes.cbegin(); it != m_liveStrokes.cend(); ++it) {
+            PageViewItem *pageItem = m_strokeItems.value(it.key(), nullptr);
+            if (pageItem && contentRect.intersects(it.value().bounds().translated(pageItem->uncroppedGeometry().topLeft()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void paintLiveStrokes(QPainter *painter, const QRect &contentRect) const
+    {
+        for (auto it = m_liveStrokes.cbegin(); it != m_liveStrokes.cend(); ++it) {
+            PageViewItem *pageItem = m_strokeItems.value(it.key(), nullptr);
+            if (!pageItem) {
+                continue;
+            }
+            const QPoint origin = pageItem->uncroppedGeometry().topLeft();
+            const QRect pageRect = contentRect.translated(-origin);
+            if (!it.value().bounds().intersects(pageRect)) {
+                continue;
+            }
+            painter->save();
+            painter->translate(origin);
+            it.value().paint(painter, pageRect);
+            painter->restore();
+        }
+    }
+
+    QList<QPair<PageViewItem *, QRect>> takeClearedOverlayRegions()
+    {
+        return std::exchange(m_clearedOverlayRegions, {});
+    }
+
+    QList<QPair<PageViewItem *, QRect>> cancelGesture()
+    {
+        m_down = false;
+        m_previousCenter.reset();
+        m_previousPage = nullptr;
+        m_pendingAnnotations.clear();
+        retireLiveStrokes();
+        return takeClearedOverlayRegions();
     }
 
     void paint(QPainter *painter, double, double, const QRect &) override
@@ -349,11 +423,6 @@ private:
                                                 double yScale,
                                                 const Okular::Page *page)
     {
-        const QPainterPath geometry = annotationPath(annotation, xScale, yScale, page);
-        if (geometry.isEmpty()) {
-            return false;
-        }
-
         switch (annotation->subType()) {
         case Okular::Annotation::AInk: {
             const auto *ink = static_cast<const Okular::InkAnnotation *>(annotation);
@@ -400,6 +469,10 @@ private:
             return false;
         }
         case Okular::Annotation::ALine: {
+            const QPainterPath geometry = annotationPath(annotation, xScale, yScale, page);
+            if (geometry.isEmpty()) {
+                return false;
+            }
             const auto *line = static_cast<const Okular::LineAnnotation *>(annotation);
             if (line->lineInnerColor().isValid() && sweptCircle.intersects(geometry)) {
                 return true;
@@ -413,6 +486,10 @@ private:
             return sweptCircle.intersects(stroker.createStroke(geometry));
         }
         case Okular::Annotation::AHighlight: {
+            const QPainterPath geometry = annotationPath(annotation, xScale, yScale, page);
+            if (geometry.isEmpty()) {
+                return false;
+            }
             const auto *highlight = static_cast<const Okular::HighlightAnnotation *>(annotation);
             if (highlight->highlightType() == Okular::HighlightAnnotation::Underline || highlight->highlightType() == Okular::HighlightAnnotation::StrikeOut) {
                 const qreal pageScale = ((xScale / page->width()) + (yScale / page->height())) / 2.0;
@@ -423,6 +500,10 @@ private:
             return sweptCircle.intersects(geometry);
         }
         case Okular::Annotation::AGeom: {
+            const QPainterPath geometry = annotationPath(annotation, xScale, yScale, page);
+            if (geometry.isEmpty()) {
+                return false;
+            }
             const auto *geom = static_cast<const Okular::GeomAnnotation *>(annotation);
             if (!geom->geometricalInnerColor().isValid()) {
                 if (annotation->style().width() <= 0.0) {
@@ -436,8 +517,51 @@ private:
             return sweptCircle.intersects(geometry);
         }
         default:
+            const QPainterPath geometry = annotationPath(annotation, xScale, yScale, page);
+            if (geometry.isEmpty()) {
+                return false;
+            }
             return sweptCircle.intersects(geometry);
         }
+    }
+
+    void commitPendingDeletions()
+    {
+        bool hasPending = false;
+        for (auto it = m_pendingAnnotations.cbegin(); it != m_pendingAnnotations.cend(); ++it) {
+            hasPending = hasPending || !it.value().isEmpty();
+        }
+        if (!hasPending) {
+            return;
+        }
+
+        m_document->beginUndoMacro(i18n("erase annotations"));
+        for (auto it = m_pendingAnnotations.cbegin(); it != m_pendingAnnotations.cend(); ++it) {
+            QList<Okular::Annotation *> annotations;
+            annotations.reserve(it.value().size());
+            for (Okular::Annotation *annotation : it.value()) {
+                if (m_document->canRemovePageAnnotation(annotation)) {
+                    annotations.append(annotation);
+                }
+            }
+            if (!annotations.isEmpty()) {
+                m_document->removePageAnnotations(it.key(), annotations);
+            }
+        }
+        m_document->endUndoMacro();
+        m_pendingAnnotations.clear();
+    }
+
+    void retireLiveStrokes()
+    {
+        for (auto it = m_liveStrokes.cbegin(); it != m_liveStrokes.cend(); ++it) {
+            PageViewItem *pageItem = m_strokeItems.value(it.key(), nullptr);
+            if (pageItem && !it.value().bounds().isNull()) {
+                m_clearedOverlayRegions.append(qMakePair(pageItem, it.value().bounds()));
+            }
+        }
+        m_liveStrokes.clear();
+        m_strokeItems.clear();
     }
 
     Okular::Document *m_document;
@@ -448,6 +572,10 @@ private:
     const Okular::Page *m_previousPage = nullptr;
     bool m_down = false;
     double m_width;
+    QHash<int, LiveStroke> m_liveStrokes;
+    QHash<int, PageViewItem *> m_strokeItems;
+    QHash<int, QSet<Okular::Annotation *>> m_pendingAnnotations;
+    QList<QPair<PageViewItem *, QRect>> m_clearedOverlayRegions;
 };
 
 /** @short PickPointEngine */
@@ -1610,6 +1738,17 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
     }
 
     const bool isEraser = eraserMode();
+    const auto repaintClearedEraser = [this] {
+        auto *eraser = dynamic_cast<EraserEngine *>(m_engine);
+        if (!eraser) {
+            return;
+        }
+        for (const auto &[pageItem, rect] : eraser->takeClearedOverlayRegions()) {
+            if (pageItem) {
+                m_pageView->viewport()->update(rect.translated(pageItem->uncroppedGeometry().topLeft()).translated(-m_pageView->contentAreaPosition()));
+            }
+        }
+    };
     if (isEraser && m_lockedItem != item) {
         m_lockedItem = item;
         m_engine->setItem(item);
@@ -1618,6 +1757,7 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
     if (isEraser && !item) {
         const QRect oldRect = m_lastDrawnRect;
         m_engine->event(eventType, button, modifiers, 0.0, 0.0, 0.0, 0.0, nullptr);
+        repaintClearedEraser();
         m_lastDrawnRect = {};
         if (oldRect.isValid()) {
             m_pageView->viewport()->update(oldRect.translated(-m_pageView->contentAreaPosition()));
@@ -1644,6 +1784,9 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
 
     // 2. use engine to perform operations
     const QRect paintRect = m_engine->event(eventType, button, modifiers, nX, nY, itemRect.width(), itemRect.height(), m_lockedItem->page());
+    if (isEraser && eventType == AnnotatorEngine::Release) {
+        repaintClearedEraser();
+    }
 
     // 3. update absolute extents rect and send paint event(s)
     if (paintRect.isValid()) {
@@ -1749,7 +1892,7 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
         if (auto *smoothEngine = dynamic_cast<SmoothPathEngine *>(m_engine)) {
             m_pendingFreehandPath = std::make_unique<SmoothPath>(smoothEngine->endSmoothPath());
             m_pendingFreehandItem = m_lockedItem;
-            m_pendingFreehandRect = m_lastDrawnRect;
+            m_pendingFreehandRect = smoothEngine->liveBounds().translated(m_lockedItem->uncroppedGeometry().topLeft());
         }
 
         if (m_continuousMode) {
@@ -1813,13 +1956,21 @@ bool PageViewAnnotator::routeKeyEvent(QKeyEvent *event)
 
 bool PageViewAnnotator::routePaints(const QRect wantedRect) const
 {
-    const bool paintsLive = m_engine && m_lockedItem && wantedRect.intersects(m_lastDrawnRect);
+    bool paintsLive = m_engine && m_lockedItem && wantedRect.intersects(m_lastDrawnRect);
+    if (const auto *smoothEngine = dynamic_cast<const SmoothPathEngine *>(m_engine); smoothEngine && m_lockedItem) {
+        paintsLive = paintsLive || wantedRect.intersects(smoothEngine->liveBounds().translated(m_lockedItem->uncroppedGeometry().topLeft()));
+    }
     const bool paintsPending = m_pendingFreehandPath && m_pendingFreehandItem && wantedRect.intersects(m_pendingFreehandRect);
-    return paintsLive || paintsPending;
+    const auto *eraser = dynamic_cast<const EraserEngine *>(m_engine);
+    return paintsLive || paintsPending || (eraser && eraser->hasLiveStrokes(wantedRect));
 }
 
 void PageViewAnnotator::routePaint(QPainter *painter, const QRect paintRect)
 {
+    auto *eraser = dynamic_cast<EraserEngine *>(m_engine);
+    if (eraser) {
+        eraser->paintLiveStrokes(painter, paintRect);
+    }
     if (!m_lockedItem && !m_pendingFreehandPath) {
         return;
     }
@@ -1830,7 +1981,17 @@ void PageViewAnnotator::routePaint(QPainter *painter, const QRect paintRect)
         painter->drawRect(paintRect);
     }
 #endif
-    if (m_engine && m_lockedItem && paintRect.intersects(m_lastDrawnRect)) {
+    if (auto *smoothEngine = dynamic_cast<SmoothPathEngine *>(m_engine); smoothEngine && m_lockedItem) {
+        const QPoint origin = m_lockedItem->uncroppedGeometry().topLeft();
+        const QRect liveBounds = smoothEngine->liveBounds().translated(origin);
+        const QRect clip = paintRect.intersected(liveBounds);
+        if (clip.isValid()) {
+            painter->save();
+            painter->translate(origin);
+            smoothEngine->paint(painter, m_lockedItem->uncroppedWidth(), m_lockedItem->uncroppedHeight(), clip.translated(-origin));
+            painter->restore();
+        }
+    } else if (m_engine && m_lockedItem && paintRect.intersects(m_lastDrawnRect)) {
         const QRect &itemRect = m_lockedItem->uncroppedGeometry();
         painter->save();
         painter->translate(itemRect.topLeft());
@@ -1877,7 +2038,7 @@ void PageViewAnnotator::resetPageViewItems()
     if (m_engine) {
         m_engine->setItem(nullptr);
         if (auto *eraser = dynamic_cast<EraserEngine *>(m_engine)) {
-            eraser->resetSweep();
+            eraser->cancelGesture();
         }
     }
     m_lockedItem = nullptr;
@@ -1918,13 +2079,24 @@ void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId,
     }
 
     // terminate any previous operation
+    QRect previousOverlayRect = m_lastDrawnRect;
     if (m_engine) {
+        if (auto *smoothEngine = dynamic_cast<SmoothPathEngine *>(m_engine); smoothEngine && m_lockedItem) {
+            previousOverlayRect |= smoothEngine->liveBounds().translated(m_lockedItem->uncroppedGeometry().topLeft());
+        }
+        if (auto *eraser = dynamic_cast<EraserEngine *>(m_engine)) {
+            for (const auto &[pageItem, rect] : eraser->cancelGesture()) {
+                if (pageItem) {
+                    m_pageView->viewport()->update(rect.translated(pageItem->uncroppedGeometry().topLeft()).translated(-m_pageView->contentAreaPosition()));
+                }
+            }
+        }
         delete m_engine;
         m_engine = nullptr;
     }
     m_lockedItem = nullptr;
-    if (m_lastDrawnRect.isValid()) {
-        m_pageView->viewport()->update(m_lastDrawnRect.translated(-m_pageView->contentAreaPosition()));
+    if (previousOverlayRect.isValid()) {
+        m_pageView->viewport()->update(previousOverlayRect.translated(-m_pageView->contentAreaPosition()));
         m_lastDrawnRect = QRect();
     }
 
