@@ -127,6 +127,9 @@ public:
 
     Okular::Annotation *focusedAnnotation() const;
     int focusedAnnotationPageNumber() const;
+    void copyFocusedAnnotation();
+    void deleteSelectedAnnotations();
+    void selectAnnotation(Okular::Annotation *annotation, int pageNumber);
 
     bool areSourceLocationsShownGraphically() const;
     void setShowSourceLocationsGraphically(bool show);
@@ -233,6 +236,7 @@ private:
     void textSelectionClear();
     // updates cursor
     void updateCursor(const QPoint p);
+    void updateAnnotationSelectionPanel();
 
     void moveMagnifier(const QPoint p);
     void updateMagnifier(const QPoint p);

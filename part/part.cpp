@@ -3957,29 +3957,13 @@ void Part::slotOpenContainingFolder()
 
 void Part::slotCopyAnnotation()
 {
-    Okular::Annotation *annotation = m_pageView->focusedAnnotation();
-    if (!annotation || annotation->subType() != Okular::Annotation::AText) {
-        return;
-    }
-
-    QDomDocument document(QStringLiteral("okular-annotations"));
-    QDomElement root = document.createElement(QStringLiteral("annotations"));
-    root.setAttribute(QStringLiteral("version"), AnnotationPopup::annotationClipboardFormatVersion);
-    document.appendChild(root);
-
-    QDomElement annotationElement = document.createElement(QStringLiteral("annotation"));
-    Okular::AnnotationUtils::storeAnnotation(annotation, annotationElement, document);
-    root.appendChild(annotationElement);
-
-    auto *mimeData = new QMimeData();
-    mimeData->setData(QLatin1String(AnnotationPopup::annotationClipboardMimeType), document.toByteArray());
-    QApplication::clipboard()->setMimeData(mimeData, QClipboard::Clipboard);
+    m_pageView->copyFocusedAnnotation();
 }
 
 void Part::slotCopyTextSelectionOrAnnotation()
 {
     Okular::Annotation *annotation = m_pageView->focusedAnnotation();
-    if (annotation && annotation->subType() == Okular::Annotation::AText) {
+    if (annotation) {
         slotCopyAnnotation();
         return;
     }
@@ -4007,7 +3991,10 @@ void Part::slotPasteAnnotation()
     }
 
     AnnotationPopup annotPopup(m_document, AnnotationPopup::SingleAnnotationMode, widget());
-    annotPopup.pasteAnnotationToPage(pageNumber, targetPointPtr);
+    Okular::Annotation *pastedAnnotation = annotPopup.pasteAnnotationToPage(pageNumber, targetPointPtr);
+    if (pastedAnnotation) {
+        m_pageView->selectAnnotation(pastedAnnotation, pageNumber);
+    }
 }
 
 QAbstractItemModel *Part::annotationsModel() const

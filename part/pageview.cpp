@@ -26,7 +26,9 @@
 #include <QDesktopServices>
 #include <QElapsedTimer>
 #include <QEvent>
+#include <QFrame>
 #include <QGestureEvent>
+#include <QHBoxLayout>
 #include <QImage>
 #include <QInputDialog>
 #include <QLoggingCategory>
@@ -35,12 +37,15 @@
 #include <QMimeDatabase>
 #include <QNativeGestureEvent>
 #include <QPainter>
+#include <QPushButton>
 #include <QScrollBar>
 #include <QScroller>
 #include <QScrollerProperties>
 #include <QSet>
 #include <QTimer>
+#include <QToolButton>
 #include <QToolTip>
+#include <QVBoxLayout>
 
 #include <KActionCollection>
 #include <KActionMenu>
@@ -67,6 +72,7 @@
 
 // local includes
 #include "annotationpopup.h"
+#include "annotationwidgets.h"
 #include "annotwindow.h"
 #include "colormodemenu.h"
 #include "core/annotations.h"
@@ -181,6 +187,13 @@ public:
     QPoint annotationAreaSelectionEnd;
     int mouseMode = 0;
     MouseAnnotation *mouseAnnotation = nullptr;
+    QFrame *annotationSelectionPanel = nullptr;
+    QToolButton *annotationStrokesButton = nullptr;
+    QToolButton *annotationCopyButton = nullptr;
+    QToolButton *annotationDeleteButton = nullptr;
+    QFrame *annotationPropertiesPopup = nullptr;
+    AnnotationWidget *annotationPropertyWidget = nullptr;
+    Okular::Annotation *annotationPanelAnnotation = nullptr;
 
     // table selection
     QList<double> tableSelectionCols;
@@ -352,6 +365,69 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     d->mouseMode = Okular::Settings::mouseMode();
     d->mouseAnnotation = new MouseAnnotation(this, document);
     d->messageWindow = new PageViewMessage(this);
+    d->annotationSelectionPanel = new QFrame(viewport());
+    d->annotationSelectionPanel->setFrameShape(QFrame::StyledPanel);
+    auto *annotationPanelLayout = new QHBoxLayout(d->annotationSelectionPanel);
+    annotationPanelLayout->setContentsMargins(4, 3, 4, 3);
+    annotationPanelLayout->setSpacing(2);
+    d->annotationStrokesButton = new QToolButton(d->annotationSelectionPanel);
+    d->annotationStrokesButton->setText(i18n("Strokes"));
+    d->annotationStrokesButton->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
+    d->annotationStrokesButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    d->annotationCopyButton = new QToolButton(d->annotationSelectionPanel);
+    d->annotationCopyButton->setText(i18n("Copy"));
+    d->annotationCopyButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
+    d->annotationCopyButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    d->annotationDeleteButton = new QToolButton(d->annotationSelectionPanel);
+    d->annotationDeleteButton->setText(i18n("Delete"));
+    d->annotationDeleteButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-delete")));
+    d->annotationDeleteButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    annotationPanelLayout->addWidget(d->annotationStrokesButton);
+    annotationPanelLayout->addWidget(d->annotationCopyButton);
+    annotationPanelLayout->addWidget(d->annotationDeleteButton);
+    d->annotationSelectionPanel->hide();
+
+    connect(d->annotationCopyButton, &QToolButton::clicked, this, &PageView::copyFocusedAnnotation);
+    connect(d->annotationDeleteButton, &QToolButton::clicked, this, &PageView::deleteSelectedAnnotations);
+    connect(d->annotationStrokesButton, &QToolButton::clicked, this, [this] {
+        Okular::Annotation *annotation = focusedAnnotation();
+        const int pageNumber = focusedAnnotationPageNumber();
+        if (!annotation || !d->document->canModifyPageAnnotation(annotation)) {
+            return;
+        }
+
+        delete d->annotationPropertiesPopup;
+        delete d->annotationPropertyWidget;
+        d->annotationPropertiesPopup = new QFrame(this, Qt::Popup);
+        d->annotationPropertyWidget = AnnotationWidgetFactory::widgetFor(annotation);
+        d->annotationPropertyWidget->setAnnotTypeEditable(false);
+        auto *popupLayout = new QVBoxLayout(d->annotationPropertiesPopup);
+        popupLayout->addWidget(d->annotationPropertyWidget->appearanceWidget());
+        auto *buttonLayout = new QHBoxLayout;
+        buttonLayout->addStretch();
+        auto *applyButton = new QPushButton(i18n("Apply"), d->annotationPropertiesPopup);
+        auto *cancelButton = new QPushButton(i18n("Cancel"), d->annotationPropertiesPopup);
+        applyButton->setEnabled(false);
+        buttonLayout->addWidget(cancelButton);
+        buttonLayout->addWidget(applyButton);
+        popupLayout->addLayout(buttonLayout);
+
+        connect(d->annotationPropertyWidget, &AnnotationWidget::dataChanged, applyButton, [applyButton] { applyButton->setEnabled(true); });
+        connect(applyButton, &QPushButton::clicked, this, [this, annotation, pageNumber] {
+            if (focusedAnnotation() != annotation || focusedAnnotationPageNumber() != pageNumber || !d->annotationPropertyWidget) {
+                return;
+            }
+            d->document->prepareToModifyAnnotationProperties(annotation);
+            d->annotationPropertyWidget->applyChanges();
+            d->document->modifyPageAnnotationProperties(pageNumber, annotation);
+            d->annotationPropertiesPopup->hide();
+        });
+        connect(cancelButton, &QPushButton::clicked, d->annotationPropertiesPopup, &QWidget::hide);
+
+        d->annotationPropertiesPopup->adjustSize();
+        d->annotationPropertiesPopup->move(d->annotationStrokesButton->mapToGlobal(QPoint(0, d->annotationStrokesButton->height())));
+        d->annotationPropertiesPopup->show();
+    });
     d->setting_viewCols = Okular::Settings::viewColumns();
     d->rtl_Mode = Okular::Settings::rtlReadingDirection();
 
@@ -493,6 +569,8 @@ PageView::~PageView()
     }
 #endif
 
+    delete d->annotationPropertiesPopup;
+    delete d->annotationPropertyWidget;
     delete d->mouseAnnotation;
 
     // delete the local storage structure
@@ -518,6 +596,60 @@ Okular::Annotation *PageView::focusedAnnotation() const
 int PageView::focusedAnnotationPageNumber() const
 {
     return d->mouseAnnotation ? d->mouseAnnotation->pageNumber() : -1;
+}
+
+void PageView::copyFocusedAnnotation()
+{
+    Okular::Annotation *annotation = focusedAnnotation();
+    const int pageNumber = focusedAnnotationPageNumber();
+    if (!annotation || pageNumber < 0 || !d->document->isAllowed(Okular::AllowCopy)) {
+        return;
+    }
+
+    AnnotationPopup popup(d->document, AnnotationPopup::SingleAnnotationMode, this);
+    popup.addAnnotation(annotation, pageNumber);
+    popup.doCopyAnnotation({annotation, pageNumber});
+}
+
+void PageView::deleteSelectedAnnotations()
+{
+    d->mouseAnnotation->deleteSelectedAnnotations();
+    updateAnnotationSelectionPanel();
+}
+
+void PageView::selectAnnotation(Okular::Annotation *annotation, int pageNumber)
+{
+    for (PageViewItem *item : std::as_const(d->items)) {
+        if (item->pageNumber() == pageNumber) {
+            d->mouseAnnotation->selectAnnotation(item, annotation);
+            updateAnnotationSelectionPanel();
+            return;
+        }
+    }
+}
+
+void PageView::updateAnnotationSelectionPanel()
+{
+    Okular::Annotation *annotation = d->annotationSelectionMode ? focusedAnnotation() : nullptr;
+    if (annotation != d->annotationPanelAnnotation) {
+        delete d->annotationPropertiesPopup;
+        d->annotationPropertiesPopup = nullptr;
+        delete d->annotationPropertyWidget;
+        d->annotationPropertyWidget = nullptr;
+        d->annotationPanelAnnotation = annotation;
+    }
+
+    d->annotationSelectionPanel->setVisible(annotation != nullptr);
+    if (!annotation) {
+        return;
+    }
+
+    d->annotationStrokesButton->setEnabled(d->document->canModifyPageAnnotation(annotation));
+    d->annotationCopyButton->setEnabled(d->document->isAllowed(Okular::AllowCopy));
+    d->annotationDeleteButton->setEnabled(d->document->canRemovePageAnnotation(annotation));
+    d->annotationSelectionPanel->adjustSize();
+    d->annotationSelectionPanel->move(qMax(8, viewport()->width() - d->annotationSelectionPanel->width() - 8), 8);
+    d->annotationSelectionPanel->raise();
 }
 
 bool PageView::mapGlobalPosToPagePoint(QPoint globalPos, int *pageNumber, Okular::NormalizedPoint *point) const
@@ -1271,6 +1403,7 @@ void PageView::notifySetup(const QList<Okular::Page *> &pageSet, int setupFlags)
     // mouseAnnotation must not access our PageViewItem widgets any longer
     d->annotator->resetPageViewItems();
     d->mouseAnnotation->reset();
+    updateAnnotationSelectionPanel();
     d->annotationAreaSelectionDragging = false;
     d->annotationAreaSelectionItem = nullptr;
 
@@ -1546,6 +1679,7 @@ void PageView::notifyPageChanged(int pageNumber, int changedFlags)
         }
 
         d->mouseAnnotation->notifyAnnotationChanged(pageNumber);
+        updateAnnotationSelectionPanel();
     }
 
     if (changedFlags & DocumentObserver::BoundingBox) {
@@ -1671,6 +1805,7 @@ void PageView::notifyCurrentPageChanged(int previous, int current)
     if (!getContinuousMode()) {
         if (d->mouseAnnotation && d->mouseAnnotation->isFocused()) {
             d->mouseAnnotation->reset();
+            updateAnnotationSelectionPanel();
         }
     }
 }
@@ -2112,6 +2247,7 @@ void PageView::drawTableDividers(QPainter *screenPainter)
 
 void PageView::resizeEvent(QResizeEvent *e)
 {
+    updateAnnotationSelectionPanel();
     if (d->items.isEmpty()) {
         resizeContentArea(e->size());
         return;
@@ -2220,9 +2356,11 @@ void PageView::keyPressEvent(QKeyEvent *e)
             d->aPrevAction = nullptr;
         }
         d->mouseAnnotation->routeKeyPressEvent(e);
+        updateAnnotationSelectionPanel();
         break;
     case Qt::Key_Delete:
         d->mouseAnnotation->routeKeyPressEvent(e);
+        updateAnnotationSelectionPanel();
         break;
     case Qt::Key_Shift:
     case Qt::Key_Control:
@@ -2510,6 +2648,13 @@ void PageView::mousePressEvent(QMouseEvent *e)
             PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
             if (pageItem) {
                 d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+                d->mouseAnnotation->routeMousePressEvent(pageItem, eventPos, true);
+                if (d->mouseAnnotation->isActive()) {
+                    d->scroller->stop();
+                    updateAnnotationSelectionPanel();
+                    return;
+                }
+                updateAnnotationSelectionPanel();
                 d->annotationAreaSelectionDragging = true;
                 d->annotationAreaSelectionItem = pageItem;
                 d->annotationAreaSelectionStart = eventPos;
@@ -2730,9 +2875,10 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
     const bool leftButton = e->button() == Qt::LeftButton;
     const bool rightButton = e->button() == Qt::RightButton;
 
-    if (!d->annotationSelectionMode && d->mouseAnnotation->isActive() && leftButton) {
+    if (d->mouseAnnotation->isActive() && leftButton) {
         // Just finished to move the annotation
         d->mouseAnnotation->routeMouseReleaseEvent();
+        updateAnnotationSelectionPanel();
     }
 
     // don't perform any mouse action when no document is shown..
@@ -2764,6 +2910,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                 } else {
                     d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                 }
+                updateAnnotationSelectionPanel();
                 const QRect repaintRect = QRect(d->annotationAreaSelectionStart, eventPos).normalized().adjusted(-2, -2, 2, 2);
                 d->annotationAreaSelectionDragging = false;
                 d->annotationAreaSelectionItem = nullptr;
@@ -4384,6 +4531,7 @@ void PageView::setAnnotationSelectionMode(bool enabled)
         d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
     }
     d->annotationSelectionMode = enabled;
+    updateAnnotationSelectionPanel();
     updateCursor();
 }
 
@@ -4403,7 +4551,7 @@ void PageView::updateCursor(const QPoint p)
             setCursor(Qt::ForbiddenCursor);
         }
     } else if (d->annotationSelectionMode) {
-        setCursor(Qt::CrossCursor);
+        setCursor(d->mouseAnnotation->isMouseOver() ? d->mouseAnnotation->cursor() : Qt::CrossCursor);
     } else if (scrollerState == QScroller::Pressed || scrollerState == QScroller::Dragging) {
         setCursor(Qt::ClosedHandCursor);
     } else if (pageItem) {

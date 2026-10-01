@@ -77,7 +77,8 @@ public:
     ~MouseAnnotation() override;
 
     /* Process a mouse press event. eventPos: Mouse position in content area coordinates. */
-    void routeMousePressEvent(PageViewItem *pageViewItem, const QPoint eventPos);
+    void routeMousePressEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool selectOnHit = false);
+    void selectAnnotation(PageViewItem *pageViewItem, Okular::Annotation *annotation);
 
     /* Process a mouse release event. */
     void routeMouseReleaseEvent();
@@ -88,6 +89,7 @@ public:
 
     /* Process a key event. */
     void routeKeyPressEvent(const QKeyEvent *e);
+    void deleteSelectedAnnotations();
 
     /* Process a tooltip event. eventPos: Mouse position in content area coordinates. */
     void routeTooltipEvent(const QHelpEvent *helpEvent);

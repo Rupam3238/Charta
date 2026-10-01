@@ -48,7 +48,7 @@ public:
     void addActionsToMenu(QMenu *menu);
 
     void exec(const QPoint point = QPoint());
-    void pasteAnnotationToPage(int pageNumber, const Okular::NormalizedPoint *targetPoint = nullptr);
+    Okular::Annotation *pasteAnnotationToPage(int pageNumber, const Okular::NormalizedPoint *targetPoint = nullptr);
 
     static bool clipboardHasAnnotations();
 

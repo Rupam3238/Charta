@@ -286,28 +286,28 @@ void AnnotationPopup::doCopyAnnotationText(AnnotPagePair pair)
     }
 }
 
-void AnnotationPopup::pasteAnnotationToPage(int pageNumber, const Okular::NormalizedPoint *targetPoint)
+Okular::Annotation *AnnotationPopup::pasteAnnotationToPage(int pageNumber, const Okular::NormalizedPoint *targetPoint)
 {
     if (pageNumber == -1 || !mDocument->isAllowed(Okular::AllowNotes)) {
-        return;
+        return nullptr;
     }
 
     const QMimeData *mimeData = QApplication::clipboard()->mimeData();
     if (!mimeData || !mimeData->hasFormat(QLatin1String(annotationClipboardMimeType))) {
-        return;
+        return nullptr;
     }
 
     QDomDocument document;
     if (!document.setContent(mimeData->data(QLatin1String(annotationClipboardMimeType)))) {
-        return;
+        return nullptr;
     }
 
     QDomElement root = document.documentElement();
     if (root.tagName() != QLatin1String("annotations")) {
-        return;
+        return nullptr;
     }
     if (!clipboardFormatVersionSupported(root)) {
-        return;
+        return nullptr;
     }
 
     QList<Okular::Annotation *> annotations;
@@ -331,7 +331,7 @@ void AnnotationPopup::pasteAnnotationToPage(int pageNumber, const Okular::Normal
     }
 
     if (annotations.isEmpty()) {
-        return;
+        return nullptr;
     }
 
     Okular::NormalizedPoint offset(0.02, 0.02);
@@ -345,6 +345,8 @@ void AnnotationPopup::pasteAnnotationToPage(int pageNumber, const Okular::Normal
         annotation->translate(offset);
         mDocument->addPageAnnotation(pageNumber, annotation);
     }
+
+    return annotations.constFirst();
 }
 
 bool AnnotationPopup::clipboardHasAnnotations()

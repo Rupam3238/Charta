@@ -92,7 +92,7 @@ MouseAnnotation::~MouseAnnotation()
 {
 }
 
-void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPoint eventPos)
+void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool selectOnHit)
 {
     /* Is there a selected annotation? */
     if (m_focusedAnnotation.isValid()) {
@@ -116,7 +116,7 @@ void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPo
             /* qDebug() << "routeMousePressEvent: select for modification"; */
             m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
             m_handle = getHandleAt(m_mousePosition, ad);
-            if (m_handle != RH_None) {
+            if (m_handle != RH_None || selectOnHit) {
                 setState(StateFocused, ad);
             }
         }
@@ -124,6 +124,22 @@ void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPo
         /* qDebug() << "routeMousePressEvent: no annotation under mouse, enter StateInactive"; */
         setState(StateInactive, ad);
     }
+}
+
+void MouseAnnotation::selectAnnotation(PageViewItem *pageViewItem, Okular::Annotation *annotation)
+{
+    if (!pageViewItem || !annotation) {
+        return;
+    }
+
+    m_areaSelectedAnnotations.clear();
+    AnnotationDescription selected;
+    selected.annotation = annotation;
+    selected.pageViewItem = pageViewItem;
+    selected.pageNumber = pageViewItem->pageNumber();
+    m_handle = RH_None;
+    setState(StateFocused, selected);
+    m_pageView->viewport()->update();
 }
 
 void MouseAnnotation::routeMouseReleaseEvent()
@@ -143,7 +159,7 @@ void MouseAnnotation::routeMouseReleaseEvent()
 
 void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed)
 {
-    if (!pageViewItem) {
+    if (!pageViewItem && (!leftButtonPressed || !m_focusedAnnotation.isValid())) {
         /* qDebug() << "routeMouseMoveEvent: no pageViewItem provided, ignore"; */
         return;
     }
@@ -164,7 +180,7 @@ void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoi
             /* qDebug() << "routeMouseMoveEvent: perform command, delta " << eventPos - m_mousePosition; */
             updateViewport(m_focusedAnnotation);
             performCommand(eventPos);
-            m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
+            m_mousePosition = eventPos - m_focusedAnnotation.pageViewItem->uncroppedGeometry().topLeft();
             updateViewport(m_focusedAnnotation);
         }
     } else {
@@ -228,21 +244,28 @@ void MouseAnnotation::routeKeyPressEvent(const QKeyEvent *e)
         cancel();
         break;
     case Qt::Key_Delete:
-        if (!m_areaSelectedAnnotations.isEmpty()) {
-            const QList<AnnotationDescription> selectedAnnotations = std::exchange(m_areaSelectedAnnotations, {});
-            cancel();
-            for (const AnnotationDescription &selected : selectedAnnotations) {
-                if (selected.isValid() && selected.isContainedInPage(m_document, selected.pageNumber)) {
-                    m_document->removePageAnnotation(selected.pageNumber, selected.annotation);
-                }
+        deleteSelectedAnnotations();
+        break;
+    }
+}
+
+void MouseAnnotation::deleteSelectedAnnotations()
+{
+    if (!m_areaSelectedAnnotations.isEmpty()) {
+        const QList<AnnotationDescription> selectedAnnotations = std::exchange(m_areaSelectedAnnotations, {});
+        cancel();
+        for (const AnnotationDescription &selected : selectedAnnotations) {
+            if (selected.isValid() && selected.isContainedInPage(m_document, selected.pageNumber) && m_document->canRemovePageAnnotation(selected.annotation)) {
+                m_document->removePageAnnotation(selected.pageNumber, selected.annotation);
             }
-            m_pageView->viewport()->update();
-        } else if (m_focusedAnnotation.isValid()) {
-            AnnotationDescription adToBeDeleted = m_focusedAnnotation;
-            cancel();
+        }
+        m_pageView->viewport()->update();
+    } else if (m_focusedAnnotation.isValid()) {
+        AnnotationDescription adToBeDeleted = m_focusedAnnotation;
+        cancel();
+        if (m_document->canRemovePageAnnotation(adToBeDeleted.annotation)) {
             m_document->removePageAnnotation(adToBeDeleted.pageNumber, adToBeDeleted.annotation);
         }
-        break;
     }
 }
 
