@@ -27,6 +27,7 @@ inline KAboutData okularAboutData()
                           "(C) 2006-2009 Pino Toscano"),
                      QString(),
                      QString());
+    about.setDesktopFileName(QStringLiteral("org.charta.reader"));
 
     about.addAuthor(i18n("Pino Toscano"), i18n("Former maintainer"), QStringLiteral("pino@kde.org"));
     about.addAuthor(i18n("Tobias Koenig"), i18n("Lots of framework work, FictionBook backend and former ODT backend"), QStringLiteral("tokoe@kde.org"));

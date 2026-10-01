@@ -38,7 +38,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent, KConfigSkeleton *skeleton,
     m_debug = new DlgDebug(this);
 #endif
 
-    addPage(m_general, i18n("General"), QStringLiteral("okular"), i18n("General Options"));
+    addPage(m_general, i18n("General"), QStringLiteral("charta"), i18n("General Options"));
     m_accessibilityPage = addPage(m_accessibility, i18n("Accessibility"), QStringLiteral("preferences-desktop-accessibility"), i18n("Accessibility Reading Aids"));
     addPage(m_performance, i18n("Performance"), QStringLiteral("preferences-system-performance"), i18n("Performance Tuning"));
     if (embedMode == Okular::ViewerWidgetMode) {
@@ -53,7 +53,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent, KConfigSkeleton *skeleton,
             addPage(m_editor, i18n("Editor"), QStringLiteral("accessories-text-editor"), i18n("Editor Options"));
         } else {
             QString editStr = i18nc("Give the user a hint, that it enabled the option --editor-cmd together with the current value of the option.",
-                                    "The editor was set by the command line to \n %1 \nIf you want to use the setting, start okular without the option --editor-cmd",
+                                     "The editor was set by the command line to \n %1 \nIf you want to use the setting, start Charta without the option --editor-cmd",
                                     editCmd);
             auto editor = new QLabel(editStr, this);
             addPage(editor, i18n("Editor"), QStringLiteral("accessories-text-editor"), i18n("Editor Options"));
@@ -62,7 +62,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent, KConfigSkeleton *skeleton,
 #ifdef OKULAR_DEBUG_CONFIGPAGE
     addPage(m_debug, "Debug", "system-run", "Debug options");
 #endif
-    setHelp(QStringLiteral("configure"), QStringLiteral("okular"));
+    setHelp(QStringLiteral("configure"), QStringLiteral("charta"));
 }
 
 void PreferencesDialog::switchToAccessibilityPage()

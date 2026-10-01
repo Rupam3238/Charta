@@ -3,44 +3,44 @@
 <!ENTITY % English "INCLUDE">
 ]>
 
-<!--  Please keep this man page content in sync with Command Line Options sections of Okular handbook -->
+<!--  Please keep this man page content in sync with the Charta handbook -->
 <refentry lang="&language;">
 <refentryinfo>
-<title>Okular User's Manual</title>
+<title>Charta User's Manual</title>
 <author><firstname>Yuri</firstname><surname>Chornoivan</surname>
-<contrib>Okular man page.</contrib>
+<contrib>Charta man page.</contrib>
 <email>yurchor@ukr.net</email></author>
 <date>2022-02-19</date>
-<releaseinfo>Okular 22.04</releaseinfo>
+<releaseinfo>Charta</releaseinfo>
 <productname>KDE Gear</productname>
 </refentryinfo>
 
 <refmeta>
-<refentrytitle><command>okular</command></refentrytitle>
+<refentrytitle><command>charta</command></refentrytitle>
 <manvolnum>1</manvolnum>
 </refmeta>
 
 <refnamediv>
-<refname>okular</refname>
+<refname>charta</refname>
 <refpurpose>a universal document viewer</refpurpose>
 </refnamediv>
 <!-- body begins here -->
 <refsynopsisdiv id='synopsis'>
 <cmdsynopsis>
-<command>okular</command>
-<arg choice="opt"><replaceable>Okular options</replaceable></arg>
+<command>charta</command>
+<arg choice="opt"><replaceable>Charta options</replaceable></arg>
 <arg choice="opt"><replaceable>URL</replaceable></arg>
 </cmdsynopsis>
 </refsynopsisdiv>
 
 
 <refsect1 id="description"><title>Description</title>
-<para><command>okular</command>
+<para><command>charta</command>
 is aimed to show documents in different formats.</para>
 
 </refsect1>
 
-<refsect1 id="options"><title>Okular options</title>
+<refsect1 id="options"><title>Charta options</title>
 <variablelist>
 
 <varlistentry>
@@ -81,21 +81,21 @@ is aimed to show documents in different formats.</para>
 <varlistentry>
 <term><option>--noraise</option></term>
 <listitem>
-<para>Allows to prevent Okular window raising after the start.</para>
+<para>Allows to prevent the Charta window from raising after startup.</para>
 </listitem>
 </varlistentry>
 
 <varlistentry>
 <term><option>--find <replaceable>string</replaceable></option></term>
 <listitem>
-<para>Tries to find and highlight a given string in the document. Only works if just one document is given as an argument of the okular command.</para>
+<para>Tries to find and highlight a given string in the document. Only works if just one document is given as an argument of the charta command.</para>
 </listitem>
 </varlistentry>
 
 <varlistentry>
 <term><option>--editor-cmd <replaceable>string</replaceable></option></term>
 <listitem>
-<para>Sets the external editor command. You cannot set the editor command in an already running Okular instance. Please note that <option>--unique</option> is not supported when setting the editor command at the commandline.</para>
+<para>Sets the external editor command. You cannot set the editor command in an already running Charta instance. Please note that <option>--unique</option> is not supported when setting the editor command at the commandline.</para>
 </listitem>
 </varlistentry>
 </variablelist>
@@ -113,21 +113,21 @@ is aimed to show documents in different formats.</para>
 </refsect1>
 
 <refsect1 id="feedback"><title>Feedback</title>
-<para>On IRC, irc.libera.chat #okular or via email, okular-devel@kde.org or on the web, &lt;<ulink url="https://okular.kde.org/">https://okular.kde.org/</ulink>&gt;.</para>
+<para>Report issues at <ulink url="https://github.com/Rupam3238/Charta/issues">the Charta issue tracker</ulink>.</para>
 </refsect1>
 
 <refsect1>
 <title>See Also</title>
 <simplelist>
 <member>More detailed user documentation is available from <ulink
-url="help:/okular">help:/okular</ulink>
+url="help:/charta">help:/charta</ulink>
 (either enter this <acronym>URL</acronym> into &konqueror;, or run
 <userinput><command>khelpcenter</command>
-<parameter>help:/okular</parameter></userinput>).</member>
+<parameter>help:/charta</parameter></userinput>).</member>
 <member>kf6options(7)</member>
 <member>qt6options(7)</member>
 <member>There is also further information available at
-<ulink url="https://okular.kde.org/">https://okular.kde.org/</ulink></member>
+<ulink url="https://github.com/Rupam3238/Charta">Charta source repository</ulink></member>
 </simplelist>
 </refsect1>
 

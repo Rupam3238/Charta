@@ -4,9 +4,9 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}/../
 )
 
-# okular
+# Charta desktop application
 
-set(okular_SRCS
+set(charta_SRCS
    main.cpp
    okular_main.cpp
    shell.cpp
@@ -18,23 +18,23 @@ set(okular_SRCS
    shell.qrc
 )
 
-ki18n_wrap_ui(okular_SRCS
+ki18n_wrap_ui(charta_SRCS
     welcomescreen.ui)
 
-add_executable(okular ${okular_SRCS})
+add_executable(charta ${charta_SRCS})
 
-target_link_libraries(okular KF6::I18n KF6::Parts KF6::WindowSystem KF6::Crash KF6::IconThemes KF6::KIOGui)
+target_link_libraries(charta KF6::I18n KF6::Parts KF6::WindowSystem KF6::Crash KF6::IconThemes KF6::KIOGui)
 if (TARGET Qt6::DBus)
-    target_link_libraries(okular Qt6::DBus)
+    target_link_libraries(charta Qt6::DBus)
 endif()
 if (HAVE_X11)
-    target_link_libraries(okular Qt6::GuiPrivate)
+    target_link_libraries(charta Qt6::GuiPrivate)
 endif()
 
-install(TARGETS okular ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+install(TARGETS charta ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
 if(APPLE)
-    set_target_properties(okular PROPERTIES
+    set_target_properties(charta PROPERTIES
         MACOSX_BUNDLE_DISPLAY_NAME "Charta"
         MACOSX_BUNDLE_BUNDLE_NAME "Charta"
         MACOSX_BUNDLE_LONG_VERSION_STRING "Charta ${RELEASE_SERVICE_VERSION}"
@@ -45,7 +45,7 @@ if(APPLE)
         MACOSX_BUNDLE_COPYRIGHT "2002-2026 The Okular Developers")
 endif()
 
-# okular shell data files
+# Charta desktop integration files
 
-install( PROGRAMS org.kde.okular.desktop  DESTINATION  ${KDE_INSTALL_APPDIR} )
-install( FILES org.kde.okular.appdata.xml DESTINATION  ${KDE_INSTALL_METAINFODIR} )
+install(PROGRAMS org.charta.reader.desktop DESTINATION ${KDE_INSTALL_APPDIR})
+install(FILES org.charta.reader.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR})

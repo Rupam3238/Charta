@@ -6,12 +6,12 @@ set (RELEASE_SERVICE_VERSION_MINOR "11")
 set (RELEASE_SERVICE_VERSION_MICRO "70")
 set (RELEASE_SERVICE_VERSION "${RELEASE_SERVICE_VERSION_MAJOR}.${RELEASE_SERVICE_VERSION_MINOR}.${RELEASE_SERVICE_VERSION_MICRO}")
 
-project(okular VERSION ${RELEASE_SERVICE_VERSION})
+project(Charta VERSION ${RELEASE_SERVICE_VERSION})
 
 set(QT_REQUIRED_VERSION "6.6.0") # Remember to update the QT_DEPRECATED_WARNINGS_SINCE below
 set(KF_REQUIRED_VERSION "5.240.0") # Remember to update the KF_DEPRECATED_WARNINGS_SINCE below
 
-set(OKULAR_UI "" CACHE STRING "Which Okular user interface to build. Possible values: desktop, mobile, both. Default: desktop (except on Android, where it is 'mobile')")
+set(OKULAR_UI "" CACHE STRING "Which Charta user interface to build. Possible values: desktop, mobile, both. Default: desktop (except on Android, where it is 'mobile')")
 
 set(FORCE_NOT_REQUIRED_DEPENDENCIES "" CACHE STRING "List (semicolon-separated) of dependencies that will be downgraded from REQUIRED to RECOMMENDED")
 
@@ -221,26 +221,26 @@ find_package(ZLIB REQUIRED)
 
 find_package(Poppler "24.08.0" COMPONENTS Qt6)
 set_okular_optional_package_properties(Poppler PROPERTIES
-        PURPOSE "Support for PDF files in okular.")
+        PURPOSE "Support for PDF files in Charta.")
 
 find_package(Freetype)
 set_okular_optional_package_properties(Freetype PROPERTIES
         DESCRIPTION  "A font rendering engine"
         URL "https://www.freetype.org"
-        PURPOSE "Provides freetype font support in the okular DVI generator.")
+        PURPOSE "Provides freetype font support in the Charta DVI generator.")
 
 find_package(TIFF)
 set_okular_optional_package_properties(TIFF PROPERTIES
         DESCRIPTION  "A library for reading and writing TIFF formatted files,"
         URL "http://www.libtiff.org"
-        PURPOSE "Support for TIFF files in okular.")
+        PURPOSE "Support for TIFF files in Charta.")
 
 set(LIBSPECTRE_MINIMUM_VERSION "0.2")
 find_package(LibSpectre "${LIBSPECTRE_MINIMUM_VERSION}")
 set_okular_optional_package_properties(LibSpectre PROPERTIES
         DESCRIPTION  "A PostScript rendering library"
         URL "https://libspectre.freedesktop.org"
-        PURPOSE "Support for PS files in okular.")
+        PURPOSE "Support for PS files in Charta.")
 
 find_package(KExiv2Qt6 CONFIG)
 set_okular_optional_package_properties(KExiv2Qt6 PROPERTIES
@@ -252,25 +252,25 @@ find_package(DjVuLibre "3.5.28")
 set_okular_optional_package_properties(DjVuLibre PROPERTIES
         DESCRIPTION  "A library for dealing with DjVu formatted files"
         URL "https://djvulibre.djvuzone.org"
-        PURPOSE "Support for DjVu files in okular.")
+        PURPOSE "Support for DjVu files in Charta.")
 
 find_package(EPub)
 set_okular_optional_package_properties(EPub PROPERTIES
         DESCRIPTION  "A library for reading EPub documents"
         URL "http://sourceforge.net/projects/ebook-tools"
-        PURPOSE "Support for EPub documents in Okular.")
+        PURPOSE "Support for EPub documents in Charta.")
 
 find_package(QMobipocket6 "2" CONFIG)
 set_okular_optional_package_properties(QMobiPocket6 PROPERTIES
         DESCRIPTION  "A library for reading Mobipocket documents"
         URL "https://commits.kde.org/kdegraphics-mobipocket"
-        PURPOSE "Support for Mobipocket documents in Okular.")
+        PURPOSE "Support for Mobipocket documents in Charta.")
 
 find_package(Discount)
 set_okular_optional_package_properties(Discount PROPERTIES
         DESCRIPTION "A library that gives you formatting functions suitable for marking down entire documents or lines of text"
         URL "https://www.pell.portland.or.us/~orc/Code/discount/"
-        PURPOSE "Support for Markdown documents in Okular.")
+        PURPOSE "Support for Markdown documents in Charta.")
 
 add_definitions(-DTRANSLATION_DOMAIN="okular")
 add_definitions(-DQT_DEPRECATED_WARNINGS_SINCE=0x060600)

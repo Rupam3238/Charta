@@ -1,5 +1,5 @@
 maintainer: aacid
-description: Okular, the unified document viewer
+description: Charta, the unified document viewer and annotator
 platforms:
  - name: Linux
  - name: Windows

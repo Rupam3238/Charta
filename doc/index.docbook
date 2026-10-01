@@ -1,5 +1,6 @@
 <?xml version="1.0" ?>
 <!DOCTYPE book PUBLIC "-//KDE//DTD DocBook XML V4.5-Based Variant V1.1//EN" "dtd/kdedbx45.dtd" [
+	<!ENTITY okular "<application>Charta</application>">
   <!ENTITY kpdf "<application>KPDF</application>">
   <!ENTITY % English "INCLUDE">
   <!ENTITY % addindex "IGNORE">
@@ -11,7 +12,7 @@ Describe all actions only possible in the navigation bars:
 Switching between documents using bookmarks
 Context menu actions like Rename Bookmarks etc.)
  -->
-<book id="okular" lang="&language;">
+<book id="charta" lang="&language;">
 	<bookinfo>
 		<title>The &okular; Handbook</title>
 		<authorgroup>
@@ -36,11 +37,11 @@ Context menu actions like Rename Bookmarks etc.)
 		<releaseinfo>26.04</releaseinfo>
 		<!-- Abstract about this handbook -->
 		<abstract>
-			<para>&okular; is a &kde; universal document viewer based on &kpdf; code.</para>
+			<para>Charta is a document viewer originating from Okular and the earlier &kpdf; codebase.</para>
 		</abstract>
 		<keywordset>
 			<keyword>KDE</keyword>
-			<keyword>okular</keyword>
+			<keyword>charta</keyword>
 			<keyword>pdf</keyword>
 			<keyword>ps</keyword>
 			<keyword>postscript</keyword>
@@ -1302,7 +1303,7 @@ Context menu actions like Rename Bookmarks etc.)
 				</para>
 		      </sect2>
 		</sect1>
-		<!-- Please keep this section content in sync with man page (man-okular.1.docbook) -->
+		   <!-- Please keep this section content in sync with man page (man-charta.1.docbook) -->
 		<sect1 id="command-line-options">
 		    <title>Command Line Options</title>
 		    <para>

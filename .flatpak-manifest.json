@@ -1,11 +1,11 @@
 {
-    "id": "org.kde.okular",
+    "id": "org.charta.reader",
     "branch": "master",
     "runtime": "org.kde.Platform",
     "runtime-version": "6.11",
     "sdk": "org.kde.Sdk",
-    "command": "okular",
-    "rename-icon": "okular",
+    "command": "charta",
+    "rename-icon": "charta",
     "tags": [
         "nightly"
     ],
@@ -20,6 +20,8 @@
         "--device=dri",
         "--filesystem=host",
         "--allow=bluetooth",
+        "--own-name=org.kde.okular",
+        "--own-name=org.kde.okular.*",
         "--talk-name=org.freedesktop.ScreenSaver",
         "--talk-name=org.freedesktop.login1"
     ],
@@ -395,15 +397,15 @@
             ]
         },
         {
-            "name": "okular",
+            "name": "charta",
             "buildsystem": "cmake-ninja",
             "builddir": true,
             "config-opts": [
                 "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
             ],
             "post-install": [
-                "mv /app/bin/okular /app/bin/okular-bin",
-                "install -Dm755 ../okular-wrapper /app/bin/okular"
+                "mv /app/bin/charta /app/bin/charta-bin",
+                "install -Dm755 ../charta-wrapper /app/bin/charta"
             ],
             "sources": [
                 {
@@ -416,10 +418,10 @@
                 },
                 {
                     "type": "script",
-                    "dest-filename": "okular-wrapper",
+                    "dest-filename": "charta-wrapper",
                     "commands": [
                         "export TMPDIR=\"$XDG_RUNTIME_DIR/app/$FLATPAK_ID\"",
-                        "exec /app/bin/okular-bin \"$@\""
+                        "exec /app/bin/charta-bin \"$@\""
                     ]
                 }
             ]
