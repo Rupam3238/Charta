@@ -2908,10 +2908,12 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
 
     const bool leftButton = e->button() == Qt::LeftButton;
     const bool rightButton = e->button() == Qt::RightButton;
+    const QPoint releasePosition = contentAreaPoint(e->pos());
 
     if (d->mouseAnnotation->isActive() && leftButton) {
         // Just finished to move the annotation
-        d->mouseAnnotation->routeMouseReleaseEvent();
+        PageViewItem *releaseItem = d->items.isEmpty() ? nullptr : pickItemOnPoint(releasePosition.x(), releasePosition.y());
+        d->mouseAnnotation->routeMouseReleaseEvent(releaseItem, releasePosition);
         updateAnnotationSelectionPanel();
     }
 
@@ -2924,7 +2926,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
         return;
     }
 
-    const QPoint eventPos = contentAreaPoint(e->pos());
+    const QPoint eventPos = releasePosition;
 
     // handle mode independent mid bottom zoom
     if (e->button() == Qt::MiddleButton) {

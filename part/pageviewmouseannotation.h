@@ -82,7 +82,7 @@ public:
     void selectAnnotations(const QList<AnnotationDescription> &annotations);
 
     /* Process a mouse release event. */
-    void routeMouseReleaseEvent();
+    void routeMouseReleaseEvent(PageViewItem *pageViewItem, const QPoint eventPos);
 
     /* Process a mouse move event. eventPos: Mouse position in content area coordinates. */
     void routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed);
@@ -148,6 +148,8 @@ public:
 
 private:
     void setState(MouseAnnotationState state, const AnnotationDescription &ad);
+    QRect selectedBoundingRect() const;
+    void updateHover(PageViewItem *pageViewItem, const QPoint eventPos);
     QRect getFullBoundingRect(const AnnotationDescription &ad) const;
     void performCommand(const QPoint newPos);
     void finishCommand();
@@ -173,6 +175,7 @@ private:
     QPoint m_mousePosition; // in page view item coordinates
     QList<AnnotationDescription> m_areaSelectedAnnotations;
     bool m_selectionMoveUndoMacroOpen = false;
+    bool m_selectionMoveChanged = false;
 
     QList<ResizeHandle> m_resizeHandleList;
 };

@@ -94,6 +94,25 @@ MouseAnnotation::~MouseAnnotation()
 
 void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool selectOnHit)
 {
+    if (selectOnHit && m_areaSelectedAnnotations.size() > 1) {
+        const AnnotationDescription &firstSelected = m_areaSelectedAnnotations.constFirst();
+        if (pageViewItem->pageNumber() == firstSelected.pageNumber) {
+            const QPoint pageOrigin = firstSelected.pageViewItem->uncroppedGeometry().topLeft();
+            const QPoint pagePosition = eventPos - pageOrigin;
+            if (selectedBoundingRect().contains(pagePosition)) {
+                const bool canMoveSelection = std::all_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [](const AnnotationDescription &selected) {
+                    return selected.annotation->canBeMoved();
+                });
+                if (canMoveSelection) {
+                    m_mousePosition = pagePosition;
+                    m_handle = RH_Content;
+                    setState(StateMoving, firstSelected);
+                }
+                return;
+            }
+        }
+    }
+
     /* Is there a selected annotation? */
     if (m_focusedAnnotation.isValid()) {
         m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
@@ -168,13 +187,63 @@ void MouseAnnotation::selectAnnotations(const QList<AnnotationDescription> &anno
     m_pageView->viewport()->update();
 }
 
-void MouseAnnotation::routeMouseReleaseEvent()
+QRect MouseAnnotation::selectedBoundingRect() const
+{
+    if (m_areaSelectedAnnotations.size() < 2) {
+        return {};
+    }
+
+    const int pageNumber = m_areaSelectedAnnotations.constFirst().pageNumber;
+    QRect selectionRect;
+    for (const AnnotationDescription &selected : m_areaSelectedAnnotations) {
+        if (!selected.isValid() || selected.pageNumber != pageNumber) {
+            return {};
+        }
+        const QRect annotationRect = Okular::AnnotationUtils::annotationGeometry(selected.annotation, selected.pageViewItem->uncroppedWidth(), selected.pageViewItem->uncroppedHeight());
+        selectionRect = selectionRect.isNull() ? annotationRect : selectionRect.united(annotationRect);
+    }
+    return selectionRect;
+}
+
+void MouseAnnotation::updateHover(PageViewItem *pageViewItem, const QPoint eventPos)
+{
+    const ResizeHandle previousHandle = m_handle;
+    const AnnotationDescription previousMouseOver = m_mouseOverAnnotation;
+
+    if (m_areaSelectedAnnotations.size() > 1) {
+        const AnnotationDescription &firstSelected = m_areaSelectedAnnotations.constFirst();
+        const QPoint pageOrigin = firstSelected.pageViewItem->uncroppedGeometry().topLeft();
+        const QPoint pagePosition = eventPos - pageOrigin;
+        m_mousePosition = pagePosition;
+        const bool onSelectedPage = pageViewItem && pageViewItem->pageNumber() == firstSelected.pageNumber;
+        m_handle = onSelectedPage && selectedBoundingRect().contains(pagePosition) ? RH_Content : RH_None;
+    } else if (m_focusedAnnotation.isValid() && pageViewItem) {
+        m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
+        m_handle = getHandleAt(m_mousePosition, m_focusedAnnotation);
+    } else {
+        m_handle = RH_None;
+    }
+
+    const AnnotationDescription mouseOver(pageViewItem, eventPos);
+    if (mouseOver.isValid()) {
+        m_mouseOverAnnotation = mouseOver;
+    } else {
+        m_mouseOverAnnotation.invalidate();
+    }
+
+    if (previousHandle != m_handle || !(previousMouseOver == m_mouseOverAnnotation)) {
+        m_pageView->updateCursor();
+    }
+}
+
+void MouseAnnotation::routeMouseReleaseEvent(PageViewItem *pageViewItem, const QPoint eventPos)
 {
     if (isModified()) {
         /* qDebug() << "routeMouseReleaseEvent: finish command"; */
         finishCommand();
         setState(StateFocused, m_focusedAnnotation);
     }
+    updateHover(pageViewItem, eventPos);
     /*
     else
     {
@@ -185,7 +254,7 @@ void MouseAnnotation::routeMouseReleaseEvent()
 
 void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed)
 {
-    if (!pageViewItem && (!leftButtonPressed || !m_focusedAnnotation.isValid())) {
+    if (!pageViewItem && (leftButtonPressed ? !m_focusedAnnotation.isValid() : m_areaSelectedAnnotations.size() < 2 && !m_focusedAnnotation.isValid())) {
         /* qDebug() << "routeMouseMoveEvent: no pageViewItem provided, ignore"; */
         return;
     }
@@ -210,29 +279,7 @@ void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoi
             updateViewport(m_focusedAnnotation);
         }
     } else {
-        if (isFocused()) {
-            /* qDebug() << "routeMouseMoveEvent: update cursor for focused annotation, new eventPos " << eventPos; */
-            m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
-            m_handle = getHandleAt(m_mousePosition, m_focusedAnnotation);
-            m_pageView->updateCursor();
-        }
-
-        /* We get here quite frequently. */
-        const AnnotationDescription ad(pageViewItem, eventPos);
-        m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
-        if (ad.isValid()) {
-            if (!(m_mouseOverAnnotation == ad)) {
-                /* qDebug() << "routeMouseMoveEvent: Annotation under mouse (subtype " << ad.annotation->subType() << ", flags " << ad.annotation->flags() << ")"; */
-                m_mouseOverAnnotation = ad;
-                m_pageView->updateCursor();
-            }
-        } else {
-            if (!(m_mouseOverAnnotation == ad)) {
-                /* qDebug() << "routeMouseMoveEvent: Annotation disappeared under mouse."; */
-                m_mouseOverAnnotation.invalidate();
-                m_pageView->updateCursor();
-            }
-        }
+        updateHover(pageViewItem, eventPos);
     }
 }
 
@@ -431,6 +478,13 @@ bool MouseAnnotation::isModified() const
 
 Qt::CursorShape MouseAnnotation::cursor() const
 {
+    if (m_areaSelectedAnnotations.size() > 1) {
+        if (m_handle == RH_Content) {
+            return isMoved() ? Qt::ClosedHandCursor : Qt::OpenHandCursor;
+        }
+        return Qt::CrossCursor;
+    }
+
     if (m_handle != RH_None) {
         if (isMoved()) {
             return Qt::SizeAllCursor;
@@ -551,6 +605,7 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
         if (m_areaSelectedAnnotations.size() > 1 && !m_selectionMoveUndoMacroOpen) {
             m_document->beginUndoMacro(i18n("move annotations"));
             m_selectionMoveUndoMacroOpen = true;
+            m_selectionMoveChanged = false;
         }
         for (const AnnotationDescription &selected : selectedAnnotations()) {
             selected.annotation->setFlags(selected.annotation->flags() | Okular::Annotation::BeingMoved);
@@ -625,7 +680,12 @@ void MouseAnnotation::performCommand(const QPoint newPos)
             delta.y = 1 - groupRect.bottom;
         }
         for (const AnnotationDescription &description : selected) {
-            m_document->translatePageAnnotation(description.pageNumber, description.annotation, delta);
+            if (!qFuzzyIsNull(delta.x) || !qFuzzyIsNull(delta.y)) {
+                m_document->translatePageAnnotation(description.pageNumber, description.annotation, delta);
+                if (selected.size() > 1) {
+                    m_selectionMoveChanged = true;
+                }
+            }
         }
 
     } else if (isResized()) {
@@ -649,12 +709,15 @@ void MouseAnnotation::finishCommand()
         for (const AnnotationDescription &description : selected) {
             description.annotation->setFlags(description.annotation->flags() & ~Okular::Annotation::BeingMoved);
         }
-        for (const AnnotationDescription &description : selected) {
-            m_document->translatePageAnnotation(description.pageNumber, description.annotation, Okular::NormalizedPoint(0.0, 0.0));
+        if (selected.size() <= 1 || m_selectionMoveChanged) {
+            for (const AnnotationDescription &description : selected) {
+                m_document->translatePageAnnotation(description.pageNumber, description.annotation, Okular::NormalizedPoint(0.0, 0.0));
+            }
         }
         if (m_selectionMoveUndoMacroOpen) {
             m_document->endUndoMacro();
             m_selectionMoveUndoMacroOpen = false;
+            m_selectionMoveChanged = false;
         }
     } else if (isResized()) {
         m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() & ~Okular::Annotation::BeingResized);
