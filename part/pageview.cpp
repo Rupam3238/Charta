@@ -118,6 +118,33 @@ static_assert(static_cast<int>(Okular::Generator::PageLayout::TwoPageRight) == O
 
 static const int pageflags = PagePainter::Accessibility | PagePainter::EnhanceLinks | PagePainter::EnhanceImages | PagePainter::Highlights | PagePainter::TextSelection | PagePainter::Annotations;
 
+namespace
+{
+class ScrollBarAreaHoverFilter final : public QObject
+{
+public:
+    using QObject::QObject;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type() == QEvent::Enter || event->type() == QEvent::Leave) {
+            auto *scrollBar = qobject_cast<QScrollBar *>(watched);
+            if (scrollBar) {
+                const bool hovered = event->type() == QEvent::Enter;
+                if (scrollBar->property("areaHovered").toBool() != hovered) {
+                    scrollBar->setProperty("areaHovered", hovered);
+                    scrollBar->style()->unpolish(scrollBar);
+                    scrollBar->style()->polish(scrollBar);
+                    scrollBar->update();
+                }
+            }
+        }
+        return QObject::eventFilter(watched, event);
+    }
+};
+}
+
 static const std::array<float, 16> kZoomValues {0.12, 0.25, 0.33, 0.50, 0.66, 0.75, 1.00, 1.25, 1.50, 2.00, 4.00, 8.00, 16.00, 25.00, 50.00, 100.00};
 
 // This is the length of the text that will be shown when the user is searching for a specific piece of text.
@@ -445,7 +472,7 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
         "QScrollBar:horizontal { height: 8px; }"
         "QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: #586574; border-radius: 4px; min-height: 32px; min-width: 32px; }"
         "QScrollBar::handle:vertical { margin: 0px 1px; }"
-        "QScrollBar::handle:vertical:hover { background: #27bfd6; margin: 0px; }"
+        "QScrollBar[areaHovered=\"true\"]::handle:vertical { background: #27bfd6; margin: 0px -2px; }"
         "QScrollBar::handle:horizontal:hover { background: #27bfd6; }"
         "QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }"
         "QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }"));
@@ -477,6 +504,7 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
 
     // the apparently "magic" value of 20 is the same used internally in QScrollArea
     verticalScrollBar()->setCursor(Qt::ArrowCursor);
+    verticalScrollBar()->installEventFilter(new ScrollBarAreaHoverFilter(verticalScrollBar()));
     verticalScrollBar()->setSingleStep(20);
     horizontalScrollBar()->setCursor(Qt::ArrowCursor);
     horizontalScrollBar()->setSingleStep(20);
