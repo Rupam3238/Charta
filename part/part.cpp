@@ -50,6 +50,7 @@
 #include <QPrinter>
 #include <QScopedValueRollback>
 #include <QScrollBar>
+#include <QSaveFile>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStandardPaths>
@@ -2667,6 +2668,51 @@ static QUrl resolveSymlinksIfFileExists(const QUrl &saveUrl)
     }
 }
 
+static bool copyFileAtomically(const QString &sourcePath, const QString &destinationPath, QString *errorText)
+{
+    QFile sourceFile(sourcePath);
+    if (!sourceFile.open(QIODevice::ReadOnly)) {
+        *errorText = sourceFile.errorString();
+        return false;
+    }
+
+    QSaveFile destinationFile(destinationPath);
+    destinationFile.setDirectWriteFallback(false);
+    if (!destinationFile.open(QIODevice::WriteOnly)) {
+        *errorText = destinationFile.errorString();
+        return false;
+    }
+
+    while (!sourceFile.atEnd()) {
+        const QByteArray buffer = sourceFile.read(64 * 1024);
+        if (buffer.isEmpty()) {
+            if (sourceFile.error() != QFileDevice::NoError) {
+                *errorText = sourceFile.errorString();
+                destinationFile.cancelWriting();
+                return false;
+            }
+            break;
+        }
+
+        qsizetype offset = 0;
+        while (offset < buffer.size()) {
+            const qint64 written = destinationFile.write(buffer.constData() + offset, buffer.size() - offset);
+            if (written <= 0) {
+                *errorText = destinationFile.errorString();
+                destinationFile.cancelWriting();
+                return false;
+            }
+            offset += written;
+        }
+    }
+
+    if (!destinationFile.commit()) {
+        *errorText = destinationFile.errorString();
+        return false;
+    }
+    return true;
+}
+
 bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
 {
     // TODO When we get different saving backends we need to query the backend
@@ -2752,6 +2798,7 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
 
     QScopedPointer<QTemporaryFile> tempFile;
     KIO::Job *copyJob = nullptr; // this will be filled with the job that writes to saveUrl
+    QUrl copySourceUrl;
 
     // Does the user want a .okular archive?
     if (flags & SaveAsOkularArchive) {
@@ -2776,7 +2823,7 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
             return false;
         }
 
-        copyJob = KIO::file_copy(QUrl::fromLocalFile(tmpFileName), realSaveUrl, -1, KIO::Overwrite);
+        copySourceUrl = QUrl::fromLocalFile(tmpFileName);
         deleteTmpFileName = true;
     } else {
         bool wontSaveForms, wontSaveAnnotations;
@@ -2849,7 +2896,7 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
                 return false;
             }
 
-            copyJob = KIO::file_copy(QUrl::fromLocalFile(tmpFileName), realSaveUrl, -1, KIO::Overwrite);
+            copySourceUrl = QUrl::fromLocalFile(tmpFileName);
             deleteTmpFileName = true;
         } else {
             // If the generators doesn't support saving changes, we will
@@ -2866,7 +2913,7 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
                     return false;
                 }
 
-                copyJob = KIO::file_copy(QUrl::fromLocalFile(tmpFileName), realSaveUrl, -1, KIO::Overwrite);
+                copySourceUrl = QUrl::fromLocalFile(tmpFileName);
                 deleteTmpFileName = true;
             } else {
                 // Otherwise just copy the open file.
@@ -2894,7 +2941,7 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
                 }
 
                 if (srcUrl != saveUrl) {
-                    copyJob = KIO::file_copy(srcUrl, realSaveUrl, -1, KIO::Overwrite);
+                    copySourceUrl = srcUrl;
                 } else {
                     // Don't do a real copy in this case, just update the timestamps
                     copyJob = KIO::setModificationTime(realSaveUrl, QDateTime::currentDateTime());
@@ -2916,18 +2963,36 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
         }
     };
 
-    KJobWidgets::setWindow(copyJob, widget());
-    if (!copyJob->exec()) {
-        KMessageBox::information(widget(), i18n("File could not be saved in '%1'. Error: '%2'. Try to save it to another location.", saveUrl.toDisplayString(), copyJob->errorString()));
-
-        // Restore watcher
-        if (url().isLocalFile()) {
-            setFileToWatch(localFilePath());
+    if (!copySourceUrl.isEmpty()) {
+        if (copySourceUrl.isLocalFile() && realSaveUrl.isLocalFile()) {
+            QString errorText;
+            if (!copyFileAtomically(copySourceUrl.toLocalFile(), realSaveUrl.toLocalFile(), &errorText)) {
+                KMessageBox::information(widget(), i18n("File could not be saved in '%1'. Error: '%2'. Try to save it to another location.", saveUrl.toDisplayString(), errorText));
+                if (url().isLocalFile()) {
+                    setFileToWatch(localFilePath());
+                }
+                deleteTmpFileFunction();
+                return false;
+            }
+        } else {
+            copyJob = KIO::file_copy(copySourceUrl, realSaveUrl, -1, KIO::Overwrite);
         }
+    }
 
-        deleteTmpFileFunction();
+    if (copyJob) {
+        KJobWidgets::setWindow(copyJob, widget());
+        if (!copyJob->exec()) {
+            KMessageBox::information(widget(), i18n("File could not be saved in '%1'. Error: '%2'. Try to save it to another location.", saveUrl.toDisplayString(), copyJob->errorString()));
 
-        return false;
+            // Restore watcher
+            if (url().isLocalFile()) {
+                setFileToWatch(localFilePath());
+            }
+
+            deleteTmpFileFunction();
+
+            return false;
+        }
     }
     deleteTmpFileFunction();
 

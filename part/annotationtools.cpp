@@ -101,13 +101,93 @@ void AnnotatorEngine::setCursor(const QCursor &cursor)
     m_cursor = cursor;
 }
 
-SmoothPath::SmoothPath(const QList<Okular::NormalizedPoint> &points, const QList<qreal> &pressures, const QPen &pen, qreal opacity, QPainter::CompositionMode compositionMode)
+SmoothPath::SmoothPath(const QList<Okular::NormalizedPoint> &points,
+                       const QList<qreal> &segmentWidths,
+                       qreal pageWidth,
+                       const QPen &pen,
+                       qreal opacity,
+                       QPainter::CompositionMode compositionMode)
     : points(points)
-    , pressures(pressures)
+    , segmentWidths(segmentWidths)
+    , pageWidth(pageWidth)
     , pen(pen)
     , opacity(opacity)
     , compositionMode(compositionMode)
 {
+}
+
+QPainterPath FreehandStrokeGeometry::segmentOutline(const QPointF &start, const QPointF &end, qreal width)
+{
+    QPainterPath outline;
+    if (width <= 0.0) {
+        return outline;
+    }
+
+    const qreal radius = width / 2.0;
+    const QPointF direction = end - start;
+    const qreal length = std::hypot(direction.x(), direction.y());
+    if (qFuzzyIsNull(length)) {
+        outline.addEllipse(QRectF(start.x() - radius, start.y() - radius, width, width));
+        return outline;
+    }
+
+    const QPointF tangent(direction.x() / length, direction.y() / length);
+    const QPointF normal(-tangent.y() * radius, tangent.x() * radius);
+    const qreal controlOffset = radius * 4.0 / 3.0;
+    const QPointF startLeft = start + normal;
+    const QPointF endLeft = end + normal;
+    const QPointF endRight = end - normal;
+    const QPointF startRight = start - normal;
+
+    outline.moveTo(startLeft);
+    outline.lineTo(endLeft);
+    outline.cubicTo(endLeft + tangent * controlOffset, endRight + tangent * controlOffset, endRight);
+    outline.lineTo(startRight);
+    outline.cubicTo(startRight - tangent * controlOffset, startLeft - tangent * controlOffset, startLeft);
+    outline.closeSubpath();
+    return outline;
+}
+
+static QByteArray pdfNumber(qreal value)
+{
+    if (qFuzzyIsNull(value)) {
+        value = 0.0;
+    }
+    QByteArray number = QByteArray::number(value, 'f', 6);
+    while (number.endsWith('0')) {
+        number.chop(1);
+    }
+    if (number.endsWith('.')) {
+        number.chop(1);
+    }
+    return number;
+}
+
+QByteArray FreehandStrokeGeometry::pdfAppearance(const QList<QPainterPath> &outlines, const QColor &color)
+{
+    QByteArray appearance = "q\n";
+    appearance += pdfNumber(color.redF()) + ' ' + pdfNumber(color.greenF()) + ' ' + pdfNumber(color.blueF()) + " rg\n";
+
+    for (const QPainterPath &outline : outlines) {
+        for (int index = 0; index < outline.elementCount(); ++index) {
+            const QPainterPath::Element element = outline.elementAt(index);
+            if (element.type == QPainterPath::MoveToElement) {
+                appearance += pdfNumber(element.x) + ' ' + pdfNumber(element.y) + " m\n";
+            } else if (element.type == QPainterPath::LineToElement) {
+                appearance += pdfNumber(element.x) + ' ' + pdfNumber(element.y) + " l\n";
+            } else if (element.type == QPainterPath::CurveToElement && index + 2 < outline.elementCount()) {
+                const QPainterPath::Element control2 = outline.elementAt(index + 1);
+                const QPainterPath::Element endPoint = outline.elementAt(index + 2);
+                appearance += pdfNumber(element.x) + ' ' + pdfNumber(element.y) + ' ' + pdfNumber(control2.x) + ' ' + pdfNumber(control2.y) + ' ' + pdfNumber(endPoint.x) + ' '
+                    + pdfNumber(endPoint.y) + " c\n";
+                index += 2;
+            }
+        }
+        appearance += "h\nf\n";
+    }
+
+    appearance += "Q\n";
+    return appearance;
 }
 
 /** SmoothPathEngine */
@@ -126,6 +206,7 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
     const qreal basePenWidth = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("1")).toDouble();
     if (page) {
         m_pageWidth = page->width();
+        m_pageHeight = page->height();
     }
     m_lastXScale = xScale;
     if (button != Left) {
@@ -135,6 +216,7 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
     if (type == Press && points.isEmpty()) {
         const qreal pressure = qBound(0.0, modifiers.pressure, 1.0);
         m_liveStroke.clear();
+        segmentWidths.clear();
         m_pressureSum = 0.0;
         m_allDefaultPressure = true;
         smoothingWindow.clear();
@@ -170,7 +252,11 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
 
         lastPoint = nextPoint;
         const qreal representativeWidth = representativeStrokeWidth(m_pressureSum, pressures.size(), m_allDefaultPressure, basePenWidth);
-        QPen pen(m_engineColor, qBound<qreal>(0.5, processedPressure * representativeWidth * xScale / m_pageWidth, 100.0));
+        const qreal pageWidth = qMax<qreal>(1.0, m_pageWidth);
+        const qreal segmentPixelWidth = qBound<qreal>(0.5, processedPressure * representativeWidth * xScale / pageWidth, 100.0);
+        const qreal segmentWidth = segmentPixelWidth * pageWidth / xScale;
+        segmentWidths.append(segmentWidth);
+        QPen pen(m_engineColor, segmentPixelWidth);
         pen.setJoinStyle(Qt::RoundJoin);
         pen.setCapStyle(Qt::RoundCap);
         const QRect segmentRect = m_liveStroke.addSegment(QPointF(previousPoint.x * xScale, previousPoint.y * yScale), QPointF(nextPoint.x * xScale, nextPoint.y * yScale), pen,
@@ -180,6 +266,7 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
         if (points.count() < 2) {
             points.clear();
             pressures.clear();
+            segmentWidths.clear();
         } else {
             m_creationCompleted = true;
         }
@@ -203,20 +290,19 @@ void SmoothPath::paint(QPainter *painter, double xScale, double yScale) const
         painter->setRenderHint(QPainter::Antialiasing, true);
 
         for (int index = 1; index < points.size(); ++index) {
-            const qreal pressure = pressures.value(index, 1.0);
-            QPen segmentPen = pen;
-            segmentPen.setWidthF(qBound(0.5, pressure * pen.widthF(), 100.0));
-            painter->setPen(segmentPen);
-            painter->drawLine(QPointF(points[index - 1].x * xScale, points[index - 1].y * yScale),
-                              QPointF(points[index].x * xScale, points[index].y * yScale));
+            const qreal width = qBound(0.5, segmentWidths.value(index - 1, pen.widthF()) * xScale / pageWidth, 100.0);
+            const QPainterPath outline = FreehandStrokeGeometry::segmentOutline(QPointF(points[index - 1].x * xScale, points[index - 1].y * yScale),
+                                                                                QPointF(points[index].x * xScale, points[index].y * yScale),
+                                                                                width);
+            painter->fillPath(outline, pen.brush());
         }
     }
 }
 
 QRect LiveStroke::addSegment(const QPointF &start, const QPointF &end, const QPen &pen, qreal opacity)
 {
-    const qreal margin = pen.widthF() / 2.0 + 2.0;
-    const QRect dirtyRect = QRectF(start, end).normalized().adjusted(-margin, -margin, margin, margin).toAlignedRect();
+    const QPainterPath outline = FreehandStrokeGeometry::segmentOutline(start, end, pen.widthF());
+    const QRect dirtyRect = outline.boundingRect().adjusted(-2.0, -2.0, 2.0, 2.0).toAlignedRect();
     const int firstTileX = qFloor(static_cast<qreal>(dirtyRect.left()) / tileSize);
     const int lastTileX = qFloor(static_cast<qreal>(dirtyRect.right()) / tileSize);
     const int firstTileY = qFloor(static_cast<qreal>(dirtyRect.top()) / tileSize);
@@ -236,8 +322,7 @@ QRect LiveStroke::addSegment(const QPointF &start, const QPointF &end, const QPe
             tilePainter.setRenderHint(QPainter::Antialiasing, true);
             tilePainter.setCompositionMode(QPainter::CompositionMode_SourceOver);
             tilePainter.setOpacity(opacity);
-            tilePainter.setPen(pen);
-            tilePainter.drawLine(start - origin, end - origin);
+            tilePainter.fillPath(outline.translated(-origin), pen.brush());
         }
     }
 
@@ -316,8 +401,34 @@ QList<Okular::Annotation *> SmoothPathEngine::end()
         ann->style().setOpacity(m_annotElement.attribute(QStringLiteral("opacity"), QStringLiteral("1.0")).toDouble());
     }
 
-    if (auto *ink = dynamic_cast<Okular::InkAnnotation *>(ann); ink && qFuzzyCompare(ink->style().opacity(), 1.0)) {
-        ink->setAppearanceStream(QByteArrayLiteral("q\n1 0 1 rg\n10 10 m\n90 10 l\n50 90 l\nh\nf\nQ\n"), QRectF(0, 0, 100, 100));
+    if (auto *ink = dynamic_cast<Okular::InkAnnotation *>(ann); ink && compositionMode == QPainter::CompositionMode_SourceOver && segmentWidths.size() == points.size() - 1) {
+        const qreal pageWidth = qMax<qreal>(1.0, m_pageWidth);
+        const qreal pageHeight = qMax<qreal>(1.0, m_pageHeight);
+        QList<QPainterPath> outlines;
+        QRectF bounds;
+        for (int index = 1; index < points.size(); ++index) {
+            const QPointF start(points[index - 1].x * pageWidth, (1.0 - points[index - 1].y) * pageHeight);
+            const QPointF end(points[index].x * pageWidth, (1.0 - points[index].y) * pageHeight);
+            const QPainterPath outline = FreehandStrokeGeometry::segmentOutline(start, end, segmentWidths[index - 1]);
+            outlines.append(outline);
+            bounds = bounds.isNull() ? outline.boundingRect() : bounds.united(outline.boundingRect());
+        }
+
+        if (!outlines.isEmpty() && bounds.isValid()) {
+            bounds.adjust(-0.25, -0.25, 0.25, 0.25);
+            QList<QPainterPath> localOutlines;
+            localOutlines.reserve(outlines.size());
+            for (const QPainterPath &outline : outlines) {
+                localOutlines.append(outline.translated(-bounds.left(), -bounds.top()));
+            }
+
+            const double left = bounds.left() / pageWidth;
+            const double top = 1.0 - bounds.bottom() / pageHeight;
+            const double right = bounds.right() / pageWidth;
+            const double bottom = 1.0 - bounds.top() / pageHeight;
+            ink->setBoundingRectangle(Okular::NormalizedRect(left, top, right, bottom));
+            ink->setAppearanceStream(FreehandStrokeGeometry::pdfAppearance(localOutlines, ink->style().color()), QRectF(0, 0, bounds.width(), bounds.height()));
+        }
     }
 
     return {ann};
@@ -332,7 +443,7 @@ SmoothPath SmoothPathEngine::endSmoothPath()
     const int width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toInt();
     const qreal opacity = m_annotElement.attribute(QStringLiteral("opacity"), QStringLiteral("1.0")).toDouble();
 
-    return SmoothPath(points, pressures, QPen(color, representativeStrokeWidth(pressures, width) * m_lastXScale / m_pageWidth), opacity, compositionMode);
+    return SmoothPath(points, segmentWidths, m_pageWidth, QPen(color, representativeStrokeWidth(pressures, width) * m_lastXScale / m_pageWidth), opacity, compositionMode);
 }
 
 QRect SmoothPathEngine::liveBounds() const

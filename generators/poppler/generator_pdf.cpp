@@ -2096,7 +2096,6 @@ bool PDFGenerator::supportsOption(SaveOption option) const
 
 bool PDFGenerator::save(const QString &fileName, SaveOptions options, QString *errorText)
 {
-    Q_UNUSED(errorText);
     std::unique_ptr<Poppler::PDFConverter> pdfConv = pdfdoc->pdfConverter();
 
     pdfConv->setOutputFileName(fileName);
@@ -2128,11 +2127,23 @@ bool PDFGenerator::save(const QString &fileName, SaveOptions options, QString *e
             break;
 
         case Poppler::BaseConverter::OpenOutputError:
-            // the default text message is good for this case
+            if (errorText) {
+                *errorText = i18n("Poppler could not open the staged PDF for writing.");
+            }
             break;
         }
+        return false;
     }
-    return success;
+
+    const std::unique_ptr<Poppler::Document> savedDocument(Poppler::Document::load(fileName));
+    if (!savedDocument) {
+        if (errorText) {
+            *errorText = i18n("Poppler could not reopen the staged PDF after saving.");
+        }
+        return false;
+    }
+
+    return true;
 }
 
 Okular::AnnotationProxy *PDFGenerator::annotationProxy() const

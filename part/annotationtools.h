@@ -8,8 +8,10 @@
 #define _OKULAR_ANNOTATIONTOOLS_H_
 
 #include <QPainter>
+#include <QPainterPath>
 #include <QPen>
 #include <QCursor>
+#include <QByteArray>
 #include <QHash>
 #include <QImage>
 #include <QRect>
@@ -93,7 +95,8 @@ class SmoothPath
 {
 public:
     SmoothPath(const QList<Okular::NormalizedPoint> &points,
-               const QList<qreal> &pressures,
+               const QList<qreal> &segmentWidths,
+               qreal pageWidth,
                const QPen &pen,
                qreal opacity = 1.0,
                QPainter::CompositionMode compositionMode = QPainter::CompositionMode_SourceOver);
@@ -101,10 +104,18 @@ public:
 
 private:
     const QList<Okular::NormalizedPoint> points;
-    const QList<qreal> pressures;
+    const QList<qreal> segmentWidths;
+    const qreal pageWidth;
     const QPen pen;
     const qreal opacity;
     const QPainter::CompositionMode compositionMode;
+};
+
+class FreehandStrokeGeometry
+{
+public:
+    static QPainterPath segmentOutline(const QPointF &start, const QPointF &end, qreal width);
+    static QByteArray pdfAppearance(const QList<QPainterPath> &outlines, const QColor &color);
 };
 
 class LiveStroke
@@ -145,6 +156,7 @@ private:
     // data
     QList<Okular::NormalizedPoint> points;
     QList<qreal> pressures;
+    QList<qreal> segmentWidths;
     QList<Okular::NormalizedPoint> smoothingWindow;
     QList<qreal> pressureWindow;
     Okular::NormalizedPoint smoothingSum;
@@ -155,6 +167,7 @@ private:
     Okular::NormalizedPoint lastPoint;
     QPainter::CompositionMode compositionMode;
     double m_pageWidth = 1.0;
+    double m_pageHeight = 1.0;
     double m_lastXScale = 1.0;
 
     static qreal representativeStrokeWidth(qreal pressureSum, qsizetype pressureCount, bool allDefaultPressure, qreal baseWidth);

@@ -18,6 +18,7 @@
 #include <KSelectAction>
 
 #include "../core/page.h"
+#include "../part/annotationtools.h"
 #include "../part/pageview.h"
 #include "../part/part.h"
 #include "../part/toggleactionmenu.h"
@@ -65,6 +66,8 @@ private Q_SLOTS:
     void testAnnotationToolBarActionsEnabledState_data();
     void testAnnotationToolBarConfigActionsEnabledState();
     void testAnnotationToolBarConfigActionsEnabledState_data();
+    void testFreehandLiveMatchesRelease_data();
+    void testFreehandLiveMatchesRelease();
 
 private:
     bool simulateAddPopupAnnotation(Okular::Part *part, int mouseX, int mouseY);
@@ -122,6 +125,66 @@ bool AnnotationToolBarTest::simulateAddPopupAnnotation(Okular::Part *part, int m
     QTest::mouseClick(pageView(part)->viewport(), Qt::LeftButton, Qt::NoModifier, QPoint(mouseX, mouseY));
     bool annotationAdded = partDocument(part)->page(0)->annotations().size() == annotationCount + 1;
     return annotationAdded;
+}
+
+void AnnotationToolBarTest::testFreehandLiveMatchesRelease_data()
+{
+    QTest::addColumn<QList<QPointF>>("samples");
+
+    QTest::newRow("straight-line") << QList<QPointF> {QPointF(30, 128), QPointF(226, 128)};
+    QTest::newRow("tight-curve") << QList<QPointF> {QPointF(35, 190), QPointF(65, 150), QPointF(95, 190), QPointF(125, 150), QPointF(155, 190)};
+    QTest::newRow("circle") << QList<QPointF> {QPointF(128, 44), QPointF(167, 55), QPointF(193, 84), QPointF(202, 123), QPointF(190, 163), QPointF(160, 192), QPointF(120, 201),
+                                               QPointF(81, 188), QPointF(55, 158), QPointF(46, 118), QPointF(59, 79), QPointF(88, 53), QPointF(128, 44)};
+    QTest::newRow("loop") << QList<QPointF> {QPointF(34, 132), QPointF(70, 84), QPointF(123, 72), QPointF(174, 98), QPointF(208, 139), QPointF(171, 174), QPointF(122, 155), QPointF(91, 118),
+                                             QPointF(133, 93), QPointF(181, 115), QPointF(216, 156)};
+    QTest::newRow("letter-m") << QList<QPointF> {QPointF(36, 206), QPointF(36, 52), QPointF(92, 135), QPointF(148, 52), QPointF(148, 206)};
+    QTest::newRow("handwriting") << QList<QPointF> {QPointF(22, 132), QPointF(43, 110), QPointF(63, 153), QPointF(84, 91), QPointF(108, 141), QPointF(132, 110), QPointF(156, 156), QPointF(181, 105), QPointF(211, 132)};
+}
+
+void AnnotationToolBarTest::testFreehandLiveMatchesRelease()
+{
+    QFETCH(QList<QPointF>, samples);
+
+    const QPen pen(QColor(Qt::magenta), 9.0);
+    LiveStroke liveStroke;
+    QList<Okular::NormalizedPoint> normalizedPoints;
+    QList<qreal> segmentWidths;
+    QList<QPainterPath> outlines;
+    normalizedPoints.reserve(samples.size());
+    segmentWidths.reserve(samples.size() - 1);
+    outlines.reserve(samples.size() - 1);
+
+    for (const QPointF &sample : samples) {
+        normalizedPoints.append(Okular::NormalizedPoint(sample.x(), sample.y()));
+    }
+    for (int index = 1; index < samples.size(); ++index) {
+        liveStroke.addSegment(samples[index - 1], samples[index], pen);
+        segmentWidths.append(pen.widthF());
+        outlines.append(FreehandStrokeGeometry::segmentOutline(samples[index - 1], samples[index], pen.widthF()));
+    }
+
+    const SmoothPath releasePath(normalizedPoints, segmentWidths, 1.0, pen);
+    QImage liveImage(256, 256, QImage::Format_ARGB32_Premultiplied);
+    QImage releaseImage(256, 256, QImage::Format_ARGB32_Premultiplied);
+    liveImage.fill(Qt::transparent);
+    releaseImage.fill(Qt::transparent);
+
+    QPainter livePainter(&liveImage);
+    liveStroke.paint(&livePainter, liveImage.rect());
+    livePainter.end();
+    QPainter releasePainter(&releaseImage);
+    releasePath.paint(&releasePainter, 1.0, 1.0);
+    releasePainter.end();
+
+    QCOMPARE(liveImage, releaseImage);
+
+    const QByteArray pdfAppearance = FreehandStrokeGeometry::pdfAppearance(outlines, pen.color());
+    QVERIFY(pdfAppearance.contains(" rg\n"));
+    QVERIFY(pdfAppearance.contains(" m\n"));
+    QVERIFY(pdfAppearance.contains(" l\n"));
+    QVERIFY(pdfAppearance.contains(" c\n"));
+    QVERIFY(pdfAppearance.contains("h\nf\n"));
+    QVERIFY(!pdfAppearance.contains(" S\n"));
 }
 
 void AnnotationToolBarTest::testAnnotationToolBar()

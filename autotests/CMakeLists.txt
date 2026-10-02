@@ -96,9 +96,9 @@ ecm_add_test(editannotationcontentstest.cpp testingutils.cpp
     LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
 )
 
-ecm_add_test(addremoveannotationtest.cpp testingutils.cpp
+ecm_add_test(addremoveannotationtest.cpp testingutils.cpp ../part/annotationtools.cpp
     TEST_NAME "addremoveannotationtest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore okularpart
 )
 if(Poppler_Qt6_FOUND)
     target_link_libraries(addremoveannotationtest Poppler::Qt6)
@@ -142,7 +142,7 @@ if(BUILD_DESKTOP)
 endif()
 
 if(BUILD_DESKTOP)
-    ecm_add_test(annotationtoolbartest.cpp ../shell/okular_main.cpp ../shell/shellutils.cpp ../shell/shell.cpp ../shell/welcomescreen.cpp ../gui/recentitemsmodel.cpp closedialoghelper.cpp ../shell/welcomescreen.ui
+    ecm_add_test(annotationtoolbartest.cpp ../part/annotationtools.cpp ../shell/okular_main.cpp ../shell/shellutils.cpp ../shell/shell.cpp ../shell/welcomescreen.cpp ../gui/recentitemsmodel.cpp closedialoghelper.cpp ../shell/welcomescreen.ui
         TEST_NAME "annotationtoolbartest"
         LINK_LIBRARIES Qt6::Test okularpart
     )

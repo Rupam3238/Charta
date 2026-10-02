@@ -81,6 +81,7 @@ private Q_SLOTS:
     void test388288();
     void testSaveAs();
     void testSaveAs_data();
+    void testFailedSavePreservesDestination();
     void testSaveAsToNonExistingPath();
     void testSaveAsToSymlink();
     void testSaveIsSymlink();
@@ -1097,6 +1098,41 @@ void PartTest::testSaveAsToNonExistingPath()
     QVERIFY(part.saveAs(QUrl::fromLocalFile(saveFilePath), Part::NoSaveAsFlags));
 
     QFile::remove(saveFilePath);
+}
+
+void PartTest::testFailedSavePreservesDestination()
+{
+#ifdef Q_OS_UNIX
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString destinationPath = tempDir.filePath(QStringLiteral("existing.pdf"));
+    QVERIFY(QFile::copy(QStringLiteral(KDESRCDIR "data/file1.pdf"), destinationPath));
+    QFile destinationFile(destinationPath);
+    QVERIFY(destinationFile.open(QIODevice::ReadOnly));
+    const QByteArray originalContents = destinationFile.readAll();
+    destinationFile.close();
+
+    Okular::Part part(nullptr, {});
+    QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/file1.pdf")));
+    auto *annotation = new Okular::TextAnnotation();
+    annotation->setBoundingRectangle(Okular::NormalizedRect(0.1, 0.1, 0.15, 0.15));
+    annotation->setContents(QStringLiteral("annotation must remain unsaved"));
+    part.m_document->addPageAnnotation(0, annotation);
+
+    QVERIFY(QFile::setPermissions(tempDir.path(), QFileDevice::ReadOwner | QFileDevice::ExeOwner));
+    QTimer::singleShot(0, [] {
+        if (auto *messageBox = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+            messageBox->accept();
+        }
+    });
+    const bool saveSucceeded = part.saveAs(QUrl::fromLocalFile(destinationPath), Part::NoSaveAsFlags);
+    QVERIFY(QFile::setPermissions(tempDir.path(), QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
+
+    QVERIFY(!saveSucceeded);
+    QVERIFY(destinationFile.open(QIODevice::ReadOnly));
+    QCOMPARE(destinationFile.readAll(), originalContents);
+#endif
 }
 
 void PartTest::testSaveAsToSymlink()

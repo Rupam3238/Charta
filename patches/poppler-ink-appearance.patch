@@ -27,9 +27,9 @@ diff --git a/poppler/Annot.cc b/poppler/Annot.cc
 diff --git a/qt6/src/poppler-annotation.h b/qt6/src/poppler-annotation.h
 --- a/qt6/src/poppler-annotation.h
 +++ b/qt6/src/poppler-annotation.h
-@@ -19,6 +19,7 @@
+@@ -19,6 +19,8 @@
  #define _POPPLER_ANNOTATION_H_
-#define POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE 1
++#define POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE 1
  
  #include <QtCore/QDateTime>
 +#include <QtCore/QByteArray>

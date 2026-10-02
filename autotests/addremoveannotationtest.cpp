@@ -18,6 +18,7 @@
 #include "../core/annotations.h"
 #include "../core/document.h"
 #include "../core/page.h"
+#include "../part/annotationtools.h"
 #include "../settings_core.h"
 #include "testingutils.h"
 
@@ -226,7 +227,6 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
 #if !defined(HAVE_POPPLER_QT6) || !defined(POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE)
     QSKIP("This test requires Poppler's custom Ink appearance API");
 #else
-    const QByteArray appearance = QByteArrayLiteral("q\n1 0 1 rg\n10 10 m\n90 10 l\n50 90 l\nh\nf\nQ\n");
     auto countMagentaPixels = [](const QImage &image) {
         int count = 0;
         for (int y = 0; y < image.height(); ++y) {
@@ -239,6 +239,18 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
         }
         return count;
     };
+    auto magentaPixelBounds = [](const QImage &image) {
+        QRect bounds;
+        for (int y = 0; y < image.height(); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                const QColor color = image.pixelColor(x, y);
+                if (color.red() > 220 && color.blue() > 220 && color.green() < 80 && color.alpha() > 200) {
+                    bounds |= QRect(x, y, 1, 1);
+                }
+            }
+        }
+        return bounds;
+    };
 
     const QString sourceFile = QStringLiteral(KDESRCDIR "data/file1.pdf");
     auto liveDocument = Poppler::Document::load(sourceFile);
@@ -246,19 +258,105 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
     auto livePage = liveDocument->page(0);
     QVERIFY(livePage);
 
-    Poppler::InkAnnotation liveInk;
-    liveInk.setBoundary(QRectF(0.2, 0.2, 0.2, 0.2));
-    liveInk.setInkPaths({QVector<QPointF>{{0.2, 0.2}, {0.4, 0.4}}});
-    liveInk.setAppearanceStream(appearance, QRectF(0, 0, 100, 100));
-    livePage->addAnnotation(&liveInk);
-    QVERIFY(countMagentaPixels(livePage->renderToImage(72, 72)) > 100);
+    const QList<QPointF> samples {QPointF(0.2, 0.60), QPointF(0.25, 0.50), QPointF(0.31, 0.60), QPointF(0.37, 0.50), QPointF(0.43, 0.60)};
+    QDomDocument engineDocument;
+    QDomElement toolElement = engineDocument.createElement(QStringLiteral("tool"));
+    toolElement.setAttribute(QStringLiteral("color"), QStringLiteral("#ff00ff"));
+    QDomElement annotationElement = engineDocument.createElement(QStringLiteral("annotation"));
+    annotationElement.setAttribute(QStringLiteral("type"), QStringLiteral("Ink"));
+    annotationElement.setAttribute(QStringLiteral("width"), QStringLiteral("8"));
+    annotationElement.setAttribute(QStringLiteral("color"), QStringLiteral("#ff00ff"));
+    toolElement.appendChild(annotationElement);
+    engineDocument.appendChild(toolElement);
 
-    auto *ink = new Okular::InkAnnotation;
-    ink->setInkPaths({{Okular::NormalizedPoint(0.2, 0.2), Okular::NormalizedPoint(0.4, 0.4)}});
-    ink->setBoundingRectangle(Okular::NormalizedRect(0.2, 0.2, 0.4, 0.4));
-    ink->style().setColor(Qt::black);
-    ink->style().setWidth(2.0);
-    ink->setAppearanceStream(appearance, QRectF(0, 0, 100, 100));
+    SmoothPathEngine engine(toolElement);
+    const auto modifiers = AnnotatorEngine::Modifiers {};
+    const Okular::Page *page = m_document->page(0);
+    const qreal pageWidth = page->width();
+    const qreal pageHeight = page->height();
+    engine.event(AnnotatorEngine::Press, AnnotatorEngine::Left, modifiers, samples.first().x(), samples.first().y(), pageWidth, pageHeight, page);
+    for (int index = 1; index < samples.size(); ++index) {
+        engine.event(AnnotatorEngine::Move, AnnotatorEngine::Left, modifiers, samples[index].x(), samples[index].y(), pageWidth, pageHeight, page);
+    }
+    engine.event(AnnotatorEngine::Release, AnnotatorEngine::Left, modifiers, samples.last().x(), samples.last().y(), pageWidth, pageHeight, page);
+    QVERIFY(engine.creationCompleted());
+    QImage liveStrokeImage(qRound(pageWidth), qRound(pageHeight), QImage::Format_ARGB32_Premultiplied);
+    liveStrokeImage.fill(Qt::transparent);
+    QPainter liveStrokePainter(&liveStrokeImage);
+    engine.paint(&liveStrokePainter, pageWidth, pageHeight, liveStrokeImage.rect());
+    liveStrokePainter.end();
+    const QRect liveStrokeBounds = magentaPixelBounds(liveStrokeImage);
+    QVERIFY(!liveStrokeBounds.isEmpty());
+
+    const QList<Okular::Annotation *> createdAnnotations = engine.end();
+    QCOMPARE(createdAnnotations.size(), 1);
+    auto *ink = dynamic_cast<Okular::InkAnnotation *>(createdAnnotations.first());
+    QVERIFY(ink);
+    QVERIFY(!ink->appearanceStream().isEmpty());
+
+    const QList<QList<Okular::NormalizedPoint>> inkPaths = ink->inkPaths();
+    QCOMPARE(inkPaths.size(), 1);
+    QCOMPARE(inkPaths.constFirst().size(), samples.size());
+    const QList<Okular::NormalizedPoint> &processedPoints = inkPaths.constFirst();
+    qreal sumX = 0.0;
+    qreal sumY = 0.0;
+    for (qsizetype index = 0; index < samples.size(); ++index) {
+        sumX += samples[index].x();
+        sumY += samples[index].y();
+        QCOMPARE(processedPoints[index].x, sumX / (index + 1));
+        QCOMPARE(processedPoints[index].y, sumY / (index + 1));
+    }
+
+    QList<QPainterPath> expectedOutlines;
+    QRectF expectedBounds;
+    for (qsizetype index = 1; index < processedPoints.size(); ++index) {
+        const QPointF start(processedPoints[index - 1].x * pageWidth, (1.0 - processedPoints[index - 1].y) * pageHeight);
+        const QPointF end(processedPoints[index].x * pageWidth, (1.0 - processedPoints[index].y) * pageHeight);
+        const QPainterPath outline = FreehandStrokeGeometry::segmentOutline(start, end, 8.0);
+        expectedOutlines.append(outline);
+        expectedBounds = expectedBounds.isNull() ? outline.boundingRect() : expectedBounds.united(outline.boundingRect());
+    }
+    expectedBounds.adjust(-0.25, -0.25, 0.25, 0.25);
+    QList<QPainterPath> localOutlines;
+    localOutlines.reserve(expectedOutlines.size());
+    for (const QPainterPath &outline : expectedOutlines) {
+        localOutlines.append(outline.translated(-expectedBounds.left(), -expectedBounds.top()));
+    }
+    QCOMPARE(ink->appearanceStream(), FreehandStrokeGeometry::pdfAppearance(localOutlines, QColor(Qt::magenta)));
+    QCOMPARE(ink->appearanceBoundingBox(), QRectF(0, 0, expectedBounds.width(), expectedBounds.height()));
+    QCOMPARE(ink->boundingRectangle().left, expectedBounds.left() / pageWidth);
+    QCOMPARE(ink->boundingRectangle().right, expectedBounds.right() / pageWidth);
+    QCOMPARE(ink->boundingRectangle().top, 1.0 - expectedBounds.bottom() / pageHeight);
+    QCOMPARE(ink->boundingRectangle().bottom, 1.0 - expectedBounds.top() / pageHeight);
+
+    Poppler::InkAnnotation liveInk;
+    const Okular::NormalizedRect bounds = ink->boundingRectangle();
+    liveInk.setBoundary(QRectF(bounds.left, bounds.top, bounds.width(), bounds.height()));
+    QList<QList<QPointF>> popplerPaths;
+    for (const QList<Okular::NormalizedPoint> &path : ink->inkPaths()) {
+        QList<QPointF> points;
+        for (const Okular::NormalizedPoint &point : path) {
+            points.append(QPointF(point.x, point.y));
+        }
+        popplerPaths.append(points);
+    }
+    liveInk.setInkPaths(popplerPaths);
+    liveInk.setAppearanceStream(ink->appearanceStream(), ink->appearanceBoundingBox());
+    livePage->addAnnotation(&liveInk);
+    const QImage immediateImage = livePage->renderToImage(72, 72);
+    QVERIFY(countMagentaPixels(immediateImage) > 100);
+    const QRect immediateBounds = magentaPixelBounds(immediateImage);
+    const qreal pdfScaleX = static_cast<qreal>(immediateImage.width()) / liveStrokeImage.width();
+    const qreal pdfScaleY = static_cast<qreal>(immediateImage.height()) / liveStrokeImage.height();
+    const QRect expectedPdfBounds(qRound(liveStrokeBounds.left() * pdfScaleX),
+                                  qRound(liveStrokeBounds.top() * pdfScaleY),
+                                  qRound(liveStrokeBounds.width() * pdfScaleX),
+                                  qRound(liveStrokeBounds.height() * pdfScaleY));
+    QVERIFY(qAbs(immediateBounds.left() - expectedPdfBounds.left()) <= 3);
+    QVERIFY(qAbs(immediateBounds.top() - expectedPdfBounds.top()) <= 3);
+    QVERIFY(qAbs(immediateBounds.right() - expectedPdfBounds.right()) <= 3);
+    QVERIFY(qAbs(immediateBounds.bottom() - expectedPdfBounds.bottom()) <= 3);
+
     m_document->addPageAnnotation(0, ink);
     QCOMPARE(ink->subType(), Okular::Annotation::AInk);
 
@@ -282,8 +380,14 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
     }
     QVERIFY(savedInk);
     QCOMPARE(savedInk->inkPaths().size(), 1);
-    QCOMPARE(savedInk->inkPaths().constFirst().size(), 2);
-    QVERIFY(countMagentaPixels(savedPage->renderToImage(72, 72)) > 100);
+    QCOMPARE(savedInk->inkPaths().constFirst().size(), samples.size());
+    const QImage savedImage = savedPage->renderToImage(72, 72);
+    QVERIFY(countMagentaPixels(savedImage) > 100);
+    const QRect savedBounds = magentaPixelBounds(savedImage);
+    QVERIFY(qAbs(savedBounds.left() - expectedPdfBounds.left()) <= 3);
+    QVERIFY(qAbs(savedBounds.top() - expectedPdfBounds.top()) <= 3);
+    QVERIFY(qAbs(savedBounds.right() - expectedPdfBounds.right()) <= 3);
+    QVERIFY(qAbs(savedBounds.bottom() - expectedPdfBounds.bottom()) <= 3);
 
     auto reopenedOkularDocument = std::make_unique<Okular::Document>(nullptr);
     QMimeDatabase mimeDatabase;
