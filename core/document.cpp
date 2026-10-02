@@ -4973,17 +4973,33 @@ bool Document::swapBackingFile(const QString &newFileName, const QUrl &url)
             }
 
             // Update the undo stack contents
+            const auto refreshUndoCommand = [&newPagesVector](auto &&self, QUndoCommand *undoCommand) -> bool {
+                if (OkularUndoCommand *okularCommand = dynamic_cast<OkularUndoCommand *>(undoCommand)) {
+                    const bool success = okularCommand->refreshInternalPageReferences(newPagesVector);
+                    if (!success) {
+                        qWarning() << "Document::swapBackingFile: refreshInternalPageReferences failed" << okularCommand;
+                    }
+                    return success;
+                }
+
+                if (undoCommand->childCount() == 0) {
+                    qWarning() << "Document::swapBackingFile: Unhandled undo command" << undoCommand;
+                    return false;
+                }
+
+                for (int childIndex = 0; childIndex < undoCommand->childCount(); ++childIndex) {
+                    QUndoCommand *child = const_cast<QUndoCommand *>(undoCommand->child(childIndex));
+                    if (!self(self, child)) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
             for (int i = 0; i < d->m_undoStack->count(); ++i) {
                 // Trust me on the const_cast ^_^
                 QUndoCommand *uc = const_cast<QUndoCommand *>(d->m_undoStack->command(i));
-                if (OkularUndoCommand *ouc = dynamic_cast<OkularUndoCommand *>(uc)) {
-                    const bool success = ouc->refreshInternalPageReferences(newPagesVector);
-                    if (!success) {
-                        qWarning() << "Document::swapBackingFile: refreshInternalPageReferences failed" << ouc;
-                        return false;
-                    }
-                } else {
-                    qWarning() << "Document::swapBackingFile: Unhandled undo command" << uc;
+                if (!refreshUndoCommand(refreshUndoCommand, uc)) {
                     return false;
                 }
             }

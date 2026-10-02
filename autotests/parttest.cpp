@@ -1412,7 +1412,9 @@ void PartTest::testSaveAsUndoStackAnnotations()
     Okular::Annotation *annot = new Okular::TextAnnotation();
     annot->setBoundingRectangle(Okular::NormalizedRect(0.1, 0.1, 0.15, 0.15));
     annot->setContents(QStringLiteral("annot contents"));
+    part.m_document->beginUndoMacro(QStringLiteral("add test annotation"));
     part.m_document->addPageAnnotation(0, annot);
+    part.m_document->endUndoMacro();
     QString annotName = annot->uniqueName();
 
     if (!nativelySupportsAnnotations && !saveToArchive) {
