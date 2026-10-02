@@ -8,6 +8,7 @@
 
 // qt includes
 #include <QActionGroup>
+#include <QActionEvent>
 #include <QApplication>
 #include <QBitmap>
 #include <QColorDialog>
@@ -27,6 +28,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
+#include <QSizePolicy>
 #include <QRadioButton>
 #include <QSlider>
 #include <QSignalBlocker>
@@ -53,6 +55,74 @@
 #include "pageviewannotator.h"
 #include "settings.h"
 #include "toggleactionmenu.h"
+
+namespace
+{
+class DrawingToolBarIsland final : public KToolBar
+{
+public:
+    enum class Anchor { Left, Right };
+
+    DrawingToolBarIsland(QWidget *host, QWidget *visibleCanvas)
+        : KToolBar(QStringLiteral("drawingToolBar"), host, false)
+        , m_host(host)
+        , m_visibleCanvas(visibleCanvas)
+    {
+        setOrientation(Qt::Vertical);
+        setIconSize(QSize(18, 18));
+        setToolButtonStyle(Qt::ToolButtonIconOnly);
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        setMovable(false);
+        setFloatable(false);
+        host->installEventFilter(this);
+        visibleCanvas->installEventFilter(this);
+    }
+
+    void setAnchor(Anchor anchor)
+    {
+        m_anchor = anchor;
+        updateIslandGeometry();
+    }
+
+protected:
+    void actionEvent(QActionEvent *event) override
+    {
+        KToolBar::actionEvent(event);
+        updateIslandGeometry();
+    }
+
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if ((watched == m_host || watched == m_visibleCanvas) && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
+            updateIslandGeometry();
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    void updateIslandGeometry()
+    {
+        if (!m_host || !m_visibleCanvas) {
+            return;
+        }
+        if (layout()) {
+            layout()->activate();
+        }
+        adjustSize();
+        const int margin = 12;
+        const QPoint canvasOrigin = m_visibleCanvas->mapTo(m_host, QPoint(0, 0));
+        const QRect canvasRect(canvasOrigin, m_visibleCanvas->size());
+        const int x = m_anchor == Anchor::Left ? canvasRect.left() + margin : canvasRect.right() - width() - margin + 1;
+        const int y = canvasRect.top() + (canvasRect.height() - height()) / 2;
+        move(x, y);
+        raise();
+    }
+
+    QWidget *m_host;
+    QWidget *m_visibleCanvas;
+    Anchor m_anchor = Anchor::Left;
+};
+}
 
 class AnnotationActionHandlerPrivate
 {
@@ -1451,36 +1521,29 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
     // ensure that the annotation toolbars have been created
     d->assertToolBarExists(mw, QStringLiteral("annotationToolBar"));
     d->assertToolBarExists(mw, QStringLiteral("quickAnnotationToolBar"));
-    KToolBar *drawingToolBar = nullptr;
-    for (KToolBar *toolBar : mw->toolBars()) {
-        if (toolBar->objectName() == QLatin1String("drawingToolBar")) {
-            drawingToolBar = toolBar;
-            break;
-        }
-    }
+    KToolBar *drawingToolBar = d->drawingToolBar;
     const bool createDrawingToolBar = !drawingToolBar;
     if (!drawingToolBar) {
-        drawingToolBar = new KToolBar(QStringLiteral("drawingToolBar"), mw, Qt::LeftToolBarArea, false, false, false);
+        PageView *pageView = mw->findChild<PageView *>();
+        if (!pageView) {
+            return;
+        }
+        auto *island = new DrawingToolBarIsland(pageView, pageView->viewport());
+        island->setAnchor(DrawingToolBarIsland::Anchor::Left);
+        drawingToolBar = island;
         drawingToolBar->setWindowTitle(i18n("Drawing Tools"));
-        drawingToolBar->setOrientation(Qt::Vertical);
-        drawingToolBar->setIconSize(QSize(24, 24));
-        drawingToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-        drawingToolBar->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        drawingToolBar->setMaximumHeight(560);
-        drawingToolBar->setMovable(false);
-        drawingToolBar->setFloatable(false);
-        drawingToolBar->setAllowedAreas(Qt::LeftToolBarArea);
+        d->drawingToolBar = drawingToolBar;
     }
     drawingToolBar->setStyleSheet(QStringLiteral(
-        "QToolBar { background: #202630; border: 1px solid #3b4653; border-radius: 12px; spacing: 1px; padding: 7px 5px; margin: 10px 8px; }"
-        "QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 8px; width: 40px; height: 34px; padding: 3px; margin: 0; }"
+        "QToolBar { background: #202630; border: 1px solid #3b4653; border-radius: 10px; spacing: 1px; padding: 4px; margin: 0; }"
+        "QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px; padding: 2px; margin: 0; }"
         "QToolButton:hover { color: #f2f5f8; background: #303a46; }"
         "QToolButton:checked { color: #ffffff; background: #16414c; border-color: #27bfd6; }"
         "QToolButton:focus { border-color: #27bfd6; }"
         "QToolButton[chartaRole='erase']:checked { background: #393541; border-color: #b59ad8; }"
         "QToolButton[chartaRole='shape']:checked { background: #403725; border-color: #e6b45d; }"
         "QToolButton[chartaRole='text']:checked { background: #402d38; border-color: #e58ca9; }"
-        "QToolBar::separator { height: 1px; margin: 4px 8px; background: #45515e; }"));
+        "QToolBar::separator { height: 1px; margin: 3px 6px; background: #45515e; }"));
     d->drawingToolBar = drawingToolBar;
     if (drawingToolBar->actions().isEmpty()) {
         for (qsizetype index = 0; index < d->drawingTools.size(); ++index) {
