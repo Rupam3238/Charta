@@ -1,0 +1,102 @@
+diff --git a/poppler/Annot.h b/poppler/Annot.h
+--- a/poppler/Annot.h
++++ b/poppler/Annot.h
+@@ -1373,6 +1373,7 @@ public:
+     void draw(Gfx *gfx, bool printing) override;
+ 
+     void setInkList(const std::vector<std::unique_ptr<AnnotPath>> &paths);
++    void setAppearanceStream(const std::string &appearanceStream, const std::array<double, 4> &bbox);
+     void setDrawBelow(bool drawBelow);
+     bool getDrawBelow() const;
+ 
+diff --git a/poppler/Annot.cc b/poppler/Annot.cc
+--- a/poppler/Annot.cc
++++ b/poppler/Annot.cc
+@@ -6652,6 +6652,11 @@ void AnnotInk::setInkList(const std::vector<std::unique_ptr<AnnotPath>> &paths)
+     generateInkAppearance();
+ }
+ 
++void AnnotInk::setAppearanceStream(const std::string &appearanceStream, const std::array<double, 4> &bbox)
++{
++    setNewAppearance(createForm(appearanceStream, bbox, false, Object {}));
++}
++
+ void AnnotInk::setDrawBelow(bool drawBelow_)
+ {
+     drawBelow = drawBelow_;
+diff --git a/qt6/src/poppler-annotation.h b/qt6/src/poppler-annotation.h
+--- a/qt6/src/poppler-annotation.h
++++ b/qt6/src/poppler-annotation.h
+@@ -19,6 +19,7 @@
+ #define _POPPLER_ANNOTATION_H_
+#define POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE 1
+ 
+ #include <QtCore/QDateTime>
++#include <QtCore/QByteArray>
+ #include <QtCore/QSharedDataPointer>
+ #include <QtCore/QList>
+ #include <QtCore/QPointF>
+@@ -900,6 +901,13 @@ public:
+ 
+     QList<QVector<QPointF>> inkPaths() const;
+     void setInkPaths(const QList<QVector<QPointF>> &paths);
++
++    /**
++     * Sets a custom normal appearance Form XObject for this ink annotation.
++     * The content must contain valid PDF appearance operators and the bounding
++     * box uses local PDF user-space coordinates.
++     */
++    void setAppearanceStream(const QByteArray &appearanceStream, const QRectF &boundingBox);
+ 
+ private:
+     explicit InkAnnotation(InkAnnotationPrivate &dd);
+diff --git a/qt6/src/poppler-annotation.cc b/qt6/src/poppler-annotation.cc
+--- a/qt6/src/poppler-annotation.cc
++++ b/qt6/src/poppler-annotation.cc
+@@ -8,5 +8,6 @@
+ // qt/kde includes
+ #include <QtCore/QtAlgorithms>
++#include <array>
+ #include <QtGui/QColor>
+ #include <QtGui/QTransform>
+ #include <QImage>
+@@ -3100,6 +3101,8 @@ public:
+ 
+     // data fields
+     QList<QVector<QPointF>> inkPaths;
++    QByteArray appearanceStream;
++    QRectF appearanceBBox;
+ 
+     // helper
+     std::vector<std::unique_ptr<AnnotPath>> toAnnotPaths(const QList<QVector<QPointF>> &paths);
+@@ -3140,5 +3140,8 @@ std::shared_ptr<Annot> InkAnnotationPrivate::createNativeAnnot(::Page *destPage, DocumentData *doc)
+     // Set properties
+     flushBaseAnnotationProperties();
+     q->setInkPaths(inkPaths);
++    if (!appearanceStream.isEmpty()) {
++        q->setAppearanceStream(appearanceStream, appearanceBBox);
++    }
+ 
+     inkPaths.clear(); // Free up memory
+@@ -3210,6 +3213,21 @@ void InkAnnotation::setInkPaths(const QList<QVector<QPointF>> &paths)
+     inkann->setInkList(annotpaths);
+ }
+ 
++void InkAnnotation::setAppearanceStream(const QByteArray &appearanceStream, const QRectF &boundingBox)
++{
++    Q_D(InkAnnotation);
++
++    if (!d->pdfAnnot) {
++        d->appearanceStream = appearanceStream;
++        d->appearanceBBox = boundingBox;
++        return;
++    }
++
++    const QRectF normalizedBBox = boundingBox.normalized();
++    const std::array<double, 4> bbox = {normalizedBBox.left(), normalizedBBox.top(), normalizedBBox.right(), normalizedBBox.bottom()};
++    static_cast<AnnotInk *>(d->pdfAnnot.get())->setAppearanceStream(appearanceStream.toStdString(), bbox);
++}
++
+ /** LinkAnnotation [Annotation] */
+ class LinkAnnotationPrivate : public AnnotationPrivate
+ {

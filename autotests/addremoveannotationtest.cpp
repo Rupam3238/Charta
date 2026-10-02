@@ -5,7 +5,15 @@
 */
 
 #include <QMimeDatabase>
+#include <QDir>
+#include <QImage>
+#include <QTemporaryFile>
 #include <QTest>
+
+#ifdef HAVE_POPPLER_QT6
+#include <poppler-annotation.h>
+#include <poppler-qt6.h>
+#endif
 
 #include "../core/annotations.h"
 #include "../core/document.h"
@@ -25,6 +33,7 @@ private Q_SLOTS:
     void testAddAnnotationUndoWithRotate_Bug318091();
     void testRemoveAnnotations();
     void testRemoveAnnotationGroupUndoOnce();
+    void testInkCustomAppearanceSaveReload();
 
 private:
     Okular::Document *m_document;
@@ -210,6 +219,98 @@ void AddRemoveAnnotationTest::testRemoveAnnotationGroupUndoOnce()
 
     m_document->undo();
     QCOMPARE(m_document->page(0)->annotations().size(), 2);
+}
+
+void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
+{
+#if !defined(HAVE_POPPLER_QT6) || !defined(POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE)
+    QSKIP("This test requires Poppler's custom Ink appearance API");
+#else
+    const QByteArray appearance = QByteArrayLiteral("q\n1 0 1 rg\n10 10 m\n90 10 l\n50 90 l\nh\nf\nQ\n");
+    auto countMagentaPixels = [](const QImage &image) {
+        int count = 0;
+        for (int y = 0; y < image.height(); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                const QColor color = image.pixelColor(x, y);
+                if (color.red() > 220 && color.blue() > 220 && color.green() < 80 && color.alpha() > 200) {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    };
+
+    const QString sourceFile = QStringLiteral(KDESRCDIR "data/file1.pdf");
+    auto liveDocument = Poppler::Document::load(sourceFile);
+    QVERIFY(liveDocument);
+    auto livePage = liveDocument->page(0);
+    QVERIFY(livePage);
+
+    Poppler::InkAnnotation liveInk;
+    liveInk.setBoundary(QRectF(0.2, 0.2, 0.2, 0.2));
+    liveInk.setInkPaths({QVector<QPointF>{{0.2, 0.2}, {0.4, 0.4}}});
+    liveInk.setAppearanceStream(appearance, QRectF(0, 0, 100, 100));
+    livePage->addAnnotation(&liveInk);
+    QVERIFY(countMagentaPixels(livePage->renderToImage(72, 72)) > 100);
+
+    auto *ink = new Okular::InkAnnotation;
+    ink->setInkPaths({{Okular::NormalizedPoint(0.2, 0.2), Okular::NormalizedPoint(0.4, 0.4)}});
+    ink->setBoundingRectangle(Okular::NormalizedRect(0.2, 0.2, 0.4, 0.4));
+    ink->style().setColor(Qt::black);
+    ink->style().setWidth(2.0);
+    ink->setAppearanceStream(appearance, QRectF(0, 0, 100, 100));
+    m_document->addPageAnnotation(0, ink);
+    QCOMPARE(ink->subType(), Okular::Annotation::AInk);
+
+    QTemporaryFile savedPdf(QDir::tempPath() + QStringLiteral("/charta-ink-appearance-XXXXXX.pdf"));
+    QVERIFY(savedPdf.open());
+    savedPdf.close();
+    QString errorText;
+    QVERIFY2(m_document->saveChanges(savedPdf.fileName(), &errorText), qPrintable(errorText));
+
+    auto savedDocument = Poppler::Document::load(savedPdf.fileName());
+    QVERIFY(savedDocument);
+    auto savedPage = savedDocument->page(0);
+    QVERIFY(savedPage);
+    const auto savedAnnotations = savedPage->annotations();
+    Poppler::InkAnnotation *savedInk = nullptr;
+    for (const auto &annotation : savedAnnotations) {
+        if (annotation->subType() == Poppler::Annotation::AInk) {
+            savedInk = static_cast<Poppler::InkAnnotation *>(annotation.get());
+            break;
+        }
+    }
+    QVERIFY(savedInk);
+    QCOMPARE(savedInk->inkPaths().size(), 1);
+    QCOMPARE(savedInk->inkPaths().constFirst().size(), 2);
+    QVERIFY(countMagentaPixels(savedPage->renderToImage(72, 72)) > 100);
+
+    auto reopenedOkularDocument = std::make_unique<Okular::Document>(nullptr);
+    QMimeDatabase mimeDatabase;
+    QCOMPARE(reopenedOkularDocument->openDocument(savedPdf.fileName(), QUrl(), mimeDatabase.mimeTypeForFile(savedPdf.fileName())), Okular::Document::OpenSuccess);
+    Okular::Annotation *reopenedInk = nullptr;
+    for (Okular::Annotation *annotation : reopenedOkularDocument->page(0)->annotations()) {
+        if (annotation->subType() == Okular::Annotation::AInk) {
+            reopenedInk = annotation;
+            break;
+        }
+    }
+    QVERIFY(reopenedInk);
+    QVERIFY(reopenedOkularDocument->canRemovePageAnnotation(reopenedInk));
+    const auto originalPaths = static_cast<Okular::InkAnnotation *>(reopenedInk)->inkPaths();
+    reopenedOkularDocument->translatePageAnnotation(0, reopenedInk, Okular::NormalizedPoint(0.01, 0.01));
+    const auto movedPaths = static_cast<Okular::InkAnnotation *>(reopenedInk)->inkPaths();
+    QVERIFY(movedPaths.first().first().x != originalPaths.first().first().x);
+    QVERIFY(movedPaths.first().first().y != originalPaths.first().first().y);
+    reopenedOkularDocument->undo();
+    const auto restoredPaths = static_cast<Okular::InkAnnotation *>(reopenedInk)->inkPaths();
+    QCOMPARE(restoredPaths.first().first().x, originalPaths.first().first().x);
+    QCOMPARE(restoredPaths.first().first().y, originalPaths.first().first().y);
+    reopenedOkularDocument->removePageAnnotation(0, reopenedInk);
+    QVERIFY(reopenedOkularDocument->page(0)->annotations().isEmpty());
+    reopenedOkularDocument->undo();
+    QCOMPARE(reopenedOkularDocument->page(0)->annotations().size(), 1);
+#endif
 }
 
 QTEST_MAIN(AddRemoveAnnotationTest)

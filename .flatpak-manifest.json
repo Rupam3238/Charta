@@ -306,6 +306,10 @@
                         "stable-only": true,
                         "url-template": "https://poppler.freedesktop.org/poppler-$version.tar.xz"
                     }
+                },
+                {
+                    "type": "patch",
+                    "path": "patches/poppler-ink-appearance.patch"
                 }
             ]
         },

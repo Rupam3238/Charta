@@ -438,6 +438,11 @@ static void updatePopplerAnnotationFromOkularAnnotation(const Okular::InkAnnotat
         paths.append(points);
     }
     pInkAnnotation->setInkPaths(paths);
+#ifdef POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE
+    if (!oInkAnnotation->appearanceStream().isEmpty()) {
+        pInkAnnotation->setAppearanceStream(oInkAnnotation->appearanceStream(), oInkAnnotation->appearanceBoundingBox());
+    }
+#endif
 }
 
 static void updatePopplerAnnotationFromOkularAnnotation(const Okular::CaretAnnotation *oCaretAnnotation, Poppler::CaretAnnotation *pCaretAnnotation)

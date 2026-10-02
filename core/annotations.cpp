@@ -2550,6 +2550,8 @@ public:
     QList<QList<NormalizedPoint>> m_transformedInkPaths;
     QList<QList<qreal>> m_sessionPressures;
     qreal m_sessionPressureStrokeWidth = 0.0;
+    QByteArray m_appearanceStream;
+    QRectF m_appearanceBoundingBox;
 };
 
 InkAnnotation::InkAnnotation()
@@ -2601,6 +2603,25 @@ qreal InkAnnotation::sessionPressureStrokeWidth() const
 {
     Q_D(const InkAnnotation);
     return d->m_sessionPressureStrokeWidth;
+}
+
+void InkAnnotation::setAppearanceStream(const QByteArray &appearanceStream, const QRectF &boundingBox)
+{
+    Q_D(InkAnnotation);
+    d->m_appearanceStream = appearanceStream;
+    d->m_appearanceBoundingBox = boundingBox;
+}
+
+QByteArray InkAnnotation::appearanceStream() const
+{
+    Q_D(const InkAnnotation);
+    return d->m_appearanceStream;
+}
+
+QRectF InkAnnotation::appearanceBoundingBox() const
+{
+    Q_D(const InkAnnotation);
+    return d->m_appearanceBoundingBox;
 }
 
 Annotation::SubType InkAnnotation::subType() const

@@ -316,6 +316,10 @@ QList<Okular::Annotation *> SmoothPathEngine::end()
         ann->style().setOpacity(m_annotElement.attribute(QStringLiteral("opacity"), QStringLiteral("1.0")).toDouble());
     }
 
+    if (auto *ink = dynamic_cast<Okular::InkAnnotation *>(ann); ink && qFuzzyCompare(ink->style().opacity(), 1.0)) {
+        ink->setAppearanceStream(QByteArrayLiteral("q\n1 0 1 rg\n10 10 m\n90 10 l\n50 90 l\nh\nf\nQ\n"), QRectF(0, 0, 100, 100));
+    }
+
     return {ann};
 }
 

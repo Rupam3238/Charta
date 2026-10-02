@@ -8,10 +8,12 @@
 #define _OKULAR_ANNOTATIONS_H_
 
 #include <QDateTime>
+#include <QByteArray>
 #include <QDomDocument>
 #include <QDomElement>
 #include <QFont>
 #include <QRect>
+#include <QRectF>
 #include <QString>
 
 #include "area.h"
@@ -1470,6 +1472,11 @@ public:
     void setSessionPressures(const QList<QList<qreal>> &pressures, qreal strokeWidth);
     QList<QList<qreal>> sessionPressures() const;
     qreal sessionPressureStrokeWidth() const;
+
+    /** Session-only PDF appearance supplied to a capable generator. Not serialized. */
+    void setAppearanceStream(const QByteArray &appearanceStream, const QRectF &boundingBox);
+    QByteArray appearanceStream() const;
+    QRectF appearanceBoundingBox() const;
 
     /**
      * Returns the sub type of the ink annotation.
