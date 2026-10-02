@@ -540,6 +540,10 @@ public:
      */
     void translatePageAnnotation(int page, Annotation *annotation, const Okular::NormalizedPoint &delta);
 
+    /** Temporarily suppress automatic viewport repositioning during annotation interaction. */
+    void beginAnnotationViewportMovementBlock();
+    void endAnnotationViewportMovementBlock();
+
     /** Batch annotation-triggered pixmap refreshes until the batch ends. */
     void beginAnnotationPixmapRefreshBatch();
     void endAnnotationPixmapRefreshBatch();

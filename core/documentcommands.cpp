@@ -23,6 +23,10 @@ namespace Okular
 {
 void moveViewportIfBoundingRectNotFullyVisible(Okular::NormalizedRect boundingRect, DocumentPrivate *docPriv, int pageNumber)
 {
+    if (docPriv->m_annotationViewportMovementBlockDepth > 0) {
+        return;
+    }
+
     const Rotation pageRotation = docPriv->m_parent->page(pageNumber)->rotation();
     const QTransform rotationMatrix = Okular::buildRotationMatrix(pageRotation);
     boundingRect.transform(rotationMatrix);

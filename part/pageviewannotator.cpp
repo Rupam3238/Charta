@@ -51,6 +51,27 @@
 #include "settings.h"
 #include "signaturepartutils.h"
 
+namespace
+{
+class ScopedAnnotationViewportMovementBlock
+{
+public:
+    explicit ScopedAnnotationViewportMovementBlock(Okular::Document *document)
+        : m_document(document)
+    {
+        m_document->beginAnnotationViewportMovementBlock();
+    }
+
+    ~ScopedAnnotationViewportMovementBlock()
+    {
+        m_document->endAnnotationViewportMovementBlock();
+    }
+
+private:
+    Okular::Document *m_document;
+};
+}
+
 static QCursor penToolCursor()
 {
     QPixmap pixmap(24, 24);
@@ -1723,6 +1744,8 @@ QCursor PageViewAnnotator::cursor() const
 
 QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::EventType eventType, const AnnotatorEngine::Button button, const AnnotatorEngine::Modifiers modifiers, const QPointF pos, PageViewItem *item)
 {
+    const ScopedAnnotationViewportMovementBlock viewportMovementBlock(m_document);
+
     // creationCompleted is intended to be set by event(), handled subsequently by end(), and cleared within end().
     // If it's set here, we recursed for some reason (e.g., stacked event loop).
     // Just bail out, all we want to do is already on stack.

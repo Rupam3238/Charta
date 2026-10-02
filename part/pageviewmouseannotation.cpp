@@ -240,7 +240,14 @@ void MouseAnnotation::routeMouseReleaseEvent(PageViewItem *pageViewItem, const Q
 {
     if (isModified()) {
         /* qDebug() << "routeMouseReleaseEvent: finish command"; */
+        const bool blockViewportMovement = !m_pageView->allowsAnnotationViewportMovement();
+        if (blockViewportMovement) {
+            m_document->beginAnnotationViewportMovementBlock();
+        }
         finishCommand();
+        if (blockViewportMovement) {
+            m_document->endAnnotationViewportMovementBlock();
+        }
         setState(StateFocused, m_focusedAnnotation);
     }
     updateHover(pageViewItem, eventPos);
@@ -274,7 +281,14 @@ void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoi
         if (isModified()) {
             /* qDebug() << "routeMouseMoveEvent: perform command, delta " << eventPos - m_mousePosition; */
             updateViewport(m_focusedAnnotation);
+            const bool blockViewportMovement = !m_pageView->allowsAnnotationViewportMovement();
+            if (blockViewportMovement) {
+                m_document->beginAnnotationViewportMovementBlock();
+            }
             performCommand(eventPos);
+            if (blockViewportMovement) {
+                m_document->endAnnotationViewportMovementBlock();
+            }
             m_mousePosition = eventPos - m_focusedAnnotation.pageViewItem->uncroppedGeometry().topLeft();
             updateViewport(m_focusedAnnotation);
         }
@@ -326,6 +340,14 @@ void MouseAnnotation::routeKeyPressEvent(const QKeyEvent *e)
 void MouseAnnotation::deleteSelectedAnnotations()
 {
     const QList<AnnotationDescription> selected = selectedAnnotations();
+    if (selected.isEmpty()) {
+        return;
+    }
+
+    const bool blockViewportMovement = !m_pageView->allowsAnnotationViewportMovement();
+    if (blockViewportMovement) {
+        m_document->beginAnnotationViewportMovementBlock();
+    }
     if (selected.size() > 1) {
         cancel();
         m_areaSelectedAnnotations.clear();
@@ -345,6 +367,9 @@ void MouseAnnotation::deleteSelectedAnnotations()
         if (m_document->canRemovePageAnnotation(adToBeDeleted.annotation)) {
             m_document->removePageAnnotation(adToBeDeleted.pageNumber, adToBeDeleted.annotation);
         }
+    }
+    if (blockViewportMovement) {
+        m_document->endAnnotationViewportMovementBlock();
     }
 }
 

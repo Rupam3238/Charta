@@ -2053,6 +2053,19 @@ bool DocumentPrivate::isNormalizedRectangleFullyVisible(const Okular::Normalized
     });
 }
 
+void DocumentPrivate::beginAnnotationViewportMovementBlock()
+{
+    ++m_annotationViewportMovementBlockDepth;
+}
+
+void DocumentPrivate::endAnnotationViewportMovementBlock()
+{
+    Q_ASSERT(m_annotationViewportMovementBlockDepth > 0);
+    if (m_annotationViewportMovementBlockDepth > 0) {
+        --m_annotationViewportMovementBlockDepth;
+    }
+}
+
 struct pdfsyncpoint {
     QString file;
     qlonglong x;
@@ -3508,6 +3521,16 @@ void Document::translatePageAnnotation(int page, Annotation *annotation, const N
     int complete = (annotation->flags() & Okular::Annotation::BeingMoved) == 0;
     QUndoCommand *uc = new Okular::TranslateAnnotationCommand(d, annotation, page, delta, complete);
     d->m_undoStack->push(uc);
+}
+
+void Document::beginAnnotationViewportMovementBlock()
+{
+    d->beginAnnotationViewportMovementBlock();
+}
+
+void Document::endAnnotationViewportMovementBlock()
+{
+    d->endAnnotationViewportMovementBlock();
 }
 
 void Document::beginAnnotationPixmapRefreshBatch()

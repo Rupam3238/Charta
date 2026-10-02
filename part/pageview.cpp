@@ -4601,6 +4601,11 @@ void PageView::setAnnotationSelectionMode(bool enabled)
     updateCursor();
 }
 
+bool PageView::allowsAnnotationViewportMovement() const
+{
+    return d->annotationSelectionMode || d->mouseMode == Okular::Settings::EnumMouseMode::Browse;
+}
+
 void PageView::updateCursor(const QPoint p)
 {
     // reset mouse over link it will be re-set if that still valid
@@ -5084,6 +5089,7 @@ void PageView::slotRelayoutPages()
     const bool facingPages = facing || centerFirstPage;
     const bool centerLastPage = centerFirstPage && pageCount % 2 == 0;
     const bool continuousView = getContinuousMode();
+    const int rowHeightMargin = continuousView ? 0 : krowHeightMargin;
     const int nCols = overrideCentering ? 1 : viewColumns();
     const bool singlePageViewMode = Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Single;
 
@@ -5120,8 +5126,8 @@ void PageView::slotRelayoutPages()
         if (item->croppedWidth() + kcolWidthMargin > colWidth[cIdx]) {
             colWidth[cIdx] = item->croppedWidth() + kcolWidthMargin;
         }
-        if (item->croppedHeight() + krowHeightMargin > rowHeight[rIdx]) {
-            rowHeight[rIdx] = item->croppedHeight() + krowHeightMargin;
+        if (item->croppedHeight() + rowHeightMargin > rowHeight[rIdx]) {
+            rowHeight[rIdx] = item->croppedHeight() + rowHeightMargin;
         }
         // handle the 'centering on first row' stuff
         // update col/row indices
