@@ -104,16 +104,12 @@
 <ToolBar name="mainToolBar"><text>Main Toolbar</text>
   <Action name="show_leftpanel"/>
   <Separator/>
-  <Action name="mouse_drag"/>
-  <Action name="mouse_selecttools"/>
-  <Separator/>
   <Action name="page_number"/>
   <Separator/>
   <Action name="view_zoom_out"/>
   <Action name="zoom_to" />
   <Action name="view_zoom_in"/>
   <Action name="view_render_mode"/>
-  <Spacer/>
   <Action name="hamburger_menu"/>
 </ToolBar>
 <ActionProperties scheme="Default">

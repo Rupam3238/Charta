@@ -746,8 +746,10 @@ void PageView::setupBaseActions(KActionCollection *ac)
     updateZoomText();
 
     d->aZoomIn = KStandardAction::zoomIn(this, SLOT(slotZoomIn()), ac);
+    d->aZoomIn->setIcon(QIcon::fromTheme(QStringLiteral("list-add")));
 
     d->aZoomOut = KStandardAction::zoomOut(this, SLOT(slotZoomOut()), ac);
+    d->aZoomOut->setIcon(QIcon::fromTheme(QStringLiteral("list-remove")));
 
     d->aZoomActual = KStandardAction::actualSize(this, &PageView::slotZoomActual, ac);
     d->aZoomActual->setText(i18n("Zoom to 100%"));

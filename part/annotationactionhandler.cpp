@@ -96,6 +96,7 @@ public:
         , aEraserTool(nullptr)
         , aDrawingBrowse(nullptr)
         , aBrowseTool(nullptr)
+        , aMouseSelectTools(nullptr)
         , aCustomStamp(nullptr)
         , aCustomWidth(nullptr)
         , aCustomOpacity(nullptr)
@@ -176,6 +177,7 @@ public:
     KToggleAction *aEraserTool;
     KToggleAction *aDrawingBrowse;
     QAction *aBrowseTool;
+    QAction *aMouseSelectTools;
     KToolBar *drawingToolBar = nullptr;
     bool selectModeSwitchingToBrowse = false;
 
@@ -1070,6 +1072,8 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->aEraserTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-eraser")), i18nc("@action:intoolbar Drawing tool", "Eraser"), this);
     d->aBrowseTool = ac->action(QStringLiteral("mouse_drag"));
     Q_ASSERT(d->aBrowseTool);
+    d->aMouseSelectTools = ac->action(QStringLiteral("mouse_selecttools"));
+    Q_ASSERT(d->aMouseSelectTools);
     d->aDrawingBrowse = new KToggleAction(QIcon::fromTheme(QStringLiteral("transform-browse")), i18nc("@action:intoolbar Drawing tool", "Browse"), this);
     d->aDrawingBrowse->setChecked(d->aBrowseTool->isChecked());
     KToggleAction *aFreehandLine = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18nc("@action:intoolbar Drawing tool", "Pen / Freehand"), this);
@@ -1209,7 +1213,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     }
     connect(d->aStamp->menu(), &QMenu::triggered, d->aStamp, &ToggleActionMenu::setDefaultAction);
 
-    d->drawingTools = {d->aDrawingBrowse, d->aSelectTool, aFreehandLine, aHighlighter, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aTypewriter};
+    QAction *aMouseTextSelect = ac->action(QStringLiteral("mouse_textselect"));
+    Q_ASSERT(aMouseTextSelect);
+    d->drawingTools = {d->aDrawingBrowse, d->aSelectTool, aFreehandLine, aHighlighter, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aMouseTextSelect, aTypewriter};
 
     // Quick annotations action
     d->aQuickTools = new ToggleActionMenu(i18nc("@action:intoolbar Show list of quick annotation tools", "Quick Annotations"), this);
@@ -1487,7 +1493,7 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
         }
     }
     for (qsizetype index = 0; index < d->drawingTools.size(); ++index) {
-        const QString role = index == 3 ? QStringLiteral("highlight") : (index == 4 ? QStringLiteral("erase") : (index >= 5 && index <= 9 ? QStringLiteral("shape") : (index == 10 ? QStringLiteral("text") : QStringLiteral("navigation"))));
+        const QString role = index == 3 ? QStringLiteral("highlight") : (index == 4 ? QStringLiteral("erase") : (index >= 5 && index <= 9 ? QStringLiteral("shape") : (index == 11 ? QStringLiteral("text") : QStringLiteral("navigation"))));
         if (QWidget *toolButton = drawingToolBar->widgetForAction(d->drawingTools.at(index))) {
             toolButton->setProperty("chartaRole", role);
             toolButton->style()->unpolish(toolButton);
@@ -1511,6 +1517,23 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
     KToolBar *quickAnnotationToolBar = mw->toolBar(QStringLiteral("quickAnnotationToolBar"));
     if (KToolBar *mainToolBar = mw->toolBar(QStringLiteral("mainToolBar"))) {
         mainToolBar->removeAction(d->aQuickTools);
+        mainToolBar->removeAction(d->aBrowseTool);
+        mainToolBar->removeAction(d->aMouseSelectTools);
+
+        QAction *previousAction = nullptr;
+        for (QAction *action : mainToolBar->actions()) {
+            if (action->isSeparator() && (!previousAction || previousAction->isSeparator())) {
+                mainToolBar->removeAction(action);
+                continue;
+            }
+            previousAction = action;
+        }
+        const QList<QAction *> toolbarActions = mainToolBar->actions();
+        if (!toolbarActions.isEmpty() && toolbarActions.constLast()->isSeparator()) {
+            mainToolBar->removeAction(toolbarActions.constLast());
+        }
+        mainToolBar->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+        mainToolBar->adjustSize();
         mainToolBar->setStyleSheet(QStringLiteral(
             "QToolBar { background: #202630; border: 0; border-bottom: 1px solid #3b4653; spacing: 1px; padding: 1px 5px; }"
             "QToolButton { color: #b9c3ce; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 32px; min-height: 28px; padding: 2px 4px; }"

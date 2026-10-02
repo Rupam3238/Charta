@@ -61,13 +61,11 @@
 </Menu>
 
 <ToolBar name="OkularViewerToolBar"><text>Viewer Toolbar</text>
-  <Action name="zoom_to" />
   <Action name="view_zoom_out"/>
+  <Action name="zoom_to" />
   <Action name="view_zoom_in"/>
   <Separator/>
-  <Action name="mouse_drag"/>
   <Action name="mouse_zoom"/>
-  <Action name="mouse_selecttools"/>
 </ToolBar>
 
 </gui>
