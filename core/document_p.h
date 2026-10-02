@@ -104,6 +104,7 @@ public:
         , m_fontsCached(false)
         , m_annotationEditingEnabled(true)
         , m_annotationBeingModified(false)
+        , m_annotationPixmapRefreshBatchDepth(0)
         , m_undoStack(nullptr)
         , m_docdataMigrationNeeded(false)
         , m_synctex_scanner(nullptr)
@@ -171,6 +172,9 @@ public:
     void fontReadingGotFont(const Okular::FontInfo &font);
     void slotGeneratorConfigChanged();
     void refreshPixmaps(int);
+    void beginAnnotationPixmapRefreshBatch();
+    void endAnnotationPixmapRefreshBatch();
+    void refreshAnnotationPixmaps(int page);
     void _o_configChanged();
 
     typedef std::pair<RegularAreaRect *, QColor> MatchColor;
@@ -313,6 +317,8 @@ public:
 
     bool m_annotationEditingEnabled;
     bool m_annotationBeingModified; // is an annotation currently being moved or resized?
+    int m_annotationPixmapRefreshBatchDepth;
+    QSet<int> m_annotationPagesPendingPixmapRefresh;
 
     QUndoStack *m_undoStack;
     QDomNode m_prevPropsOfAnnotBeingModified;

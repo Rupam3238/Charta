@@ -9,10 +9,39 @@
 #include "../settings_core.h"
 #include "core/annotations.h"
 #include "core/document.h"
+#include "core/generator.h"
+#include "core/observer.h"
 #include "core/page.h"
 #include "testingutils.h"
 #include <QMimeDatabase>
 #include <QMimeType>
+
+class PixmapChangeObserver : public Okular::DocumentObserver
+{
+public:
+    explicit PixmapChangeObserver(Okular::Document *document)
+        : m_document(document)
+    {
+        m_document->addObserver(this);
+    }
+
+    ~PixmapChangeObserver() override
+    {
+        m_document->removeObserver(this);
+    }
+
+    void notifyPageChanged(int, int flags) override
+    {
+        if (flags & Okular::DocumentObserver::Pixmap) {
+            ++pixmapChanges;
+        }
+    }
+
+    int pixmapChanges = 0;
+
+private:
+    Okular::Document *m_document;
+};
 
 Okular::LineAnnotation *getNewLineAnnotation(double startX, double startY, double endX, double endY)
 {
@@ -42,6 +71,7 @@ private Q_SLOTS:
     void testSequentialTranslationsNotMergedIfBeingMovedIsNotSet();
     void testAlternateTranslationsNotMerged();
     void testGroupedTranslationsUndoTogether();
+    void testGroupedAnnotationRemovalRefreshesOnce();
     void testGeometryAppearanceSurvivesTranslateAndDeleteUndo();
 
 private:
@@ -218,17 +248,41 @@ void TranslateAnnotationTest::testGroupedTranslationsUndoTogether()
     m_document->beginUndoMacro(QStringLiteral("move annotations"));
     m_document->translatePageAnnotation(0, m_annot1, m_deltaA);
     m_document->translatePageAnnotation(0, m_annot2, m_deltaA);
+
+    PixmapChangeObserver observer(m_document);
+    m_document->requestPixmaps({new Okular::PixmapRequest(&observer, 0, 500, 700, 1.0, 0, Okular::PixmapRequest::Asynchronous)});
+    QTRY_COMPARE(observer.pixmapChanges, 1);
+    observer.pixmapChanges = 0;
+
     m_annot1->setFlags(m_annot1->flags() & ~Okular::Annotation::BeingMoved);
     m_annot2->setFlags(m_annot2->flags() & ~Okular::Annotation::BeingMoved);
+    m_document->beginAnnotationPixmapRefreshBatch();
     m_document->translatePageAnnotation(0, m_annot1, Okular::NormalizedPoint(0.0, 0.0));
     m_document->translatePageAnnotation(0, m_annot2, Okular::NormalizedPoint(0.0, 0.0));
+    m_document->endAnnotationPixmapRefreshBatch();
     m_document->endUndoMacro();
+    QTRY_COMPARE(observer.pixmapChanges, 1);
 
     QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot1->linePoints(), m_points1DeltaA));
     QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot2->linePoints(), m_points2DeltaA));
     m_document->undo();
     QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot1->linePoints(), m_origPoints1));
     QVERIFY(TestingUtils::pointListsAlmostEqual(m_annot2->linePoints(), m_origPoints2));
+}
+
+void TranslateAnnotationTest::testGroupedAnnotationRemovalRefreshesOnce()
+{
+    PixmapChangeObserver observer(m_document);
+    m_document->requestPixmaps({new Okular::PixmapRequest(&observer, 0, 500, 700, 1.0, 0, Okular::PixmapRequest::Asynchronous)});
+    QTRY_COMPARE(observer.pixmapChanges, 1);
+    observer.pixmapChanges = 0;
+
+    m_document->removePageAnnotations(0, {m_annot1, m_annot2});
+    QTRY_COMPARE(observer.pixmapChanges, 1);
+
+    QVERIFY(m_document->page(0)->annotations().isEmpty());
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotations().size(), 2);
 }
 
 void TranslateAnnotationTest::testGeometryAppearanceSurvivesTranslateAndDeleteUndo()

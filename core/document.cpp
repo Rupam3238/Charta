@@ -1082,7 +1082,7 @@ void DocumentPrivate::performRemovePageAnnotation(int page, Annotation *annotati
 
         if (isExternallyDrawn) {
             // Redraw everything, including ExternallyDrawn annotations
-            refreshPixmaps(page);
+            refreshAnnotationPixmaps(page);
         }
     }
 }
@@ -1120,6 +1120,34 @@ void DocumentPrivate::performModifyPageAnnotation(int page, Annotation *annotati
 
         // Redraw everything, including ExternallyDrawn annotations
         qCDebug(OkularCoreDebug) << "Refreshing Pixmaps";
+        refreshAnnotationPixmaps(page);
+    }
+}
+
+void DocumentPrivate::beginAnnotationPixmapRefreshBatch()
+{
+    ++m_annotationPixmapRefreshBatchDepth;
+}
+
+void DocumentPrivate::endAnnotationPixmapRefreshBatch()
+{
+    Q_ASSERT(m_annotationPixmapRefreshBatchDepth > 0);
+    if (m_annotationPixmapRefreshBatchDepth == 0 || --m_annotationPixmapRefreshBatchDepth > 0) {
+        return;
+    }
+
+    const QSet<int> pagesToRefresh = m_annotationPagesPendingPixmapRefresh;
+    m_annotationPagesPendingPixmapRefresh.clear();
+    for (const int page : pagesToRefresh) {
+        refreshPixmaps(page);
+    }
+}
+
+void DocumentPrivate::refreshAnnotationPixmaps(int page)
+{
+    if (m_annotationPixmapRefreshBatchDepth > 0) {
+        m_annotationPagesPendingPixmapRefresh.insert(page);
+    } else {
         refreshPixmaps(page);
     }
 }
@@ -3482,6 +3510,16 @@ void Document::translatePageAnnotation(int page, Annotation *annotation, const N
     d->m_undoStack->push(uc);
 }
 
+void Document::beginAnnotationPixmapRefreshBatch()
+{
+    d->beginAnnotationPixmapRefreshBatch();
+}
+
+void Document::endAnnotationPixmapRefreshBatch()
+{
+    d->endAnnotationPixmapRefreshBatch();
+}
+
 void Document::beginUndoMacro(const QString &text)
 {
     d->m_undoStack->beginMacro(text);
@@ -3538,12 +3576,14 @@ void Document::removePageAnnotation(int page, Annotation *annotation)
 
 void Document::removePageAnnotations(int page, const QList<Annotation *> &annotations)
 {
+    d->beginAnnotationPixmapRefreshBatch();
     d->m_undoStack->beginMacro(i18nc("remove a collection of annotations from the page", "remove annotations"));
     for (Annotation *annotation : annotations) {
         QUndoCommand *uc = new RemoveAnnotationCommand(this->d, annotation, page);
         d->m_undoStack->push(uc);
     }
     d->m_undoStack->endMacro();
+    d->endAnnotationPixmapRefreshBatch();
 }
 
 bool DocumentPrivate::canAddAnnotationsNatively() const

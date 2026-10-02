@@ -540,6 +540,10 @@ public:
      */
     void translatePageAnnotation(int page, Annotation *annotation, const Okular::NormalizedPoint &delta);
 
+    /** Batch annotation-triggered pixmap refreshes until the batch ends. */
+    void beginAnnotationPixmapRefreshBatch();
+    void endAnnotationPixmapRefreshBatch();
+
     /** Group subsequent annotation edits into a single undo step. */
     void beginUndoMacro(const QString &text);
     void endUndoMacro();

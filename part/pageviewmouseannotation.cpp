@@ -710,8 +710,15 @@ void MouseAnnotation::finishCommand()
             description.annotation->setFlags(description.annotation->flags() & ~Okular::Annotation::BeingMoved);
         }
         if (selected.size() <= 1 || m_selectionMoveChanged) {
+            const bool batchPixmapRefreshes = selected.size() > 1;
+            if (batchPixmapRefreshes) {
+                m_document->beginAnnotationPixmapRefreshBatch();
+            }
             for (const AnnotationDescription &description : selected) {
                 m_document->translatePageAnnotation(description.pageNumber, description.annotation, Okular::NormalizedPoint(0.0, 0.0));
+            }
+            if (batchPixmapRefreshes) {
+                m_document->endAnnotationPixmapRefreshBatch();
             }
         }
         if (m_selectionMoveUndoMacroOpen) {
