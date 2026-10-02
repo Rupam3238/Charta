@@ -395,7 +395,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             }
             if (kind == DrawingToolKind::Eraser) {
                 annotator->setEraserWidth(value);
-            } else if (kind != DrawingToolKind::Line && kind != DrawingToolKind::Arrow) {
+            } else {
                 annotator->setDrawingToolWidthPixels(value);
             }
         });

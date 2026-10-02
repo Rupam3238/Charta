@@ -1154,6 +1154,51 @@ public:
         if (page) {
             pagewidth = page->width();
         }
+
+        const bool isStraightLine = numofpoints == 2 && m_annotElement.attribute(QStringLiteral("type")) == QLatin1String("Line");
+        if (isStraightLine) {
+            const auto updateEndpointAndPreview = [&] {
+                if (modifiers.constrainRatioAndAngle) {
+                    movingpoint = constrainAngle(newPoint, nX, nY, xScale, yScale, M_PI / 12.);
+                } else {
+                    movingpoint = Okular::NormalizedPoint(nX, nY);
+                }
+                const qreal width = qMax<qreal>(0.5, m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toDouble() * xScale / pagewidth);
+                const int margin = qMax(3, qCeil(width * 6.0) + 2);
+                return QRect(QPoint(qFloor(qMin(newPoint.x, movingpoint.x) * xScale), qFloor(qMin(newPoint.y, movingpoint.y) * yScale)),
+                             QPoint(qCeil(qMax(newPoint.x, movingpoint.x) * xScale), qCeil(qMax(newPoint.y, movingpoint.y) * yScale)))
+                    .adjusted(-margin, -margin, margin, margin);
+            };
+
+            if (type == Press && button == Left) {
+                newPoint = Okular::NormalizedPoint(nX, nY);
+                movingpoint = newPoint;
+                m_isDragging = true;
+                hasMovingPoint = true;
+                movingrect = updateEndpointAndPreview();
+                return movingrect;
+            }
+            if (type == Move && m_isDragging) {
+                const QRect oldMovingRect = movingrect;
+                movingrect = updateEndpointAndPreview();
+                return oldMovingRect | movingrect;
+            }
+            if (type == Release && button == Left && m_isDragging) {
+                const QRect oldMovingRect = movingrect;
+                movingrect = updateEndpointAndPreview();
+                points = {newPoint, movingpoint};
+                rect = QRect(QPoint(qFloor(qMin(newPoint.x, movingpoint.x) * xScale), qFloor(qMin(newPoint.y, movingpoint.y) * yScale)),
+                             QPoint(qCeil(qMax(newPoint.x, movingpoint.x) * xScale), qCeil(qMax(newPoint.y, movingpoint.y) * yScale)))
+                            .adjusted(0, 0, 1, 1);
+                normRect = Okular::NormalizedRect(rect, xScale, yScale);
+                m_isDragging = false;
+                hasMovingPoint = false;
+                m_creationCompleted = true;
+                return oldMovingRect | movingrect | rect;
+            }
+            return QRect();
+        }
+
         // only proceed if pressing left button
         //            if ( button != Left )
         //                return rect;
@@ -1217,6 +1262,13 @@ public:
             return;
         }
 
+        const bool isStraightLine = numofpoints == 2 && m_annotElement.attribute(QStringLiteral("type")) == QLatin1String("Line");
+        const auto makeLinePen = [this, xScale] {
+            const QColor color = m_annotElement.hasAttribute(QStringLiteral("color")) ? QColor(m_annotElement.attribute(QStringLiteral("color"))) : m_engineColor;
+            const qreal width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toDouble() * xScale / pagewidth;
+            return QPen(color, qMax<qreal>(0.5, width), Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+        };
+
         if (m_block && points.count() == 2) {
             const Okular::NormalizedPoint first = points[0];
             const Okular::NormalizedPoint second = points[1];
@@ -1231,6 +1283,8 @@ public:
                 const QColor color = m_annotElement.hasAttribute(QStringLiteral("color")) ? QColor(m_annotElement.attribute(QStringLiteral("color"))) : m_engineColor;
                 const qreal width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toDouble() * xScale / pagewidth;
                 pen = QPen(color, qMax<qreal>(0.5, width));
+            } else if (isStraightLine) {
+                pen = makeLinePen();
             }
             painter->setPen(pen);
             for (int i = 1; i < points.count(); ++i) {
@@ -1243,9 +1297,24 @@ public:
                 const QColor color = m_annotElement.hasAttribute(QStringLiteral("color")) ? QColor(m_annotElement.attribute(QStringLiteral("color"))) : m_engineColor;
                 const qreal width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toDouble() * xScale / pagewidth;
                 pen = QPen(color, qMax<qreal>(0.5, width));
+            } else if (isStraightLine) {
+                pen = makeLinePen();
             }
             painter->setPen(pen);
-            painter->drawLine((int)(newPoint.x * (double)xScale), (int)(newPoint.y * (double)yScale), (int)(movingpoint.x * (double)xScale), (int)(movingpoint.y * (double)yScale));
+            const QPointF start(newPoint.x * xScale, newPoint.y * yScale);
+            const QPointF end(movingpoint.x * xScale, movingpoint.y * yScale);
+            painter->drawLine(start, end);
+            const int endStyle = m_annotElement.attribute(QStringLiteral("endStyle"), QStringLiteral("5")).toInt();
+            const QLineF line(start, end);
+            if (isStraightLine && line.length() > 0.0 && (endStyle == 3 || endStyle == 4 || endStyle == 7 || endStyle == 8)) {
+                const QPointF direction = (end - start) / line.length();
+                const QPointF perpendicular(-direction.y(), direction.x());
+                const qreal size = qMin<qreal>(6.0 * m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toDouble() * xScale / pagewidth, line.length() / 2.0);
+                const qreal endDirection = endStyle == 7 || endStyle == 8 ? 1.0 : -1.0;
+                const QPointF base = end + direction * (endDirection * size);
+                painter->drawLine(base + perpendicular * (size / 2.0), end);
+                painter->drawLine(end, base - perpendicular * (size / 2.0));
+            }
         }
     }
 
@@ -1327,6 +1396,7 @@ private:
     bool last;
     int numofpoints;
     bool hasMovingPoint;
+    bool m_isDragging = false;
     double pagewidth = 1.0;
 };
 
