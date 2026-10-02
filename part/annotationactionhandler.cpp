@@ -33,6 +33,7 @@
 #include <QSlider>
 #include <QSignalBlocker>
 #include <QScreen>
+#include <QTimer>
 #include <QVBoxLayout>
 
 // kde includes
@@ -67,6 +68,7 @@ public:
         : KToolBar(QStringLiteral("drawingToolBar"), host, false)
         , m_host(host)
         , m_visibleCanvas(visibleCanvas)
+        , m_window(host->window())
     {
         setOrientation(Qt::Vertical);
         setIconSize(QSize(18, 18));
@@ -76,12 +78,25 @@ public:
         setFloatable(false);
         host->installEventFilter(this);
         visibleCanvas->installEventFilter(this);
+        m_window->installEventFilter(this);
     }
 
     void setAnchor(Anchor anchor)
     {
         m_anchor = anchor;
-        updateIslandGeometry();
+        scheduleIslandUpdate();
+    }
+
+    void setRequestedVisible(bool visible)
+    {
+        m_requestedVisible = visible;
+        setVisible(visible);
+        scheduleIslandUpdate();
+    }
+
+    bool requestedVisible() const
+    {
+        return m_requestedVisible;
     }
 
 protected:
@@ -93,13 +108,31 @@ protected:
 
     bool eventFilter(QObject *watched, QEvent *event) override
     {
-        if ((watched == m_host || watched == m_visibleCanvas) && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
-            updateIslandGeometry();
+        const bool geometryEvent = event->type() == QEvent::Resize || event->type() == QEvent::Show;
+        if ((watched == m_host || watched == m_visibleCanvas) && geometryEvent) {
+            scheduleIslandUpdate();
+        } else if (watched == m_window && event->type() == QEvent::WindowStateChange) {
+            scheduleIslandUpdate();
         }
         return QObject::eventFilter(watched, event);
     }
 
 private:
+    void scheduleIslandUpdate()
+    {
+        if (m_updateScheduled) {
+            return;
+        }
+        m_updateScheduled = true;
+        QTimer::singleShot(0, this, [this] {
+            m_updateScheduled = false;
+            if (m_requestedVisible && !isVisible() && m_host->isVisible()) {
+                show();
+            }
+            updateIslandGeometry();
+        });
+    }
+
     void updateIslandGeometry()
     {
         if (!m_host || !m_visibleCanvas) {
@@ -120,7 +153,10 @@ private:
 
     QWidget *m_host;
     QWidget *m_visibleCanvas;
+    QWidget *m_window;
     Anchor m_anchor = Anchor::Left;
+    bool m_requestedVisible = true;
+    bool m_updateScheduled = false;
 };
 }
 
@@ -1534,6 +1570,7 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
         drawingToolBar->setWindowTitle(i18n("Drawing Tools"));
         d->drawingToolBar = drawingToolBar;
     }
+    auto *island = static_cast<DrawingToolBarIsland *>(drawingToolBar);
     drawingToolBar->setStyleSheet(QStringLiteral(
         "QToolBar { background: #202630; border: 1px solid #3b4653; border-radius: 10px; spacing: 1px; padding: 4px; margin: 0; }"
         "QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px; padding: 2px; margin: 0; }"
@@ -1573,7 +1610,17 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
         }
     }
     if (createDrawingToolBar) {
-        drawingToolBar->show();
+        connect(d->aShowToolBar, &QAction::triggered, island, [island] { island->setRequestedVisible(true); });
+        connect(d->aHideToolBar, &QAction::triggered, island, [island] { island->setRequestedVisible(false); });
+        connect(d->aToolBarVisibility, &QAction::toggled, island, [island](bool visible) { island->setRequestedVisible(visible); });
+        connect(drawingToolBar, &QToolBar::visibilityChanged, this, &AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged, Qt::UniqueConnection);
+        connect(drawingToolBar, &QToolBar::visibilityChanged, this, [this, island](bool visible) {
+            if (!visible && (island->window()->isFullScreen() || !island->isHidden())) {
+                return;
+            }
+            d->aToolBarVisibility->setChecked(visible);
+        });
+        island->setRequestedVisible(true);
     }
 
     KToolBar *annotationToolBar = mw->toolBar(QStringLiteral("annotationToolBar"));
@@ -1615,15 +1662,8 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
     QObject::disconnect(annotationToolBar, nullptr, d->aToolBarVisibility, nullptr);
     QObject::disconnect(quickAnnotationToolBar, nullptr, d->aToolBarVisibility, nullptr);
 
-    connect(drawingToolBar, &QToolBar::visibilityChanged, this, &AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged, Qt::UniqueConnection);
-    connect(d->aShowToolBar, &QAction::triggered, drawingToolBar, &KToolBar::show, Qt::UniqueConnection);
-    connect(d->aHideToolBar, &QAction::triggered, drawingToolBar, &KToolBar::hide, Qt::UniqueConnection);
-    QObject::disconnect(d->aToolBarVisibility, &QAction::toggled, drawingToolBar, &KToolBar::setVisible);
-    QObject::disconnect(drawingToolBar, &QToolBar::visibilityChanged, d->aToolBarVisibility, &QAction::setChecked);
-    d->aToolBarVisibility->setChecked(drawingToolBar->isVisible());
-    connect(drawingToolBar, &QToolBar::visibilityChanged, d->aToolBarVisibility, &QAction::setChecked, Qt::UniqueConnection);
-    connect(d->aToolBarVisibility, &QAction::toggled, drawingToolBar, &KToolBar::setVisible, Qt::UniqueConnection);
-    d->aShowToolBar->setEnabled(!drawingToolBar->isVisible());
+    d->aToolBarVisibility->setChecked(island->requestedVisible());
+    d->aShowToolBar->setEnabled(!island->requestedVisible());
 }
 
 void AnnotationActionHandler::reparseBuiltinToolsConfig()
@@ -1675,6 +1715,12 @@ void AnnotationActionHandler::deselectAllAnnotationActions()
 
 void AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged(bool visible)
 {
+    if (!visible) {
+        auto *island = static_cast<DrawingToolBarIsland *>(d->drawingToolBar);
+        if (island->window()->isFullScreen() && island->requestedVisible()) {
+            return;
+        }
+    }
     d->aShowToolBar->setEnabled(!visible);
     if (!visible && !d->isQuickToolAction(d->agTools->checkedAction())) {
         deselectAllAnnotationActions();

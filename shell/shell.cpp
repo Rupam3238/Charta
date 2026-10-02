@@ -60,7 +60,6 @@
 #include "shellutils.h"
 
 static const char *shouldShowMenuBarComingFromFullScreen = "shouldShowMenuBarComingFromFullScreen";
-static const char *shouldShowToolBarComingFromFullScreen = "shouldShowToolBarComingFromFullScreen";
 
 static const char *const SESSION_URL_KEY = "Urls";
 static const char *const SESSION_TAB_KEY = "ActiveTab";
@@ -180,7 +179,6 @@ private:
 Shell::Shell(const QString &serializedOptions)
     : KParts::MainWindow()
     , m_menuBarWasShown(true)
-    , m_toolBarWasShown(true)
     , m_isValid(true)
 {
     setObjectName(QStringLiteral("okular::Shell#"));
@@ -535,7 +533,6 @@ void Shell::readSettings()
 
     if (fullScreen) {
         m_menuBarWasShown = group.readEntry(shouldShowMenuBarComingFromFullScreen, true);
-        m_toolBarWasShown = group.readEntry(shouldShowToolBarComingFromFullScreen, true);
     }
 
     const KConfigGroup sidebarGroup = KSharedConfig::openConfig()->group(GeneralGroupKey());
@@ -560,7 +557,6 @@ void Shell::writeSettings()
     group.writeEntry("FullScreen", m_fullScreenAction->isChecked());
     if (m_fullScreenAction->isChecked()) {
         group.writeEntry(shouldShowMenuBarComingFromFullScreen, m_menuBarWasShown);
-        group.writeEntry(shouldShowToolBarComingFromFullScreen, m_toolBarWasShown);
     }
     KSharedConfig::openConfig()->sync();
 }
@@ -812,16 +808,10 @@ void Shell::slotUpdateFullScreen()
         m_menuBarWasShown = !menuBar()->isHidden();
         menuBar()->hide();
 
-        m_toolBarWasShown = !toolBar()->isHidden();
-        toolBar()->hide();
-
         KToggleFullScreenAction::setFullScreen(this, true);
     } else {
         if (m_menuBarWasShown) {
             menuBar()->show();
-        }
-        if (m_toolBarWasShown) {
-            toolBar()->show();
         }
         KToggleFullScreenAction::setFullScreen(this, false);
     }

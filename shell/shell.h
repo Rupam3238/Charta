@@ -173,7 +173,7 @@ private:
     QAction *m_closeAction;
     KToggleAction *m_fullScreenAction;
     KToggleAction *m_showMenuBarAction;
-    bool m_menuBarWasShown, m_toolBarWasShown;
+    bool m_menuBarWasShown;
     bool m_unique;
     QTabWidget *m_tabWidget;
     KToggleAction *m_openInTab;
