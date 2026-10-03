@@ -43,6 +43,8 @@
 #include <QInputDialog>
 #include <QJsonArray>
 #include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
 #include <QLayout>
 #include <QMenu>
 #include <QMenuBar>
@@ -56,6 +58,7 @@
 #include <QSaveFile>
 #include <QSlider>
 #include <QSpinBox>
+#include <QStackedWidget>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTimer>
@@ -152,6 +155,7 @@ public:
             "QWidget#optionsBar { background: #202630; border-right: 1px solid #3b4653; }"
             "QWidget#optionsBar QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 40px; max-width: 40px; min-height: 40px; max-height: 40px; padding: 4px; margin: 0; }"
             "QWidget#optionsBar QToolButton:hover { color: #f2f5f8; background: #303a46; }"
+            "QWidget#optionsBar QToolButton:checked { color: #ffffff; background: #16414c; border-color: #27bfd6; }"
             "QWidget#optionsBar QToolButton:pressed { color: #ffffff; background: #16414c; border-color: #27bfd6; }"
             "QWidget#optionsBar QFrame { background: #45515e; border: 0; margin: 3px 6px; }"));
 
@@ -159,29 +163,31 @@ public:
         buttonLayout->setContentsMargins(4, 8, 4, 8);
         buttonLayout->setSpacing(4);
 
-        const auto createButton = [this](const QString &iconName, const QString &label) {
+        const auto createButton = [this](const QString &iconName, const QString &label, const QString &name, bool checkable) {
             auto *button = new QToolButton(this);
+            button->setObjectName(name);
             button->setIcon(QIcon::fromTheme(iconName));
             button->setIconSize(QSize(28, 28));
             button->setToolButtonStyle(Qt::ToolButtonIconOnly);
             button->setFixedSize(40, 40);
             button->setAutoRaise(true);
+            button->setCheckable(checkable);
             button->setToolTip(label);
             button->setAccessibleName(label);
             return button;
         };
 
-        buttonLayout->addWidget(createButton(QStringLiteral("view-list-details"), i18n("Pages")), 0, Qt::AlignHCenter);
-        buttonLayout->addWidget(createButton(QStringLiteral("system-search"), i18n("Search")), 0, Qt::AlignHCenter);
-        buttonLayout->addWidget(createButton(QStringLiteral("deep-history"), i18n("Annotation History")), 0, Qt::AlignHCenter);
-        buttonLayout->addWidget(createButton(QStringLiteral("bookmarks"), i18n("Bookmarks")), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("view-list-details"), i18n("Pages"), QStringLiteral("optionsPagesButton"), true), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("system-search"), i18n("Search"), QStringLiteral("optionsSearchButton"), true), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("deep-history"), i18n("Annotation History"), QStringLiteral("optionsHistoryButton"), true), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("bookmarks"), i18n("Bookmarks"), QStringLiteral("optionsBookmarksButton"), true), 0, Qt::AlignHCenter);
         buttonLayout->addStretch(1);
 
         auto *separator = new QFrame(this);
         separator->setFrameShape(QFrame::HLine);
         separator->setFixedHeight(1);
         buttonLayout->addWidget(separator);
-        buttonLayout->addWidget(createButton(QStringLiteral("settings-configure"), i18n("Settings")), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("settings-configure"), i18n("Settings"), QStringLiteral("optionsSettingsButton"), false), 0, Qt::AlignHCenter);
 
         updateFullscreenVisibility();
     }
@@ -379,6 +385,189 @@ private:
     PageView *m_pageView;
     QWidget *m_viewport;
     bool m_updateScheduled = false;
+};
+
+class OptionsPanelHost final : public QObject
+{
+public:
+    OptionsPanelHost(QWidget *host, OptionsBar *optionsBar, Okular::Document *document, QWidget *pagesWidget, SearchWidget *searchWidget, Reviews *reviewsWidget, QAction *preferencesAction)
+        : QObject(host)
+        , m_host(host)
+        , m_optionsBar(optionsBar)
+        , m_document(document)
+        , m_searchWidget(searchWidget)
+    {
+        m_panel = new QFrame(host);
+        m_panel->setObjectName(QStringLiteral("optionsPanel"));
+        m_panel->setAttribute(Qt::WA_StyledBackground);
+        m_panel->setStyleSheet(QStringLiteral(
+            "QFrame#optionsPanel { background: #202630; color: #f2f5f8; border: 1px solid #3b4653; }"
+            "QFrame#optionsPanel QLabel { color: #f2f5f8; background: transparent; border: 0; }"
+            "QFrame#optionsPanel QListWidget { color: #d8e0e8; background: #202630; border: 0; outline: 0; }"
+            "QFrame#optionsPanel QListWidget::item { min-height: 34px; padding: 4px 8px; border-bottom: 1px solid #303a46; }"
+            "QFrame#optionsPanel QListWidget::item:hover { background: #303a46; }"
+            "QFrame#optionsPanel QListWidget::item:selected { color: #ffffff; background: #16414c; }"
+            "QFrame#optionsPanel QLineEdit { color: #f2f5f8; background: #1a2028; border: 1px solid #3b4653; border-radius: 6px; min-height: 30px; padding: 2px 8px; selection-background-color: #16414c; }"
+            "QFrame#optionsPanel QScrollArea { color: #d8e0e8; background: #202630; border: 0; }"));
+
+        auto *panelLayout = new QVBoxLayout(m_panel);
+        panelLayout->setContentsMargins(12, 10, 12, 10);
+
+        m_stack = new QStackedWidget(m_panel);
+        panelLayout->addWidget(m_stack);
+
+        m_stack->addWidget(createPanelPage(i18n("Pages"), pagesWidget));
+
+        auto *searchPage = new QWidget(m_stack);
+        auto *searchLayout = new QVBoxLayout(searchPage);
+        searchLayout->setContentsMargins(0, 0, 0, 0);
+        searchLayout->setSpacing(8);
+        auto *searchTitle = new QLabel(i18n("Search"), searchPage);
+        searchTitle->setObjectName(QStringLiteral("optionsPanelTitle"));
+        searchLayout->addWidget(searchTitle);
+        searchLayout->addWidget(searchWidget);
+        m_searchResults = new QListWidget(searchPage);
+        m_searchResults->setObjectName(QStringLiteral("searchResults"));
+        searchLayout->addWidget(m_searchResults, 1);
+        m_stack->addWidget(searchPage);
+
+        m_stack->addWidget(reviewsWidget);
+        auto *outlineView = new TOC(m_stack, m_document);
+        m_document->addObserver(outlineView);
+        m_stack->addWidget(outlineView);
+
+        m_panel->hide();
+        m_optionsBar->installEventFilter(this);
+        m_host->installEventFilter(this);
+
+        QToolButton *pagesButton = m_optionsBar->findChild<QToolButton *>(QStringLiteral("optionsPagesButton"));
+        QToolButton *searchButton = m_optionsBar->findChild<QToolButton *>(QStringLiteral("optionsSearchButton"));
+        QToolButton *historyButton = m_optionsBar->findChild<QToolButton *>(QStringLiteral("optionsHistoryButton"));
+        QToolButton *bookmarksButton = m_optionsBar->findChild<QToolButton *>(QStringLiteral("optionsBookmarksButton"));
+        connect(pagesButton, &QToolButton::clicked, this, [this, pagesButton] { togglePanel(pagesButton, 0, 260); });
+        connect(searchButton, &QToolButton::clicked, this, [this, searchButton] {
+            if (togglePanel(searchButton, 1, 360)) {
+                focusSearch();
+            }
+        });
+        connect(historyButton, &QToolButton::clicked, this, [this, historyButton] { togglePanel(historyButton, 2, 340); });
+        connect(bookmarksButton, &QToolButton::clicked, this, [this, bookmarksButton] { togglePanel(bookmarksButton, 3, 340); });
+        connect(m_optionsBar->findChild<QToolButton *>(QStringLiteral("optionsSettingsButton")), &QToolButton::clicked, this, [this, preferencesAction] {
+            closePanel();
+            preferencesAction->trigger();
+        });
+
+        if (QLineEdit *searchLine = m_searchWidget->findChild<QLineEdit *>()) {
+            connect(searchLine, &QLineEdit::textChanged, m_searchResults, &QListWidget::clear);
+        }
+        connect(m_document, &Okular::Document::searchFinished, this, [this](int searchId, Okular::Document::SearchStatus) {
+            if (searchId == SW_SEARCH_ID) {
+                updateSearchResults();
+            }
+        });
+        connect(m_searchResults, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
+            m_document->setViewportPage(item->data(Qt::UserRole).toUInt());
+        });
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (watched == m_host && event->type() == QEvent::Resize) {
+            positionPanel();
+        } else if (watched == m_optionsBar) {
+            if (event->type() == QEvent::Hide) {
+                m_panel->hide();
+            } else if (event->type() == QEvent::Show && m_activeButton) {
+                positionPanel();
+                m_panel->show();
+                m_panel->raise();
+            }
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    QWidget *createPanelPage(const QString &title, QWidget *content)
+    {
+        auto *page = new QWidget(m_stack);
+        auto *layout = new QVBoxLayout(page);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(8);
+        auto *heading = new QLabel(title, page);
+        heading->setObjectName(QStringLiteral("optionsPanelTitle"));
+        layout->addWidget(heading);
+        layout->addWidget(content, 1);
+        return page;
+    }
+
+    bool togglePanel(QToolButton *button, int index, int width)
+    {
+        if (m_activeButton == button) {
+            closePanel();
+            return false;
+        }
+        if (m_activeButton) {
+            m_activeButton->setChecked(false);
+        }
+        m_activeButton = button;
+        m_activeButton->setChecked(true);
+        m_stack->setCurrentIndex(index);
+        m_panel->setFixedWidth(width);
+        positionPanel();
+        m_panel->show();
+        m_panel->raise();
+        return true;
+    }
+
+    void closePanel()
+    {
+        if (m_activeButton) {
+            m_activeButton->setChecked(false);
+            m_activeButton = nullptr;
+        }
+        m_panel->hide();
+    }
+
+    void focusSearch()
+    {
+        if (QLineEdit *searchLine = m_searchWidget->findChild<QLineEdit *>()) {
+            searchLine->setFocus();
+        }
+    }
+
+    void positionPanel()
+    {
+        if (!m_optionsBar->isHidden()) {
+            m_panel->setGeometry(m_optionsBar->geometry().right() + 1, 0, m_panel->width(), m_host->height());
+        }
+    }
+
+    void updateSearchResults()
+    {
+        m_searchResults->clear();
+        for (uint pageNumber = 0; pageNumber < m_document->pages(); ++pageNumber) {
+            const Okular::Page *page = m_document->page(pageNumber);
+            if (page->hasHighlights(SW_SEARCH_ID)) {
+                const QString pageLabel = page->label().isEmpty() ? QString::number(pageNumber + 1) : page->label();
+                auto *result = new QListWidgetItem(i18n("Page %1", pageLabel), m_searchResults);
+                result->setData(Qt::UserRole, pageNumber);
+            }
+        }
+        if (m_searchResults->count() == 0 && !m_searchWidget->findChild<QLineEdit *>()->text().isEmpty()) {
+            auto *noResults = new QListWidgetItem(i18n("No results"), m_searchResults);
+            noResults->setFlags(Qt::NoItemFlags);
+        }
+    }
+
+    QWidget *m_host;
+    OptionsBar *m_optionsBar;
+    Okular::Document *m_document;
+    SearchWidget *m_searchWidget;
+    QFrame *m_panel;
+    QStackedWidget *m_stack;
+    QListWidget *m_searchResults;
+    QToolButton *m_activeButton = nullptr;
 };
 }
 
@@ -1059,6 +1248,13 @@ void Part::setupViewerActions()
 
     if (!m_pageView->findChild<QWidget *>(QStringLiteral("pageNavigationIsland"), Qt::FindDirectChildrenOnly)) {
         new PageNavigationIsland(m_pageView, m_miniBarLogic, m_gotoPage, m_prevPage, m_nextPage);
+    }
+
+    QWidget *pageViewContainer = m_pageView->parentWidget();
+    OptionsBar *optionsBar = dynamic_cast<OptionsBar *>(pageViewContainer->findChild<QWidget *>(QStringLiteral("optionsBar"), Qt::FindDirectChildrenOnly));
+    if (optionsBar && !pageViewContainer->findChild<QObject *>(QStringLiteral("optionsPanelHost"), Qt::FindDirectChildrenOnly)) {
+        auto *optionsPanelHost = new OptionsPanelHost(pageViewContainer, optionsBar, m_document, m_thumbnailList, m_searchWidget, m_reviewsWidget, prefs);
+        optionsPanelHost->setObjectName(QStringLiteral("optionsPanelHost"));
     }
 }
 
