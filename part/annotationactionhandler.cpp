@@ -166,39 +166,51 @@ private:
 class ToolSettingsPopupDismissFilter final : public QObject
 {
 public:
-    explicit ToolSettingsPopupDismissFilter(QDialog *popup)
-        : m_popup(popup)
+    explicit ToolSettingsPopupDismissFilter(QDialog *popup, QObject *parent)
+        : QObject(parent)
+        , m_popup(popup)
     {
+    }
+
+    bool awaitingEscapeRelease() const
+    {
+        return m_escapeReleasePending;
     }
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override
     {
-        if (event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride) {
-            auto *keyEvent = static_cast<QKeyEvent *>(event);
-            if (keyEvent->key() == Qt::Key_Escape && m_escapeDismissed) {
-                keyEvent->accept();
-                return true;
+        if (m_escapeReleasePending) {
+            if (event->type() == QEvent::KeyRelease) {
+                auto *keyEvent = static_cast<QKeyEvent *>(event);
+                if (keyEvent->key() == Qt::Key_Escape) {
+                    keyEvent->accept();
+                    m_escapeReleasePending = false;
+                    qApp->removeEventFilter(this);
+                    deleteLater();
+                    return true;
+                }
             }
-        } else if (event->type() == QEvent::KeyRelease && m_escapeDismissed) {
-            auto *keyEvent = static_cast<QKeyEvent *>(event);
-            if (keyEvent->key() == Qt::Key_Escape) {
-                keyEvent->accept();
-                m_escapeDismissed = false;
-                return true;
-            }
+            return QObject::eventFilter(watched, event);
         }
 
         if (!m_popup || !m_popup->isVisible()) {
             return QObject::eventFilter(watched, event);
         }
 
-        if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
+        if (event->type() == QEvent::ShortcutOverride) {
             auto *keyEvent = static_cast<QKeyEvent *>(event);
             QWidget *modalWidget = QApplication::activeModalWidget();
             if (keyEvent->key() == Qt::Key_Escape && (!modalWidget || modalWidget == m_popup || m_popup->isAncestorOf(modalWidget))) {
                 keyEvent->accept();
-                m_escapeDismissed = true;
+                return true;
+            }
+        } else if (event->type() == QEvent::KeyPress) {
+            auto *keyEvent = static_cast<QKeyEvent *>(event);
+            QWidget *modalWidget = QApplication::activeModalWidget();
+            if (keyEvent->key() == Qt::Key_Escape && (!modalWidget || modalWidget == m_popup || m_popup->isAncestorOf(modalWidget))) {
+                keyEvent->accept();
+                m_escapeReleasePending = true;
                 m_popup->reject();
                 return true;
             }
@@ -222,7 +234,7 @@ protected:
 
 private:
     QDialog *m_popup;
-    bool m_escapeDismissed = false;
+    bool m_escapeReleasePending = false;
 };
 }
 
@@ -829,10 +841,13 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         popupPosition.setY(qBound(available.top(), popupPosition.y(), available.bottom() - popup.height() + 1));
     }
     popup.move(popupPosition);
-    ToolSettingsPopupDismissFilter dismissFilter(&popup);
-    qApp->installEventFilter(&dismissFilter);
+    auto *dismissFilter = new ToolSettingsPopupDismissFilter(&popup, qApp);
+    qApp->installEventFilter(dismissFilter);
     popup.exec();
-    qApp->removeEventFilter(&dismissFilter);
+    if (!dismissFilter->awaitingEscapeRelease()) {
+        qApp->removeEventFilter(dismissFilter);
+        delete dismissFilter;
+    }
 
     if (restoreActiveAction && !action->isChecked()) {
         const QSignalBlocker blocker(action);
