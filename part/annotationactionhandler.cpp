@@ -679,7 +679,43 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         });
     };
 
-    addWidthControl(*kindIt == DrawingToolKind::Eraser ? 1.0 : 0.5, *kindIt == DrawingToolKind::Eraser ? 64.0 : (isFreeformHighlight ? 48.0 : 20.0), *kindIt == DrawingToolKind::Eraser ? 0 : 1);
+    if (*kindIt == DrawingToolKind::Text) {
+        auto *fontSizeRow = new QHBoxLayout;
+        fontSizeRow->addWidget(new QLabel(i18n("Font size"), contents));
+        fontSizeRow->addStretch(1);
+        auto *fontSize = new QDoubleSpinBox(contents);
+        fontSize->setRange(1.0, 200.0);
+        fontSize->setDecimals(1);
+        fontSize->setSuffix(i18n(" pt"));
+        fontSize->setFixedWidth(110);
+        const double initialPointSize = currentFont.pointSizeF() > 0.0 ? currentFont.pointSizeF() : 10.0;
+        fontSize->setValue(initialPointSize);
+        fontSizeRow->addWidget(fontSize);
+        layout->addLayout(fontSizeRow);
+        QObject::connect(fontSize, &QDoubleSpinBox::valueChanged, q, [this](double pointSize) {
+            currentFont.setPointSizeF(pointSize);
+            annotator->setAnnotationFont(currentFont);
+            updateConfigActions();
+        });
+
+        auto *fontFamily = new QToolButton(contents);
+        fontFamily->setText(i18n("Font family…"));
+        fontFamily->setToolTip(i18n("Choose the font used for new text annotations"));
+        layout->addWidget(fontFamily, 0, Qt::AlignLeft);
+        QObject::connect(fontFamily, &QToolButton::clicked, q, [this, fontSize] {
+            bool accepted = false;
+            QWidget *fontDialogParent = drawingToolBar ? drawingToolBar->window() : QApplication::activeWindow();
+            QFont selectedFont = QFontDialog::getFont(&accepted, currentFont, fontDialogParent);
+            if (accepted) {
+                selectedFont.setPointSizeF(fontSize->value());
+                currentFont = selectedFont;
+                annotator->setAnnotationFont(currentFont);
+                updateConfigActions();
+            }
+        });
+    } else {
+        addWidthControl(*kindIt == DrawingToolKind::Eraser ? 1.0 : 0.5, *kindIt == DrawingToolKind::Eraser ? 64.0 : (isFreeformHighlight ? 48.0 : 20.0), *kindIt == DrawingToolKind::Eraser ? 0 : 1);
+    }
 
     if (*kindIt != DrawingToolKind::Eraser) {
         addColorControl(i18n("Color"), false);
@@ -1243,6 +1279,8 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->drawingToolKinds.insert(aFreehandLine, AnnotationActionHandlerPrivate::DrawingToolKind::Pen);
     d->drawingToolKinds.insert(aHighlighter, AnnotationActionHandlerPrivate::DrawingToolKind::Pen);
     d->drawingToolIds.insert(aHighlighter, 15);
+    d->drawingToolKinds.insert(aTypewriter, AnnotationActionHandlerPrivate::DrawingToolKind::Text);
+    d->drawingToolIds.insert(aTypewriter, 5);
     d->drawingToolKinds.insert(d->aEraserTool, AnnotationActionHandlerPrivate::DrawingToolKind::Eraser);
     d->drawingToolKinds.insert(aStraightLine, AnnotationActionHandlerPrivate::DrawingToolKind::Line);
     d->drawingToolKinds.insert(aArrow, AnnotationActionHandlerPrivate::DrawingToolKind::Arrow);

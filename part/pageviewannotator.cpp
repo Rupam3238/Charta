@@ -14,8 +14,10 @@
 #include <QEvent>
 #include <QFile>
 #include <QFileDialog>
+#include <QFocusEvent>
 #include <QHash>
 #include <QInputDialog>
+#include <QKeyEvent>
 #include <QList>
 #include <QLoggingCategory>
 #include <QPainter>
@@ -826,11 +828,9 @@ public:
         if (typeString == QLatin1String("FreeText")) {
             addInPlaceTextAnnotation(ann, i18n("Inline Note"), QString(), Okular::TextAnnotation::Unknown);
         } else if (typeString == QLatin1String("Typewriter")) {
-            bool resok;
-            const QString content = QInputDialog::getMultiLineText(pageView, i18n("New Text Note"), i18n("Text of the new note:"), QString(), &resok);
-            if (resok) {
-                addInPlaceTextAnnotation(ann, i18n("Typewriter"), content, Okular::TextAnnotation::TypeWriter);
-            }
+            addInPlaceTextAnnotation(ann, i18n("Text"), QString(), Okular::TextAnnotation::TypeWriter);
+            rect.right = qMin(1.0, qMax(rect.right, rect.left + 220.0 / xscale));
+            rect.bottom = qMin(1.0, qMax(rect.bottom, rect.top + 72.0 / yscale));
         } else if (typeString == QLatin1String("Text")) {
             Okular::TextAnnotation *ta = new Okular::TextAnnotation();
             ann = ta;
@@ -1713,9 +1713,139 @@ void PageViewAnnotator::reparseQuickToolsConfig()
 
 PageViewAnnotator::~PageViewAnnotator()
 {
+    if (m_typewriterEditor) {
+        m_typewriterEditor->removeEventFilter(this);
+        m_typewriterEditor->deleteLater();
+        m_typewriterEditor = nullptr;
+        m_typewriterAnnotation = nullptr;
+    }
     delete m_engine;
     delete m_builtinToolsDefinition;
     delete m_quickToolsDefinition;
+}
+
+bool PageViewAnnotator::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_typewriterEditor) {
+        if (event->type() == QEvent::FocusOut) {
+            finishTypewriterTextEdit();
+        } else if (event->type() == QEvent::KeyPress) {
+            const auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape || (keyEvent->key() == Qt::Key_Return && keyEvent->modifiers().testFlag(Qt::ControlModifier))) {
+                finishTypewriterTextEdit();
+                return true;
+            }
+        }
+    }
+    return QObject::eventFilter(watched, event);
+}
+
+void PageViewAnnotator::startTypewriterTextEdit(Okular::TextAnnotation *annotation, PageViewItem *pageViewItem)
+{
+    finishTypewriterTextEdit();
+    if (!annotation || !pageViewItem) {
+        return;
+    }
+
+    const double pageWidth = pageViewItem->uncroppedWidth();
+    const double pageHeight = pageViewItem->uncroppedHeight();
+    const QRect initialEditorRect = Okular::AnnotationUtils::annotationGeometry(annotation, pageWidth, pageHeight);
+    const QPoint pageOrigin = pageViewItem->uncroppedGeometry().topLeft() - m_pageView->contentAreaPosition();
+    const QRect editorRect = QRect(pageOrigin.x() + initialEditorRect.left(), pageOrigin.y() + initialEditorRect.top(), initialEditorRect.width(), initialEditorRect.height());
+
+    auto *editor = new QPlainTextEdit(m_pageView->viewport());
+    editor->setObjectName(QStringLiteral("typewriterTextEditor"));
+    editor->setLineWrapMode(QPlainTextEdit::WidgetWidth);
+    editor->setFont(annotation->textFont());
+    editor->setPlainText(annotation->contents());
+    editor->setFrameStyle(QFrame::NoFrame);
+    editor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    editor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    editor->document()->setDocumentMargin(0);
+    editor->setAutoFillBackground(false);
+    editor->setAttribute(Qt::WA_TranslucentBackground);
+
+    const QColor textColor = annotation->textColor().isValid() ? annotation->textColor() : annotation->style().color();
+    QPalette palette = editor->palette();
+    palette.setColor(QPalette::Text, textColor);
+    palette.setColor(QPalette::Base, Qt::transparent);
+    palette.setColor(QPalette::Window, Qt::transparent);
+    palette.setColor(QPalette::WindowText, textColor);
+    editor->setPalette(palette);
+    editor->setStyleSheet(QStringLiteral("QPlainTextEdit#typewriterTextEditor { color: %1; background: transparent; border: 1px solid rgba(39, 191, 214, 170); padding: 0px; margin: 0px; selection-background-color: rgba(39, 191, 214, 120); }").arg(textColor.name(QColor::HexRgb)));
+
+    auto syncEditorToAnnotationGeometry = [this, annotation, pageViewItem, editor]() {
+        if (!annotation || !pageViewItem || !editor || m_typewriterEditor != editor) {
+            return;
+        }
+
+        const double pageWidth = pageViewItem->uncroppedWidth();
+        const double pageHeight = pageViewItem->uncroppedHeight();
+        const QSizeF documentSize = editor->document()->documentLayout()->documentSize();
+        const int padding = 4;
+        const int maxTextWidth = qMin<int>(qMax(80, static_cast<int>(pageWidth) - 24), 420);
+        const int desiredWidth = qBound(80, qCeil(documentSize.width()) + padding * 2, maxTextWidth);
+        const int desiredHeight = qMax(24, qCeil(documentSize.height()) + padding * 2);
+
+        const Okular::NormalizedRect currentBounds = annotation->boundingRectangle();
+        const double left = qBound(0.0, currentBounds.left, 1.0);
+        const double top = qBound(0.0, currentBounds.top, 1.0);
+        const double right = qMin(1.0, left + desiredWidth / pageWidth);
+        const double bottom = qMin(1.0, top + desiredHeight / pageHeight);
+        const Okular::NormalizedRect updatedBounds(left, top, right, bottom);
+        annotation->setBoundingRectangle(updatedBounds);
+
+        const QPoint contentTopLeft = pageViewItem->uncroppedGeometry().topLeft() - m_pageView->contentAreaPosition();
+        const QRect newEditorRect(QPoint(contentTopLeft.x() + qRound(left * pageWidth), contentTopLeft.y() + qRound(top * pageHeight)), QSize(desiredWidth, desiredHeight));
+        editor->setGeometry(newEditorRect);
+    };
+
+    connect(editor, &QPlainTextEdit::textChanged, editor, syncEditorToAnnotationGeometry);
+    editor->setGeometry(editorRect);
+    syncEditorToAnnotationGeometry();
+
+    m_typewriterEditor = editor;
+    m_typewriterAnnotation = annotation;
+    m_typewriterPageNumber = pageViewItem->pageNumber();
+    editor->installEventFilter(this);
+    editor->show();
+    editor->setFocus(Qt::OtherFocusReason);
+}
+
+void PageViewAnnotator::finishTypewriterTextEdit()
+{
+    if (!m_typewriterEditor) {
+        m_typewriterAnnotation = nullptr;
+        m_typewriterPageNumber = -1;
+        return;
+    }
+
+    QPlainTextEdit *editor = m_typewriterEditor.data();
+    editor->removeEventFilter(this);
+    m_typewriterEditor = nullptr;
+
+    Okular::TextAnnotation *annotation = m_typewriterAnnotation;
+    const int pageNumber = m_typewriterPageNumber;
+    m_typewriterAnnotation = nullptr;
+    m_typewriterPageNumber = -1;
+
+    if (annotation && pageNumber >= 0 && m_document->canModifyPageAnnotation(annotation)) {
+        const QString text = editor->toPlainText();
+        const bool isEmpty = text.trimmed().isEmpty();
+        const bool annotationWasEmpty = annotation->contents().trimmed().isEmpty();
+
+        if (isEmpty && annotationWasEmpty) {
+            // Newly created empty typewriter annotation: canceling the edit should remove it.
+            m_document->removePageAnnotation(pageNumber, annotation);
+        } else if (text != annotation->contents()) {
+            // Preserve the annotation when the temporary editor closes: only the editor is transient.
+            m_document->editPageAnnotationContents(pageNumber, annotation, text, editor->textCursor().position(), 0, 0);
+        }
+    }
+
+    editor->hide();
+    editor->deleteLater();
+    m_pageView->updateCursor();
 }
 
 void PageViewAnnotator::setSignatureMode(bool enabled)
@@ -1944,6 +2074,11 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
             annotation->setModificationDate(QDateTime::currentDateTime());
             annotation->setAuthor(Okular::Settings::identityAuthor());
             m_document->addPageAnnotation(m_lockedItem->pageNumber(), annotation);
+
+            if (auto *textAnnotation = dynamic_cast<Okular::TextAnnotation *>(annotation);
+                textAnnotation && textAnnotation->textType() == Okular::TextAnnotation::InPlace && textAnnotation->inplaceIntent() == Okular::TextAnnotation::TypeWriter) {
+                startTypewriterTextEdit(textAnnotation, m_lockedItem);
+            }
 
 #if HAVE_NEW_SIGNATURE_API
             if (auto signatureAnnotation = dynamic_cast<Okular::SignatureAnnotation *>(annotation)) {
@@ -2197,7 +2332,11 @@ void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId,
         endTemporaryEraser(true);
     }
 
-    // ask for Author's name if not already set
+    const bool keepingTypewriterEditor = m_typewriterEditor
+        && (toolId == -1 || (toolsDefinition && toolsDefinition->tool(toolId).attribute(QStringLiteral("type")) == QLatin1String("typewriter")));
+    if (!keepingTypewriterEditor) {
+        finishTypewriterTextEdit();
+    }
     if (toolId > 0 && Okular::Settings::identityAuthor().isEmpty()) {
         // get default username from the kdelibs/kdecore/KUser
         KUser currentUser;
@@ -2208,7 +2347,6 @@ void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId,
             userName = QInputDialog::getText(m_pageView, i18n("Author name"), i18n("Author name for the annotation:"), QLineEdit::Normal, QString(), &ok);
 
             if (!ok) {
-                detachAnnotation();
                 return;
             }
         }

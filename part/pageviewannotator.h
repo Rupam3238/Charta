@@ -8,6 +8,8 @@
 #define _OKULAR_PAGEVIEWANNOTATOR_H_
 
 #include <QObject>
+#include <QPlainTextEdit>
+#include <QPointer>
 #include <qdom.h>
 
 #include <memory>
@@ -164,6 +166,9 @@ Q_SIGNALS:
     void requestOpenNewlySignedFile(const QString &filePath, int pageNumber);
 
 private:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    void startTypewriterTextEdit(Okular::TextAnnotation *annotation, PageViewItem *pageViewItem);
+    void finishTypewriterTextEdit();
     void endTemporaryEraser(bool cancel);
     void reparseBuiltinToolsConfig();
     void reparseQuickToolsConfig();
@@ -201,6 +206,9 @@ private:
     PageViewItem *m_temporaryPreviousLockedItem = nullptr;
     QRect m_temporaryPreviousDrawnRect;
     bool m_temporaryRightButtonHeld = false;
+    QPointer<QPlainTextEdit> m_typewriterEditor;
+    Okular::TextAnnotation *m_typewriterAnnotation = nullptr;
+    int m_typewriterPageNumber = -1;
     // selected annotation name
     // QString m_selectedAnnotationName;
 };
