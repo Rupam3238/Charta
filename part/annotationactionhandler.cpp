@@ -145,7 +145,7 @@ private:
         const int margin = 12;
         const QPoint canvasOrigin = m_visibleCanvas->mapTo(m_host, QPoint(0, 0));
         const QRect canvasRect(canvasOrigin, m_visibleCanvas->size());
-        const int x = m_anchor == Anchor::Left ? canvasRect.left() + margin : canvasRect.right() - width() - margin + 1;
+        const int x = canvasRect.right() - width() - margin + 1;
         const int y = canvasRect.top() + (canvasRect.height() - height()) / 2;
         move(x, y);
         raise();
@@ -1565,7 +1565,7 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
             return;
         }
         auto *island = new DrawingToolBarIsland(pageView, pageView->viewport());
-        island->setAnchor(DrawingToolBarIsland::Anchor::Left);
+        island->setAnchor(DrawingToolBarIsland::Anchor::Right);
         drawingToolBar = island;
         drawingToolBar->setWindowTitle(i18n("Drawing Tools"));
         d->drawingToolBar = drawingToolBar;

@@ -4572,6 +4572,7 @@ void PageView::updateZoomText()
     d->aZoom->setCurrentItem(selIdx);
     d->aZoom->setEnabled(d->items.size() > 0);
     d->aZoom->selectableActionGroup()->setEnabled(d->items.size() > 0);
+    Q_EMIT zoomFactorChanged(d->zoomFactor);
 }
 
 void PageView::updateViewMode(const int nr)

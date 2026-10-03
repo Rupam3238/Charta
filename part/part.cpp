@@ -35,8 +35,11 @@
 #endif // HAVE_DBUS
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QEvent>
 #include <QFile>
 #include <QFileDialog>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QInputDialog>
 #include <QJsonArray>
 #include <QLabel>
@@ -56,6 +59,8 @@
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTimer>
+#include <QToolButton>
+#include <QVBoxLayout>
 #include <QWidgetAction>
 
 #include <KAboutPluginDialog>
@@ -130,6 +135,252 @@
 
 #include <memory>
 #include <type_traits>
+
+namespace
+{
+class OptionsBar final : public QWidget
+{
+public:
+    explicit OptionsBar(QWidget *parent)
+        : QWidget(parent)
+        , m_window(nullptr)
+    {
+        setObjectName(QStringLiteral("optionsBar"));
+        setFixedWidth(59);
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        setStyleSheet(QStringLiteral(
+            "QWidget#optionsBar { background: #202630; border-right: 1px solid #3b4653; }"
+            "QWidget#optionsBar QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 40px; max-width: 40px; min-height: 40px; max-height: 40px; padding: 4px; margin: 0; }"
+            "QWidget#optionsBar QToolButton:hover { color: #f2f5f8; background: #303a46; }"
+            "QWidget#optionsBar QToolButton:pressed { color: #ffffff; background: #16414c; border-color: #27bfd6; }"
+            "QWidget#optionsBar QFrame { background: #45515e; border: 0; margin: 3px 6px; }"));
+
+        auto *buttonLayout = new QVBoxLayout(this);
+        buttonLayout->setContentsMargins(4, 8, 4, 8);
+        buttonLayout->setSpacing(4);
+
+        const auto createButton = [this](const QString &iconName, const QString &label) {
+            auto *button = new QToolButton(this);
+            button->setIcon(QIcon::fromTheme(iconName));
+            button->setIconSize(QSize(28, 28));
+            button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+            button->setFixedSize(40, 40);
+            button->setAutoRaise(true);
+            button->setToolTip(label);
+            button->setAccessibleName(label);
+            return button;
+        };
+
+        buttonLayout->addWidget(createButton(QStringLiteral("view-list-details"), i18n("Pages")), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("system-search"), i18n("Search")), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("deep-history"), i18n("Annotation History")), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("bookmarks"), i18n("Bookmarks")), 0, Qt::AlignHCenter);
+        buttonLayout->addStretch(1);
+
+        auto *separator = new QFrame(this);
+        separator->setFrameShape(QFrame::HLine);
+        separator->setFixedHeight(1);
+        buttonLayout->addWidget(separator);
+        buttonLayout->addWidget(createButton(QStringLiteral("settings-configure"), i18n("Settings")), 0, Qt::AlignHCenter);
+
+        updateFullscreenVisibility();
+    }
+
+protected:
+    bool event(QEvent *event) override
+    {
+        const QEvent::Type type = event->type();
+        const bool handled = QWidget::event(event);
+        if (type == QEvent::ParentChange || type == QEvent::Show) {
+            updateFullscreenVisibility();
+        }
+        return handled;
+    }
+
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (watched == m_window && event->type() == QEvent::WindowStateChange) {
+            updateFullscreenVisibility();
+        }
+        return QWidget::eventFilter(watched, event);
+    }
+
+private:
+    void updateFullscreenVisibility()
+    {
+        QWidget *currentWindow = window();
+        if (m_window != currentWindow) {
+            if (m_window) {
+                m_window->removeEventFilter(this);
+            }
+            m_window = currentWindow;
+            m_window->installEventFilter(this);
+        }
+        setVisible(!m_window->isFullScreen());
+    }
+
+    QWidget *m_window;
+};
+
+class ZoomIsland final : public QWidget
+{
+public:
+    explicit ZoomIsland(PageView *pageView)
+        : QWidget(pageView)
+        , m_pageView(pageView)
+        , m_viewport(pageView->viewport())
+    {
+        setObjectName(QStringLiteral("zoomIsland"));
+        setAttribute(Qt::WA_StyledBackground);
+        setStyleSheet(QStringLiteral(
+            "QWidget#zoomIsland { background: #202630; border: 1px solid #3b4653; border-radius: 8px; }"
+            "QWidget#zoomIsland QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; padding: 2px; margin: 0; }"
+            "QWidget#zoomIsland QToolButton:hover { color: #f2f5f8; background: #303a46; }"
+            "QWidget#zoomIsland QLabel { color: #f2f5f8; background: transparent; border: 0; min-width: 48px; }"));
+
+        auto *islandLayout = new QHBoxLayout(this);
+        islandLayout->setContentsMargins(4, 3, 4, 3);
+        islandLayout->setSpacing(2);
+
+        const auto addZoomButton = [this, islandLayout](const QString &iconName, const QString &tooltip, const QString &actionName) {
+            auto *button = new QToolButton(this);
+            button->setIcon(QIcon::fromTheme(iconName));
+            button->setIconSize(QSize(16, 16));
+            button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+            button->setFixedSize(28, 28);
+            button->setAutoRaise(true);
+            button->setToolTip(tooltip);
+            QAction *zoomAction = m_pageView->actionCollection()->action(actionName);
+            button->setEnabled(zoomAction->isEnabled());
+            connect(button, &QToolButton::clicked, zoomAction, &QAction::trigger);
+            connect(zoomAction, &QAction::changed, button, [button, zoomAction] { button->setEnabled(zoomAction->isEnabled()); });
+            islandLayout->addWidget(button);
+        };
+
+        addZoomButton(QStringLiteral("list-remove"), i18n("Zoom Out"), QStringLiteral("view_zoom_out"));
+
+        m_zoomLabel = new QLabel(this);
+        m_zoomLabel->setAlignment(Qt::AlignCenter);
+        islandLayout->addWidget(m_zoomLabel);
+
+        addZoomButton(QStringLiteral("list-add"), i18n("Zoom In"), QStringLiteral("view_zoom_in"));
+
+        m_pageView->installEventFilter(this);
+        m_viewport->installEventFilter(this);
+        scheduleGeometryUpdate();
+    }
+
+    void setZoomFactor(double zoomFactor)
+    {
+        m_zoomLabel->setText(QStringLiteral("%1%").arg(qRound(zoomFactor * 100.0)));
+        adjustSize();
+        scheduleGeometryUpdate();
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if ((watched == m_pageView || watched == m_viewport)
+            && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
+            scheduleGeometryUpdate();
+        }
+        return QWidget::eventFilter(watched, event);
+    }
+
+private:
+    void scheduleGeometryUpdate()
+    {
+        if (m_updateScheduled) {
+            return;
+        }
+        m_updateScheduled = true;
+        QTimer::singleShot(0, this, [this] {
+            m_updateScheduled = false;
+            adjustSize();
+            const QPoint viewportOrigin = m_viewport->mapTo(m_pageView, QPoint(0, 0));
+            const QRect viewportRect(viewportOrigin, m_viewport->size());
+            const int margin = 12;
+            move(viewportRect.right() - width() - margin + 1, viewportRect.bottom() - height() - margin + 1);
+            raise();
+        });
+    }
+
+    PageView *m_pageView;
+    QWidget *m_viewport;
+    QLabel *m_zoomLabel;
+    bool m_updateScheduled = false;
+};
+
+class PageNavigationIsland final : public QWidget
+{
+public:
+    PageNavigationIsland(PageView *pageView, MiniBarLogic *miniBarLogic, QAction *gotoPage, QAction *previousPage, QAction *nextPage)
+        : QWidget(pageView)
+        , m_pageView(pageView)
+        , m_viewport(pageView->viewport())
+    {
+        setObjectName(QStringLiteral("pageNavigationIsland"));
+        setAttribute(Qt::WA_StyledBackground);
+        setStyleSheet(QStringLiteral(
+            "QWidget#pageNavigationIsland { background: #202630; border: 1px solid #3b4653; border-radius: 7px; }"
+            "QWidget#pageNavigationIsland QLineEdit { color: #f2f5f8; background: #1a2028; border: 1px solid #3b4653; border-radius: 5px; min-width: 38px; min-height: 22px; padding: 1px 4px; selection-background-color: #16414c; }"
+            "QWidget#pageNavigationIsland QLabel { color: #aab6c2; background: transparent; border: 0; }"
+            "QWidget#pageNavigationIsland QToolButton { color: #aab6c2; background: transparent; border: 0; padding: 0; }"));
+
+        auto *islandLayout = new QHBoxLayout(this);
+        islandLayout->setContentsMargins(5, 3, 5, 3);
+        islandLayout->setSpacing(0);
+
+        auto *miniBar = new MiniBar(this, miniBarLogic);
+        for (QToolButton *button : miniBar->findChildren<QToolButton *>()) {
+            if (!button->icon().isNull()) {
+                button->hide();
+            }
+        }
+        connect(miniBar, &MiniBar::gotoPage, gotoPage, &QAction::trigger);
+        connect(miniBar, &MiniBar::prevPage, previousPage, &QAction::trigger);
+        connect(miniBar, &MiniBar::nextPage, nextPage, &QAction::trigger);
+        connect(miniBar, &MiniBar::forwardKeyPressEvent, pageView, &PageView::externalKeyPressEvent);
+        islandLayout->addWidget(miniBar);
+
+        m_pageView->installEventFilter(this);
+        m_viewport->installEventFilter(this);
+        scheduleGeometryUpdate();
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if ((watched == m_pageView || watched == m_viewport)
+            && (event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
+            scheduleGeometryUpdate();
+        }
+        return QWidget::eventFilter(watched, event);
+    }
+
+private:
+    void scheduleGeometryUpdate()
+    {
+        if (m_updateScheduled) {
+            return;
+        }
+        m_updateScheduled = true;
+        QTimer::singleShot(0, this, [this] {
+            m_updateScheduled = false;
+            adjustSize();
+            const QPoint viewportOrigin = m_viewport->mapTo(m_pageView, QPoint(0, 0));
+            const QRect viewportRect(viewportOrigin, m_viewport->size());
+            const int margin = 12;
+            move(viewportRect.left() + margin, viewportRect.bottom() - height() - margin + 1);
+            raise();
+        });
+    }
+
+    PageView *m_pageView;
+    QWidget *m_viewport;
+    bool m_updateScheduled = false;
+};
+}
 
 #ifdef OKULAR_KEEP_FILE_OPEN
 class FileKeeper
@@ -485,7 +736,14 @@ Part::Part(QObject *parent, const QVariantList &args)
     m_signatureInProgressMessage->addAction(finishSigningAction);
     rightLayout->addWidget(m_signatureInProgressMessage);
 #endif
-    m_pageView = new PageView(rightContainer, m_document);
+    QWidget *pageViewContainer = new QWidget(rightContainer);
+    QHBoxLayout *pageViewLayout = new QHBoxLayout(pageViewContainer);
+    pageViewLayout->setContentsMargins(0, 0, 0, 0);
+    pageViewLayout->setSpacing(0);
+    QWidget *optionsBar = new OptionsBar(pageViewContainer);
+    pageViewLayout->addWidget(optionsBar);
+    m_pageView = new PageView(pageViewContainer, m_document);
+    pageViewLayout->addWidget(m_pageView);
     rightContainer->setFocusProxy(m_pageView);
     QMetaObject::invokeMethod(m_pageView, "setFocus", Qt::QueuedConnection); // usability setting
     //    m_splitter->setFocusProxy(m_pageView);
@@ -499,7 +757,7 @@ Part::Part(QObject *parent, const QVariantList &args)
     connect(m_document, &Document::notice, this, &Part::noticeMessage);
     connect(m_document, &Document::sourceReferenceActivated, this, &Part::slotHandleActivatedSourceReference);
     connect(m_pageView.data(), &PageView::fitWindowToPage, this, &Part::fitWindowToPage);
-    rightLayout->addWidget(m_pageView);
+    rightLayout->addWidget(pageViewContainer, 1);
     m_layers->setPageView(m_pageView);
     m_signaturePanel->setPageView(m_pageView);
     m_findBar = new FindBar(m_document, rightContainer);
@@ -798,6 +1056,10 @@ void Part::setupViewerActions()
     ac->addAction(QStringLiteral("options_configure_color_modes"), configureColorModes);
     configureColorModes->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
     connect(configureColorModes, &QAction::triggered, this, &Part::slotAccessibilityPreferences);
+
+    if (!m_pageView->findChild<QWidget *>(QStringLiteral("pageNavigationIsland"), Qt::FindDirectChildrenOnly)) {
+        new PageNavigationIsland(m_pageView, m_miniBarLogic, m_gotoPage, m_prevPage, m_nextPage);
+    }
 }
 
 void Part::setViewerShortcuts()
@@ -3827,6 +4089,12 @@ void Part::unsetDummyMode()
     connect(m_pageView.data(), &PageView::mouseForwardButtonClick, m_historyNext, &QAction::trigger);
 
     m_pageView->setupActions(actionCollection());
+
+    if (!m_pageView->findChild<QWidget *>(QStringLiteral("zoomIsland"), Qt::FindDirectChildrenOnly)) {
+        auto *zoomIsland = new ZoomIsland(m_pageView);
+        connect(m_pageView, &PageView::zoomFactorChanged, zoomIsland, &ZoomIsland::setZoomFactor);
+        zoomIsland->setZoomFactor(m_pageView->capability(Okular::View::Zoom).toDouble());
+    }
 
     // attach the actions of the children widgets too
     m_formsMessage->addAction(m_pageView->toggleFormsAction());
