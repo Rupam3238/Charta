@@ -2543,6 +2543,8 @@ public:
     void resetTransformation() override;
     double distanceSqr(double x, double y, double xScale, double yScale) const override;
     void translate(const NormalizedPoint &coord) override;
+    void adjust(const NormalizedPoint &deltaCoord1, const NormalizedPoint &deltaCoord2) override;
+    bool canBeResized() const override;
     void setAnnotationProperties(const QDomNode &node) override;
     AnnotationPrivate *getNewAnnotationPrivate() override;
 
@@ -2713,6 +2715,28 @@ void InkAnnotationPrivate::translate(const NormalizedPoint &coord)
             p.y = p.y + coord.y;
         }
     }
+}
+
+void InkAnnotationPrivate::adjust(const NormalizedPoint &deltaCoord1, const NormalizedPoint &deltaCoord2)
+{
+    const NormalizedRect oldBoundary = m_boundary;
+    AnnotationPrivate::adjust(deltaCoord1, deltaCoord2);
+
+    const double oldWidth = oldBoundary.right - oldBoundary.left;
+    const double oldHeight = oldBoundary.bottom - oldBoundary.top;
+    const double scaleX = oldWidth > 0.0 ? (m_boundary.right - m_boundary.left) / oldWidth : 1.0;
+    const double scaleY = oldHeight > 0.0 ? (m_boundary.bottom - m_boundary.top) / oldHeight : 1.0;
+    for (QList<NormalizedPoint> &path : m_inkPaths) {
+        for (NormalizedPoint &point : path) {
+            point.x = m_boundary.left + (point.x - oldBoundary.left) * scaleX;
+            point.y = m_boundary.top + (point.y - oldBoundary.top) * scaleY;
+        }
+    }
+}
+
+bool InkAnnotationPrivate::canBeResized() const
+{
+    return true;
 }
 
 void InkAnnotationPrivate::setAnnotationProperties(const QDomNode &node)

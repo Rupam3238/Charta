@@ -174,14 +174,31 @@ public:
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override
     {
+        if (event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride) {
+            auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape && m_escapeDismissed) {
+                keyEvent->accept();
+                return true;
+            }
+        } else if (event->type() == QEvent::KeyRelease && m_escapeDismissed) {
+            auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                keyEvent->accept();
+                m_escapeDismissed = false;
+                return true;
+            }
+        }
+
         if (!m_popup || !m_popup->isVisible()) {
             return QObject::eventFilter(watched, event);
         }
 
-        if (event->type() == QEvent::KeyPress) {
+        if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
             auto *keyEvent = static_cast<QKeyEvent *>(event);
             QWidget *modalWidget = QApplication::activeModalWidget();
             if (keyEvent->key() == Qt::Key_Escape && (!modalWidget || modalWidget == m_popup || m_popup->isAncestorOf(modalWidget))) {
+                keyEvent->accept();
+                m_escapeDismissed = true;
                 m_popup->reject();
                 return true;
             }
@@ -205,6 +222,7 @@ protected:
 
 private:
     QDialog *m_popup;
+    bool m_escapeDismissed = false;
 };
 }
 
@@ -307,6 +325,9 @@ public:
     QHash<QObject *, QAction *> settingsButtonActions;
     QAction *pendingMousePopupAction = nullptr;
     bool deselectingTools = false;
+    QAction *temporaryToolPreviousAction = nullptr;
+    QAction *temporaryToolAction = nullptr;
+    bool restoringTemporaryTool = false;
     bool freeformHighlightActive = false;
     QActionGroup *agTools;
     QAction *agLastAction;
@@ -390,6 +411,11 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
     const auto kindIt = drawingToolKinds.constFind(action);
     if (kindIt == drawingToolKinds.cend()) {
         return false;
+    }
+    const bool restoreActiveAction = action->isCheckable() && agLastAction == action;
+    if (restoreActiveAction && !action->isChecked()) {
+        const QSignalBlocker blocker(action);
+        action->setChecked(true);
     }
     const bool isFreeformHighlight = drawingToolIds.value(action, -1) == 15;
     Okular::Annotation *selectedAnnotation = selectedAnnotations.isEmpty() ? nullptr : selectedAnnotations.constFirst();
@@ -808,6 +834,14 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
     popup.exec();
     qApp->removeEventFilter(&dismissFilter);
 
+    if (restoreActiveAction && !action->isChecked()) {
+        const QSignalBlocker blocker(action);
+        action->setChecked(true);
+    }
+    if (restoreActiveAction) {
+        agLastAction = action;
+    }
+
     if (document && selectedAnnotation && selectedAnnotationChanged) {
         const Okular::Page *page = document->page(pageNumber);
         QList<Okular::Annotation *> annotationsToModify;
@@ -1077,7 +1111,7 @@ void AnnotationActionHandlerPrivate::populateQuickAnnotations()
             }
         }
         QObject::connect(annFav, &KToggleAction::toggled, q, [this, favToolId](bool checked) {
-            if (checked) {
+            if (checked && !restoringTemporaryTool) {
                 slotQuickToolSelected(favToolId);
             }
         });
@@ -1332,7 +1366,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     for (const auto &ann : tools) {
         // action group workaround: connecting to toggled instead of triggered
         connect(ann, &QAction::toggled, this, [this, toolId](bool checked) {
-            if (checked) {
+            if (checked && !d->restoringTemporaryTool) {
                 d->aBrowseTool->setChecked(false);
                 d->annotator->setAnnotationSelectionMode(false);
                 d->selectTool(toolId);
@@ -1344,7 +1378,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->agTools->addAction(d->aSelectTool);
     d->agTools->addAction(d->aEraserTool);
     connect(d->aSelectTool, &QAction::toggled, this, [this](bool checked) {
-        if (!checked) {
+        if (!checked || d->restoringTemporaryTool) {
             return;
         }
         d->aBrowseTool->setChecked(false);
@@ -1359,6 +1393,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         }
     });
     connect(d->aEraserTool, &QAction::toggled, this, [this](bool checked) {
+        if (d->restoringTemporaryTool) {
+            return;
+        }
         if (checked) {
             d->aBrowseTool->setChecked(false);
             d->annotator->setAnnotationSelectionMode(false);
@@ -1398,7 +1435,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         // action group workaround: connecting to toggled instead of triggered
         // (because deselectAllAnnotationActions has to call triggered)
         connect(ann, &QAction::toggled, this, [this, stamp](bool checked) {
-            if (checked) {
+            if (checked && !d->restoringTemporaryTool) {
                 d->slotStampToolSelected(stamp.second);
             }
         });
@@ -1488,6 +1525,11 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     // action group workaround: allows unchecking the currently selected annotation action.
     // Other parts of code dependent to this workaround are marked with "action group workaround".
     connect(d->agTools, &QActionGroup::triggered, this, [this, aHighlighter](QAction *action) {
+        if (d->restoringTemporaryTool && action == d->temporaryToolPreviousAction) {
+            d->pendingMousePopupAction = nullptr;
+            d->agLastAction = action;
+            return;
+        }
         if (action == d->agLastAction) {
             const bool mouseRepeat = d->pendingMousePopupAction == action;
             d->pendingMousePopupAction = nullptr;
@@ -1495,7 +1537,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
                 d->agLastAction = nullptr;
                 d->agTools->checkedAction()->setChecked(false);
                 d->selectTool(-1);
-            } else if (mouseRepeat && d->showToolSettings(action)) {
+            } else if (d->restoringTemporaryTool) {
+                return;
+            } else if ((mouseRepeat || d->drawingToolKinds.contains(action)) && d->showToolSettings(action)) {
                 return;
             } else if (!d->drawingToolKinds.contains(action)) {
                 d->agLastAction = nullptr;
@@ -1800,6 +1844,53 @@ void AnnotationActionHandler::deselectAllAnnotationActions()
         checkedAction->trigger(); // action group workaround: using trigger instead of setChecked
         d->deselectingTools = false;
     }
+}
+
+bool AnnotationActionHandler::beginTemporaryTool(TemporaryTool tool)
+{
+    if (d->temporaryToolAction) {
+        return false;
+    }
+
+    QAction *previousAction = d->agTools->checkedAction();
+    if (!previousAction && d->aDrawingBrowse->isChecked()) {
+        previousAction = d->aDrawingBrowse;
+    }
+    if (!previousAction) {
+        return false;
+    }
+
+    QAction *temporaryAction = tool == TemporaryTool::Select ? static_cast<QAction *>(d->aSelectTool) : static_cast<QAction *>(d->aEraserTool);
+    if (previousAction == temporaryAction) {
+        return false;
+    }
+
+    d->temporaryToolPreviousAction = previousAction;
+    d->temporaryToolAction = temporaryAction;
+    temporaryAction->trigger();
+    if (!temporaryAction->isChecked()) {
+        d->temporaryToolPreviousAction = nullptr;
+        d->temporaryToolAction = nullptr;
+        return false;
+    }
+    return true;
+}
+
+void AnnotationActionHandler::endTemporaryTool()
+{
+    if (!d->temporaryToolAction) {
+        return;
+    }
+
+    QAction *previousAction = d->temporaryToolPreviousAction;
+    d->temporaryToolAction = nullptr;
+    if (previousAction) {
+        d->restoringTemporaryTool = true;
+        previousAction->trigger();
+        d->restoringTemporaryTool = false;
+    }
+    d->temporaryToolPreviousAction = nullptr;
+    d->updateConfigActions();
 }
 
 void AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged(bool visible)

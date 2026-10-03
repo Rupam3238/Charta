@@ -1875,6 +1875,11 @@ bool PageViewAnnotator::active() const
 
 void PageViewAnnotator::setEraserMode(bool enabled)
 {
+    if (enabled && m_temporaryPreviousEngine && m_temporaryRightButtonHeld && eraserMode()) {
+        Q_EMIT toolActive(true);
+        m_pageView->updateCursor();
+        return;
+    }
     if (m_temporaryPreviousEngine) {
         endTemporaryEraser(true);
     }
@@ -1932,6 +1937,28 @@ void PageViewAnnotator::setAnnotationSelectionMode(bool enabled)
     m_pageView->setAnnotationSelectionMode(enabled);
 }
 
+bool PageViewAnnotator::beginTemporarySelectionTool()
+{
+    return m_actionHandler && m_actionHandler->beginTemporaryTool(AnnotationActionHandler::TemporaryTool::Select);
+}
+
+bool PageViewAnnotator::beginTemporaryEraserTool()
+{
+    return m_actionHandler && m_actionHandler->beginTemporaryTool(AnnotationActionHandler::TemporaryTool::Eraser);
+}
+
+void PageViewAnnotator::endTemporaryTool()
+{
+    if (m_actionHandler) {
+        m_actionHandler->endTemporaryTool();
+    }
+}
+
+bool PageViewAnnotator::usesRightButtonForTemporaryEraser() const
+{
+    return m_temporaryPreviousEngine || dynamic_cast<const SmoothPathEngine *>(m_engine);
+}
+
 bool PageViewAnnotator::annotating() const
 {
     return active() && m_lockedItem;
@@ -1954,6 +1981,7 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
     }
 
     if (button == AnnotatorEngine::Right && eventType == AnnotatorEngine::Press && !m_temporaryRightButtonHeld && dynamic_cast<SmoothPathEngine *>(m_engine)) {
+        bool activateEraserAction = false;
         if (!m_lockedItem) {
             m_temporaryPreviousEngine.reset(m_engine);
             m_temporaryPreviousLockedItem = m_lockedItem;
@@ -1962,8 +1990,12 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
             m_lockedItem = nullptr;
             m_lastDrawnRect = {};
             m_pageView->updateCursor();
+            activateEraserAction = true;
         }
         m_temporaryRightButtonHeld = true;
+        if (activateEraserAction) {
+            beginTemporaryEraserTool();
+        }
     }
 
     if (m_temporaryRightButtonHeld && !m_temporaryPreviousEngine && button == AnnotatorEngine::Right) {
@@ -2491,11 +2523,13 @@ void PageViewAnnotator::endTemporaryEraser(bool cancel)
     m_lastDrawnRect = m_temporaryPreviousDrawnRect;
     m_temporaryPreviousLockedItem = nullptr;
     m_temporaryPreviousDrawnRect = {};
+    m_temporaryRightButtonHeld = false;
 
     if (eraserRect.isValid()) {
         m_pageView->viewport()->update(eraserRect.translated(-m_pageView->contentAreaPosition()));
     }
     m_pageView->updateCursor();
+    endTemporaryTool();
 }
 
 void PageViewAnnotator::selectLastTool()

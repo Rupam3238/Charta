@@ -30,7 +30,11 @@
 #include "videowidget.h"
 
 static const int handleSize = 10;
-static const int handleSizeHalf = handleSize / 2;
+static const int handleLongSize = 20;
+static const int handleShortSize = 6;
+static const int handlePadding = handleLongSize / 2;
+static const int handleHitExpansion = 4;
+static const double minimumNormalizedResizeDimension = 0.005;
 
 bool AnnotationDescription::isValid() const
 {
@@ -99,13 +103,14 @@ void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPo
         if (pageViewItem->pageNumber() == firstSelected.pageNumber) {
             const QPoint pageOrigin = firstSelected.pageViewItem->uncroppedGeometry().topLeft();
             const QPoint pagePosition = eventPos - pageOrigin;
+            m_handle = getSelectionHandleAt(pagePosition);
+            if (m_handle != RH_None && m_handle != RH_Content) {
+                m_mousePosition = pagePosition;
+                setState(StateFocused, firstSelected);
+                return;
+            }
             if (selectedBoundingRect().contains(pagePosition)) {
                 m_mousePosition = pagePosition;
-                m_handle = getSelectionHandleAt(pagePosition);
-                if (m_handle != RH_None && m_handle != RH_Content) {
-                    setState(StateFocused, firstSelected);
-                    return;
-                }
                 const bool canMoveSelection = std::all_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [](const AnnotationDescription &selected) { return selected.annotation->canBeMoved(); });
                 if (canMoveSelection) {
                     m_handle = RH_Content;
@@ -262,7 +267,7 @@ void MouseAnnotation::routeMouseReleaseEvent(PageViewItem *pageViewItem, const Q
     */
 }
 
-void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed)
+void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed, Qt::KeyboardModifiers modifiers)
 {
     if (!pageViewItem && (leftButtonPressed ? !m_focusedAnnotation.isValid() : m_areaSelectedAnnotations.size() < 2 && !m_focusedAnnotation.isValid())) {
         /* qDebug() << "routeMouseMoveEvent: no pageViewItem provided, ignore"; */
@@ -288,7 +293,7 @@ void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoi
             if (blockViewportMovement) {
                 m_document->beginAnnotationViewportMovementBlock();
             }
-            performCommand(eventPos);
+            performCommand(eventPos, modifiers);
             if (blockViewportMovement) {
                 m_document->endAnnotationViewportMovementBlock();
             }
@@ -407,23 +412,27 @@ void MouseAnnotation::routeTooltipEvent(const QHelpEvent *helpEvent)
 void MouseAnnotation::routePaint(QPainter *painter, const QRect paintRect)
 {
     /* QPainter draws relative to the origin of uncropped viewport. */
-    static const QColor borderColor = QColor::fromHsvF(0, 0, 1.0);
     static const QColor fillColor = QColor::fromHsvF(0, 0, 0.75, 0.66);
 
     if (m_areaSelectedAnnotations.size() > 1) {
         const AnnotationDescription &firstSelected = m_areaSelectedAnnotations.constFirst();
         const QRect boundingRect = selectedBoundingRect();
         const QPoint origin = firstSelected.pageViewItem->uncroppedGeometry().topLeft();
-        if (paintRect.intersects(boundingRect.translated(origin).adjusted(-handleSizeHalf, -handleSizeHalf, handleSizeHalf, handleSizeHalf))) {
+        if (paintRect.intersects(boundingRect.translated(origin).adjusted(-handlePadding, -handlePadding, handlePadding, handlePadding))) {
             painter->save();
             painter->translate(origin);
             painter->setPen(QPen(fillColor, 2, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
             painter->drawRect(boundingRect);
             if (selectionCanBeResized()) {
-                painter->setPen(borderColor);
-                painter->setBrush(fillColor);
+                painter->setPen(QPen(QColor(55, 76, 90), 1));
+                painter->setBrush(Qt::white);
                 for (const ResizeHandle &handle : std::as_const(m_resizeHandleList)) {
-                    painter->drawRect(getHandleRect(handle, boundingRect));
+                    const QRect handleRect = getHandleRect(handle, boundingRect);
+                    if (handle == RH_Top || handle == RH_Bottom || handle == RH_Left || handle == RH_Right) {
+                        painter->drawRoundedRect(handleRect, handleShortSize / 2.0, handleShortSize / 2.0);
+                    } else {
+                        painter->drawEllipse(handleRect);
+                    }
                 }
             }
             painter->restore();
@@ -437,7 +446,7 @@ void MouseAnnotation::routePaint(QPainter *painter, const QRect paintRect)
         }
         const QRect boundingRect = Okular::AnnotationUtils::annotationGeometry(selected.annotation, selected.pageViewItem->uncroppedWidth(), selected.pageViewItem->uncroppedHeight());
         const QPoint origin = selected.pageViewItem->uncroppedGeometry().topLeft();
-        if (!paintRect.intersects(boundingRect.translated(origin).adjusted(-handleSizeHalf, -handleSizeHalf, handleSizeHalf, handleSizeHalf))) {
+        if (!paintRect.intersects(boundingRect.translated(origin).adjusted(-handlePadding, -handlePadding, handlePadding, handlePadding))) {
             continue;
         }
         painter->save();
@@ -459,7 +468,7 @@ void MouseAnnotation::routePaint(QPainter *painter, const QRect paintRect)
      */
     const QRect boundingRect = Okular::AnnotationUtils::annotationGeometry(m_focusedAnnotation.annotation, m_focusedAnnotation.pageViewItem->uncroppedWidth(), m_focusedAnnotation.pageViewItem->uncroppedHeight());
 
-    if (!paintRect.intersects(boundingRect.translated(m_focusedAnnotation.pageViewItem->uncroppedGeometry().topLeft()).adjusted(-handleSizeHalf, -handleSizeHalf, handleSizeHalf, handleSizeHalf))) {
+    if (!paintRect.intersects(boundingRect.translated(m_focusedAnnotation.pageViewItem->uncroppedGeometry().topLeft()).adjusted(-handlePadding, -handlePadding, handlePadding, handlePadding))) {
         /* Our selection rectangle is not in a region that needs to be (re-)drawn. */
         return;
     }
@@ -469,11 +478,15 @@ void MouseAnnotation::routePaint(QPainter *painter, const QRect paintRect)
     painter->setPen(QPen(fillColor, 2, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
     painter->drawRect(boundingRect);
     if (m_focusedAnnotation.annotation->canBeResized()) {
-        painter->setPen(borderColor);
-        painter->setBrush(fillColor);
+        painter->setPen(QPen(QColor(55, 76, 90), 1));
+        painter->setBrush(Qt::white);
         for (const ResizeHandle &handle : std::as_const(m_resizeHandleList)) {
-            QRect rect = getHandleRect(handle, m_focusedAnnotation);
-            painter->drawRect(rect);
+            const QRect handleRect = getHandleRect(handle, m_focusedAnnotation);
+            if (handle == RH_Top || handle == RH_Bottom || handle == RH_Left || handle == RH_Right) {
+                painter->drawRoundedRect(handleRect, handleShortSize / 2.0, handleShortSize / 2.0);
+            } else {
+                painter->drawEllipse(handleRect);
+            }
         }
     }
     painter->restore();
@@ -665,6 +678,14 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
         break;
     case StateResizing:
         m_focusedAnnotation = ad;
+        m_resizeStartMousePosition = m_mousePosition;
+        m_resizeStartRects.clear();
+        m_resizeStartBoundingRect = {};
+        for (const AnnotationDescription &selected : selectedAnnotations()) {
+            const Okular::NormalizedRect rect = selected.annotation->boundingRectangle();
+            m_resizeStartRects.append(rect);
+            m_resizeStartBoundingRect = m_resizeStartBoundingRect.isNull() ? rect : m_resizeStartBoundingRect | rect;
+        }
         if (m_areaSelectedAnnotations.size() > 1) {
             if (!m_selectionResizeUndoMacroOpen) {
                 m_document->beginUndoMacro(i18n("resize annotations"));
@@ -680,6 +701,8 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
         break;
     case StateFocused:
         m_focusedAnnotation = ad;
+        m_resizeStartRects.clear();
+        m_resizeStartBoundingRect = {};
         m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() & ~(Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized));
         updateViewport(m_focusedAnnotation);
         break;
@@ -692,6 +715,8 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
         }
         m_focusedAnnotation.invalidate();
         m_handle = RH_None;
+        m_resizeStartRects.clear();
+        m_resizeStartBoundingRect = {};
     }
 
     /* qDebug() << "setState: enter " << state; */
@@ -706,16 +731,17 @@ QRect MouseAnnotation::getFullBoundingRect(const AnnotationDescription &ad) cons
     QRect boundingRect;
     if (ad.isValid()) {
         boundingRect = Okular::AnnotationUtils::annotationGeometry(ad.annotation, ad.pageViewItem->uncroppedWidth(), ad.pageViewItem->uncroppedHeight());
-        boundingRect = boundingRect.adjusted(-handleSizeHalf, -handleSizeHalf, handleSizeHalf, handleSizeHalf);
+        boundingRect = boundingRect.adjusted(-handlePadding, -handlePadding, handlePadding, handlePadding);
     }
     return boundingRect;
 }
 
 /* Apply the command determined by m_state to the currently focused annotation. */
-void MouseAnnotation::performCommand(const QPoint newPos)
+void MouseAnnotation::performCommand(const QPoint newPos, Qt::KeyboardModifiers modifiers)
 {
     const QRect &pageViewItemRect = m_focusedAnnotation.pageViewItem->uncroppedGeometry();
-    QPointF mouseDelta(newPos - pageViewItemRect.topLeft() - m_mousePosition);
+    const QPoint resizeMousePosition = isResized() ? m_resizeStartMousePosition : m_mousePosition;
+    QPointF mouseDelta(newPos - pageViewItemRect.topLeft() - resizeMousePosition);
     QPointF normalizedRotatedMouseDelta(rotateInRect(QPointF(mouseDelta.x() / pageViewItemRect.width(), mouseDelta.y() / pageViewItemRect.height()), m_focusedAnnotation.pageViewItem->page()->rotation()));
 
     if (isMoved()) {
@@ -752,44 +778,34 @@ void MouseAnnotation::performCommand(const QPoint newPos)
     } else if (isResized()) {
         QPointF delta1, delta2;
         handleToAdjust(normalizedRotatedMouseDelta, delta1, delta2, m_handle, m_focusedAnnotation.pageViewItem->page()->rotation());
+        const bool preserveAspectRatio = !(modifiers & Qt::ShiftModifier);
         if (m_areaSelectedAnnotations.size() > 1) {
-            Okular::NormalizedRect groupRect;
-            bool hasGroupRect = false;
-            for (const AnnotationDescription &description : std::as_const(m_areaSelectedAnnotations)) {
-                const Okular::NormalizedRect rect = description.annotation->boundingRectangle();
-                groupRect = hasGroupRect ? groupRect | rect : rect;
-                hasGroupRect = true;
-            }
+            const Okular::NormalizedRect targetGroupRect = resizedRect(m_resizeStartBoundingRect, delta1, delta2, preserveAspectRatio);
+            const double oldWidth = m_resizeStartBoundingRect.right - m_resizeStartBoundingRect.left;
+            const double oldHeight = m_resizeStartBoundingRect.bottom - m_resizeStartBoundingRect.top;
+            const double scaleX = oldWidth > 0.000001 ? (targetGroupRect.right - targetGroupRect.left) / oldWidth : 1.0;
+            const double scaleY = oldHeight > 0.000001 ? (targetGroupRect.bottom - targetGroupRect.top) / oldHeight : 1.0;
 
-            const double minWidth = qMin(0.005, (groupRect.right - groupRect.left) / 2.0);
-            const double minHeight = qMin(0.005, (groupRect.bottom - groupRect.top) / 2.0);
-            const double newLeft = qBound(0.0, groupRect.left + delta1.x(), groupRect.right - minWidth);
-            const double newRight = qBound(groupRect.left + minWidth, groupRect.right + delta2.x(), 1.0);
-            const double newTop = qBound(0.0, groupRect.top + delta1.y(), groupRect.bottom - minHeight);
-            const double newBottom = qBound(groupRect.top + minHeight, groupRect.bottom + delta2.y(), 1.0);
-            const double oldWidth = groupRect.right - groupRect.left;
-            const double oldHeight = groupRect.bottom - groupRect.top;
-            const double newWidth = newRight - newLeft;
-            const double newHeight = newBottom - newTop;
-            const double scaleX = oldWidth > 0.000001 ? newWidth / oldWidth : 1.0;
-            const double scaleY = oldHeight > 0.000001 ? newHeight / oldHeight : 1.0;
-
-            for (const AnnotationDescription &description : std::as_const(m_areaSelectedAnnotations)) {
+            for (qsizetype index = 0; index < m_areaSelectedAnnotations.size(); ++index) {
+                const AnnotationDescription &description = m_areaSelectedAnnotations.at(index);
                 const Okular::NormalizedRect rect = description.annotation->boundingRectangle();
-                const double targetLeft = newLeft + (rect.left - groupRect.left) * scaleX;
-                const double targetRight = newLeft + (rect.right - groupRect.left) * scaleX;
-                const double targetTop = newTop + (rect.top - groupRect.top) * scaleY;
-                const double targetBottom = newTop + (rect.bottom - groupRect.top) * scaleY;
+                const Okular::NormalizedRect startRect = m_resizeStartRects.at(index);
+                const double targetLeft = targetGroupRect.left + (startRect.left - m_resizeStartBoundingRect.left) * scaleX;
+                const double targetRight = targetGroupRect.left + (startRect.right - m_resizeStartBoundingRect.left) * scaleX;
+                const double targetTop = targetGroupRect.top + (startRect.top - m_resizeStartBoundingRect.top) * scaleY;
+                const double targetBottom = targetGroupRect.top + (startRect.bottom - m_resizeStartBoundingRect.top) * scaleY;
                 m_document->adjustPageAnnotation(description.pageNumber,
                                                  description.annotation,
                                                  Okular::NormalizedPoint(targetLeft - rect.left, targetTop - rect.top),
                                                  Okular::NormalizedPoint(targetRight - rect.right, targetBottom - rect.bottom));
             }
         } else {
+            const Okular::NormalizedRect rect = m_focusedAnnotation.annotation->boundingRectangle();
+            const Okular::NormalizedRect targetRect = resizedRect(m_resizeStartBoundingRect, delta1, delta2, preserveAspectRatio);
             m_document->adjustPageAnnotation(m_focusedAnnotation.pageNumber,
                                              m_focusedAnnotation.annotation,
-                                             Okular::NormalizedPoint(delta1.x(), delta1.y()),
-                                             Okular::NormalizedPoint(delta2.x(), delta2.y()));
+                                             Okular::NormalizedPoint(targetRect.left - rect.left, targetRect.top - rect.top),
+                                             Okular::NormalizedPoint(targetRect.right - rect.right, targetRect.bottom - rect.bottom));
         }
     }
 }
@@ -859,7 +875,7 @@ MouseAnnotation::ResizeHandle MouseAnnotation::getHandleAt(const QPoint eventPos
 
     if (ad.annotation->canBeResized()) {
         for (const ResizeHandle &handle : m_resizeHandleList) {
-            const QRect rect = getHandleRect(handle, ad);
+            const QRect rect = getHandleHitRect(handle, ad);
             if (rect.contains(eventPos)) {
                 selected |= handle;
             }
@@ -905,7 +921,7 @@ MouseAnnotation::ResizeHandle MouseAnnotation::getSelectionHandleAt(const QPoint
     ResizeHandle selected = RH_None;
     if (selectionCanBeResized()) {
         for (const ResizeHandle &handle : std::as_const(m_resizeHandleList)) {
-            if (getHandleRect(handle, boundingRect).contains(eventPos)) {
+            if (getHandleHitRect(handle, boundingRect).contains(eventPos)) {
                 selected |= handle;
             }
         }
@@ -938,25 +954,86 @@ QRect MouseAnnotation::getHandleRect(ResizeHandle handle, const AnnotationDescri
 
 QRect MouseAnnotation::getHandleRect(ResizeHandle handle, const QRect &boundingRect) const
 {
-    int left, top;
+    const int width = handle == RH_Top || handle == RH_Bottom ? handleLongSize : handle == RH_Left || handle == RH_Right ? handleShortSize : handleSize;
+    const int height = handle == RH_Left || handle == RH_Right ? handleLongSize : handle == RH_Top || handle == RH_Bottom ? handleShortSize : handleSize;
+    const int centerX = (handle & RH_Left) ? boundingRect.left() : (handle & RH_Right) ? boundingRect.right() : boundingRect.left() + boundingRect.width() / 2;
+    const int centerY = (handle & RH_Top) ? boundingRect.top() : (handle & RH_Bottom) ? boundingRect.bottom() : boundingRect.top() + boundingRect.height() / 2;
+    return QRect(centerX - width / 2, centerY - height / 2, width, height);
+}
 
-    if (handle & RH_Top) {
-        top = boundingRect.top() - handleSizeHalf;
-    } else if (handle & RH_Bottom) {
-        top = boundingRect.bottom() - handleSizeHalf;
-    } else {
-        top = boundingRect.top() + boundingRect.height() / 2 - handleSizeHalf;
+QRect MouseAnnotation::getHandleHitRect(ResizeHandle handle, const AnnotationDescription &ad) const
+{
+    return getHandleRect(handle, ad).adjusted(-handleHitExpansion, -handleHitExpansion, handleHitExpansion, handleHitExpansion);
+}
+
+QRect MouseAnnotation::getHandleHitRect(ResizeHandle handle, const QRect &boundingRect) const
+{
+    return getHandleRect(handle, boundingRect).adjusted(-handleHitExpansion, -handleHitExpansion, handleHitExpansion, handleHitExpansion);
+}
+
+Okular::NormalizedRect MouseAnnotation::resizedRect(const Okular::NormalizedRect &startRect, const QPointF &delta1, const QPointF &delta2, bool preserveAspectRatio) const
+{
+    const double width = startRect.right - startRect.left;
+    const double height = startRect.bottom - startRect.top;
+    const double minWidth = width > 0.0 ? qMin(minimumNormalizedResizeDimension, width) : minimumNormalizedResizeDimension;
+    const double minHeight = height > 0.0 ? qMin(minimumNormalizedResizeDimension, height) : minimumNormalizedResizeDimension;
+    double left = qBound(0.0, startRect.left + delta1.x(), startRect.right - minWidth);
+    double right = qBound(left + minWidth, startRect.right + delta2.x(), 1.0);
+    double top = qBound(0.0, startRect.top + delta1.y(), startRect.bottom - minHeight);
+    double bottom = qBound(top + minHeight, startRect.bottom + delta2.y(), 1.0);
+
+    if (!preserveAspectRatio || width <= 0.0 || height <= 0.0) {
+        return Okular::NormalizedRect(left, top, right, bottom);
     }
 
-    if (handle & RH_Left) {
-        left = boundingRect.left() - handleSizeHalf;
-    } else if (handle & RH_Right) {
-        left = boundingRect.right() - handleSizeHalf;
-    } else {
-        left = boundingRect.left() + boundingRect.width() / 2 - handleSizeHalf;
+    const bool movesLeft = m_handle & RH_Left;
+    const bool movesRight = m_handle & RH_Right;
+    const bool movesTop = m_handle & RH_Top;
+    const bool movesBottom = m_handle & RH_Bottom;
+    const double minimumScale = qMax(minWidth / width, minHeight / height);
+    double scale = 1.0;
+    double maximumScale = std::numeric_limits<double>::max();
+
+    if ((movesLeft || movesRight) && (movesTop || movesBottom)) {
+        const double anchorX = movesLeft ? startRect.right : startRect.left;
+        const double anchorY = movesTop ? startRect.bottom : startRect.top;
+        const double movingX = movesLeft ? left : right;
+        const double movingY = movesTop ? top : bottom;
+        scale = qMax(qAbs(movingX - anchorX) / width, qAbs(movingY - anchorY) / height);
+        maximumScale = qMin(movesLeft ? anchorX / width : (1.0 - anchorX) / width,
+                            movesTop ? anchorY / height : (1.0 - anchorY) / height);
+        scale = qBound(minimumScale, scale, maximumScale);
+        left = movesLeft ? anchorX - width * scale : startRect.left;
+        right = movesRight ? anchorX + width * scale : startRect.right;
+        top = movesTop ? anchorY - height * scale : startRect.top;
+        bottom = movesBottom ? anchorY + height * scale : startRect.bottom;
+    } else if (movesLeft || movesRight) {
+        const double anchorX = movesLeft ? startRect.right : startRect.left;
+        const double centerY = (startRect.top + startRect.bottom) / 2.0;
+        const double movingX = movesLeft ? left : right;
+        scale = qAbs(movingX - anchorX) / width;
+        maximumScale = qMin(movesLeft ? anchorX / width : (1.0 - anchorX) / width,
+                            qMin(2.0 * centerY / height, 2.0 * (1.0 - centerY) / height));
+        scale = qBound(minimumScale, scale, maximumScale);
+        left = movesLeft ? anchorX - width * scale : startRect.left;
+        right = movesRight ? anchorX + width * scale : startRect.right;
+        top = centerY - height * scale / 2.0;
+        bottom = centerY + height * scale / 2.0;
+    } else if (movesTop || movesBottom) {
+        const double anchorY = movesTop ? startRect.bottom : startRect.top;
+        const double centerX = (startRect.left + startRect.right) / 2.0;
+        const double movingY = movesTop ? top : bottom;
+        scale = qAbs(movingY - anchorY) / height;
+        maximumScale = qMin(movesTop ? anchorY / height : (1.0 - anchorY) / height,
+                            qMin(2.0 * centerX / width, 2.0 * (1.0 - centerX) / width));
+        scale = qBound(minimumScale, scale, maximumScale);
+        top = movesTop ? anchorY - height * scale : startRect.top;
+        bottom = movesBottom ? anchorY + height * scale : startRect.bottom;
+        left = centerX - width * scale / 2.0;
+        right = centerX + width * scale / 2.0;
     }
 
-    return QRect(left, top, handleSize, handleSize);
+    return Okular::NormalizedRect(left, top, right, bottom);
 }
 
 bool MouseAnnotation::selectionCanBeResized() const

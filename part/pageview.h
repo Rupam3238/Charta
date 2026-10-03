@@ -241,6 +241,7 @@ private:
     // updates cursor
     void updateCursor(const QPoint p);
     void updateAnnotationSelectionPanel();
+    void showRightClickMenu(PageViewItem *pageItem, const QPoint eventPos, const QPoint globalPos);
 
     void moveMagnifier(const QPoint p);
     void updateMagnifier(const QPoint p);

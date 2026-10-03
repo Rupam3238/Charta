@@ -74,6 +74,10 @@ public:
     void setEraserWidth(double width);
     double eraserWidth() const;
     void setAnnotationSelectionMode(bool enabled);
+    bool beginTemporarySelectionTool();
+    bool beginTemporaryEraserTool();
+    void endTemporaryTool();
+    bool usesRightButtonForTemporaryEraser() const;
     // @return Are we currently annotating (using the selected tool)?
     bool annotating() const;
 

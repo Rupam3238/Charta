@@ -2415,7 +2415,7 @@ void PageView::keyPressEvent(QKeyEvent *e)
         }
         if (d->temporaryRightButtonSelection) {
             d->temporaryRightButtonSelection = false;
-            d->annotationSelectionMode = false;
+            d->annotator->endTemporaryTool();
             updateAnnotationSelectionPanel();
             updateCursor();
         }
@@ -2586,10 +2586,17 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
         d->annotationAreaSelectionEnd = eventPos;
         const QRect newSelection = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
         viewport()->update((oldSelection | newSelection).adjusted(-2, -2, 2, 2).translated(-contentAreaPosition()));
+        if (d->temporaryRightButtonSelection && d->annotationAreaSelectionItem) {
+            const QRect selectionRect = newSelection.translated(-d->annotationAreaSelectionItem->uncroppedGeometry().topLeft())
+                                           .intersected(QRect(QPoint(0, 0), d->annotationAreaSelectionItem->uncroppedGeometry().size()));
+            d->mouseAnnotation->selectAnnotationsInRect(d->annotationAreaSelectionItem, selectionRect);
+            updateAnnotationSelectionPanel();
+            updateCursor();
+        }
         return;
     }
     if (d->annotationSelectionMode) {
-        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, selectionButton);
+        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, selectionButton, e->modifiers());
         updateAnnotationSelectionPanel();
         updateCursor();
         return;
@@ -2601,7 +2608,7 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
             d->leftClickTimer.stop();
             if (d->mouseAnnotation->isActive()) {
                 // if left button pressed and annotation is focused, forward move event
-                d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton);
+                d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton, e->modifiers());
             }
             // drag page
             else {
@@ -2636,9 +2643,8 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
             if (deltaX > 5 || deltaX < -5 || deltaY > 5 || deltaY < -5) {
                 const QPoint startPos = contentAreaPoint(mapFromGlobal(d->mousePressPos.toPoint()));
                 PageViewItem *selectionPage = pickItemOnPoint(startPos.x(), startPos.y());
-                if (selectionPage) {
+                if (selectionPage && d->annotator->beginTemporarySelectionTool()) {
                     d->temporaryRightButtonSelection = true;
-                    d->annotationSelectionMode = true;
                     d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                     d->annotationAreaSelectionDragging = true;
                     d->annotationAreaSelectionItem = selectionPage;
@@ -2653,7 +2659,7 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
             }
         } else {
             /* Forward move events which are still not yet consumed by "mouse grab" or aMouseSelect */
-            d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton);
+            d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton, e->modifiers());
             updateCursor();
         }
     } break;
@@ -2667,7 +2673,7 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
             updateSelection(eventPos);
             d->mouseOverLinkObject = nullptr;
         }
-        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton);
+        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton, e->modifiers());
         updateCursor();
         break;
 
@@ -2684,7 +2690,7 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
         if (!d->mouseTextSelecting && !d->mousePressPos.isNull() && d->document->supportsSearching() && ((eventPos - d->mouseSelectPos).manhattanLength() > 5)) {
             d->mouseTextSelecting = true;
         }
-        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton);
+        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton, e->modifiers());
         updateSelection(eventPos);
         updateCursor();
         break;
@@ -2723,11 +2729,17 @@ void PageView::mousePressEvent(QMouseEvent *e)
     if (d->annotator && d->annotator->active()) {
         d->scroller->stop();
         PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
+        if (e->button() == Qt::RightButton) {
+            d->mousePressPos = e->globalPosition();
+        }
         d->annotator->routeMouseEvent(e, pageItem);
         return;
     }
 
     if (d->annotationSelectionMode) {
+        if (e->button() == Qt::RightButton) {
+            d->mousePressPos = e->globalPosition();
+        }
         if (e->button() == Qt::LeftButton) {
             PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
             if (pageItem) {
@@ -2949,6 +2961,35 @@ void PageView::mousePressEvent(QMouseEvent *e)
     }
 }
 
+void PageView::showRightClickMenu(PageViewItem *pageItem, const QPoint eventPos, const QPoint globalPos)
+{
+    const QPoint pressPos = contentAreaPoint(mapFromGlobal(d->mousePressPos.toPoint()));
+    const PageViewItem *pageItemPressPos = pickItemOnPoint(pressPos.x(), pressPos.y());
+    const bool clickOnPage = pageItem && pageItem == pageItemPressPos
+        && (d->mousePressPos - globalPos).manhattanLength() < QApplication::startDragDistance();
+    if (clickOnPage) {
+        QMenu *menu = createProcessLinkMenu(pageItem, eventPos);
+        const QRect &itemRect = pageItem->uncroppedGeometry();
+        const double nX = pageItem->absToPageX(eventPos.x());
+        const double nY = pageItem->absToPageY(eventPos.y());
+
+        AnnotationPopup annotPopup(d->document, AnnotationPopup::MultiAnnotationMode, this);
+        addAnnotationActionsForPoint(annotPopup, pageItem, eventPos, &menu);
+
+        if (menu) {
+            menu->exec(globalPos);
+            menu->deleteLater();
+        } else {
+            const Okular::ObjectRect *rect = pageItem->page()->objectRect(Okular::ObjectRect::Image, nX, nY, itemRect.width(), itemRect.height());
+            if (!rect) {
+                Q_EMIT rightClick(pageItem->page(), globalPos);
+            }
+        }
+    } else {
+        Q_EMIT rightClick(pageItem ? pageItem->page() : nullptr, globalPos);
+    }
+}
+
 void PageView::mouseReleaseEvent(QMouseEvent *e)
 {
     // stop the drag scrolling
@@ -2985,6 +3026,12 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
     }
 
     if (d->annotationSelectionMode) {
+        if (rightButton && !d->temporaryRightButtonSelection) {
+            PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
+            showRightClickMenu(pageItem, eventPos, e->globalPosition().toPoint());
+            updateCursor();
+            return;
+        }
         const bool selectionButton = leftButton || (d->temporaryRightButtonSelection && rightButton);
         if (selectionButton) {
             if (d->annotationAreaSelectionDragging && d->annotationAreaSelectionItem) {
@@ -3006,8 +3053,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
         }
         if (d->temporaryRightButtonSelection && rightButton) {
             d->temporaryRightButtonSelection = false;
-            d->annotationSelectionMode = false;
-            updateAnnotationSelectionPanel();
+            d->annotator->endTemporaryTool();
         }
         updateCursor();
         return;
@@ -3016,6 +3062,11 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
     // if we're editing an annotation, dispatch event to it
     if (d->annotator && d->annotator->active()) {
         PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
+        if (rightButton && !d->annotator->usesRightButtonForTemporaryEraser()) {
+            showRightClickMenu(pageItem, eventPos, e->globalPosition().toPoint());
+            updateCursor();
+            return;
+        }
         d->annotator->routeMouseEvent(e, pageItem);
         return;
     }
@@ -3067,37 +3118,7 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                 }
             }
         } else if (rightButton && !d->mouseAnnotation->isModified()) {
-            if (pageItem && pageItem == pageItemPressPos && ((d->mousePressPos - e->globalPosition()).manhattanLength() < QApplication::startDragDistance())) {
-                QMenu *menu = createProcessLinkMenu(pageItem, eventPos);
-
-                const QRect &itemRect = pageItem->uncroppedGeometry();
-                const double nX = pageItem->absToPageX(eventPos.x());
-                const double nY = pageItem->absToPageY(eventPos.y());
-
-                AnnotationPopup annotPopup(d->document, AnnotationPopup::MultiAnnotationMode, this);
-                // Do not move annotPopup inside the if, it needs to live until menu->exec()
-                addAnnotationActionsForPoint(annotPopup, pageItem, eventPos, &menu);
-
-                if (menu) {
-                    menu->exec(e->globalPosition().toPoint());
-                    menu->deleteLater();
-                } else {
-                    // a link can move us to another page or even to another document, there's no point in trying to
-                    //  process the click on the image once we have processes the click on the link
-                    const Okular::ObjectRect *rect = pageItem->page()->objectRect(Okular::ObjectRect::Image, nX, nY, itemRect.width(), itemRect.height());
-                    if (rect) {
-                        // handle right click over a image
-                    } else {
-                        // right click (if not within 5 px of the press point, the mode
-                        // had been already changed to 'Selection' instead of 'Normal')
-                        Q_EMIT rightClick(pageItem->page(), e->globalPosition().toPoint());
-                    }
-                }
-            } else {
-                // right click (if not within 5 px of the press point, the mode
-                // had been already changed to 'Selection' instead of 'Normal')
-                Q_EMIT rightClick(pageItem ? pageItem->page() : nullptr, e->globalPosition().toPoint());
-            }
+            showRightClickMenu(pageItem, eventPos, e->globalPosition().toPoint());
         }
     } break;
 

@@ -178,9 +178,24 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
                 }
 
                 if (annFlags & Okular::Annotation::ExternallyDrawn) {
-                    // ExternallyDrawn annots are never rendered by PagePainter.
-                    // Just paint the boundingRect if the annot is moved or resized.
-                    if (annFlags & (Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized)) {
+                    if ((annFlags & Okular::Annotation::BeingResized) && boundary.intersects(limitRect)) {
+                        switch (ann->subType()) {
+                        case Okular::Annotation::ALine:
+                        case Okular::Annotation::AHighlight:
+                        case Okular::Annotation::AInk:
+                            bufferedAnnotations.append(ann);
+                            break;
+                        case Okular::Annotation::AText:
+                        case Okular::Annotation::AGeom:
+                        case Okular::Annotation::AStamp:
+                            unbufferedAnnotations.append(ann);
+                            break;
+                        default:
+                            boundingRectOnlyAnn = ann;
+                            break;
+                        }
+                    } else if (annFlags & Okular::Annotation::BeingMoved) {
+                        // Moving externally drawn annotations retains the existing bounding-box preview.
                         boundingRectOnlyAnn = ann;
                     }
                     continue;

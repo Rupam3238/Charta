@@ -85,7 +85,7 @@ public:
     void routeMouseReleaseEvent(PageViewItem *pageViewItem, const QPoint eventPos);
 
     /* Process a mouse move event. eventPos: Mouse position in content area coordinates. */
-    void routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed);
+    void routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed, Qt::KeyboardModifiers modifiers = Qt::NoModifier);
     void selectAnnotationsInRect(PageViewItem *pageViewItem, const QRect &selectionRect);
 
     /* Process a key event. */
@@ -151,13 +151,16 @@ private:
     QRect selectedBoundingRect() const;
     void updateHover(PageViewItem *pageViewItem, const QPoint eventPos);
     QRect getFullBoundingRect(const AnnotationDescription &ad) const;
-    void performCommand(const QPoint newPos);
+    void performCommand(const QPoint newPos, Qt::KeyboardModifiers modifiers);
     void finishCommand();
     void updateViewport(const AnnotationDescription &ad) const;
     ResizeHandle getHandleAt(const QPoint eventPos, const AnnotationDescription &ad) const;
     ResizeHandle getSelectionHandleAt(const QPoint eventPos) const;
     QRect getHandleRect(ResizeHandle handle, const AnnotationDescription &ad) const;
     QRect getHandleRect(ResizeHandle handle, const QRect &boundingRect) const;
+    QRect getHandleHitRect(ResizeHandle handle, const AnnotationDescription &ad) const;
+    QRect getHandleHitRect(ResizeHandle handle, const QRect &boundingRect) const;
+    Okular::NormalizedRect resizedRect(const Okular::NormalizedRect &startRect, const QPointF &delta1, const QPointF &delta2, bool preserveAspectRatio) const;
     bool selectionCanBeResized() const;
     static void handleToAdjust(const QPointF dIn, QPointF &dOut1, QPointF &dOut2, MouseAnnotation::ResizeHandle handle, Okular::Rotation rotation);
     static QPointF rotateInRect(const QPointF rotated, Okular::Rotation rotation);
@@ -177,6 +180,9 @@ private:
     AnnotationDescription m_mouseOverAnnotation;
     QPoint m_mousePosition; // in page view item coordinates
     QList<AnnotationDescription> m_areaSelectedAnnotations;
+    Okular::NormalizedRect m_resizeStartBoundingRect;
+    QList<Okular::NormalizedRect> m_resizeStartRects;
+    QPoint m_resizeStartMousePosition;
     bool m_selectionMoveUndoMacroOpen = false;
     bool m_selectionMoveChanged = false;
     bool m_selectionResizeUndoMacroOpen = false;
