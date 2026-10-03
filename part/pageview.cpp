@@ -207,6 +207,7 @@ public:
     QSet<int> pagesWithTextSelection;
     bool mouseOnRect = false;
     bool annotationSelectionMode = false;
+    bool temporaryRightButtonSelection = false;
     bool annotationAreaSelectionDragging = false;
     PageViewItem *annotationAreaSelectionItem = nullptr;
     QPoint annotationAreaSelectionStart;
@@ -2412,6 +2413,12 @@ void PageView::keyPressEvent(QKeyEvent *e)
             d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
             viewport()->update(marquee.translated(-contentAreaPosition()));
         }
+        if (d->temporaryRightButtonSelection) {
+            d->temporaryRightButtonSelection = false;
+            d->annotationSelectionMode = false;
+            updateAnnotationSelectionPanel();
+            updateCursor();
+        }
         Q_EMIT escPressed();
         selectionClear(d->tableDividersGuessed ? ClearOnlyDividers : ClearAllSelection);
         textSelectionClear();
@@ -2569,8 +2576,9 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
         return;
     }
 
-    bool leftButton = (e->buttons() == Qt::LeftButton);
-    bool rightButton = (e->buttons() == Qt::RightButton);
+    const bool leftButton = e->buttons().testFlag(Qt::LeftButton);
+    const bool rightButton = e->buttons().testFlag(Qt::RightButton);
+    const bool selectionButton = leftButton || (d->temporaryRightButtonSelection && rightButton);
 
     PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
     if (d->annotationSelectionMode && d->annotationAreaSelectionDragging) {
@@ -2581,7 +2589,7 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
         return;
     }
     if (d->annotationSelectionMode) {
-        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton);
+        d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, selectionButton);
         updateAnnotationSelectionPanel();
         updateCursor();
         return;
@@ -2623,14 +2631,24 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
                 }
             }
         } else if (rightButton && !d->mousePressPos.isNull() && d->aMouseSelect) {
-            // if mouse moves 5 px away from the press point, switch to 'selection'
+            // A right-button drag temporarily uses annotation selection in Browse mode.
             qreal deltaX = d->mousePressPos.x() - e->globalPosition().x(), deltaY = d->mousePressPos.y() - e->globalPosition().y();
             if (deltaX > 5 || deltaX < -5 || deltaY > 5 || deltaY < -5) {
-                d->aPrevAction = d->aMouseNormal;
-                d->aMouseSelect->trigger();
-                QPoint newPos = eventPos + QPoint(deltaX, deltaY);
-                selectionStart(newPos, palette().color(QPalette::Active, QPalette::Highlight).lighter(120), false);
-                updateSelection(eventPos);
+                const QPoint startPos = contentAreaPoint(mapFromGlobal(d->mousePressPos.toPoint()));
+                PageViewItem *selectionPage = pickItemOnPoint(startPos.x(), startPos.y());
+                if (selectionPage) {
+                    d->temporaryRightButtonSelection = true;
+                    d->annotationSelectionMode = true;
+                    d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+                    d->annotationAreaSelectionDragging = true;
+                    d->annotationAreaSelectionItem = selectionPage;
+                    d->annotationAreaSelectionStart = startPos;
+                    d->annotationAreaSelectionEnd = eventPos;
+                    d->scroller->stop();
+                    updateAnnotationSelectionPanel();
+                    updateCursor();
+                    viewport()->update(QRect(startPos, eventPos).normalized().adjusted(-2, -2, 2, 2).translated(-contentAreaPosition()));
+                }
                 break;
             }
         } else {
@@ -2967,7 +2985,8 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
     }
 
     if (d->annotationSelectionMode) {
-        if (leftButton) {
+        const bool selectionButton = leftButton || (d->temporaryRightButtonSelection && rightButton);
+        if (selectionButton) {
             if (d->annotationAreaSelectionDragging && d->annotationAreaSelectionItem) {
                 if ((eventPos - d->annotationAreaSelectionStart).manhattanLength() >= QApplication::startDragDistance()) {
                     const QRect selectionRect = QRect(d->annotationAreaSelectionStart, eventPos)
@@ -2984,6 +3003,11 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                 d->annotationAreaSelectionItem = nullptr;
                 viewport()->update(repaintRect.translated(-contentAreaPosition()));
             }
+        }
+        if (d->temporaryRightButtonSelection && rightButton) {
+            d->temporaryRightButtonSelection = false;
+            d->annotationSelectionMode = false;
+            updateAnnotationSelectionPanel();
         }
         updateCursor();
         return;
@@ -4622,7 +4646,7 @@ void PageView::updateCursor(const QPoint p)
         if (pageItem || d->annotator->annotating()) {
             setCursor(d->annotator->cursor());
         } else {
-            setCursor(Qt::ForbiddenCursor);
+            setCursor(d->annotator->cursor());
         }
     } else if (d->annotationSelectionMode) {
         setCursor(d->mouseAnnotation->isMouseOver() ? d->mouseAnnotation->cursor() : Qt::CrossCursor);

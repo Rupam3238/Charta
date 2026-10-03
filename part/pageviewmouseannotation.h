@@ -155,7 +155,10 @@ private:
     void finishCommand();
     void updateViewport(const AnnotationDescription &ad) const;
     ResizeHandle getHandleAt(const QPoint eventPos, const AnnotationDescription &ad) const;
+    ResizeHandle getSelectionHandleAt(const QPoint eventPos) const;
     QRect getHandleRect(ResizeHandle handle, const AnnotationDescription &ad) const;
+    QRect getHandleRect(ResizeHandle handle, const QRect &boundingRect) const;
+    bool selectionCanBeResized() const;
     static void handleToAdjust(const QPointF dIn, QPointF &dOut1, QPointF &dOut2, MouseAnnotation::ResizeHandle handle, Okular::Rotation rotation);
     static QPointF rotateInRect(const QPointF rotated, Okular::Rotation rotation);
     static ResizeHandle rotateHandle(ResizeHandle handle, Okular::Rotation rotation);
@@ -176,6 +179,7 @@ private:
     QList<AnnotationDescription> m_areaSelectedAnnotations;
     bool m_selectionMoveUndoMacroOpen = false;
     bool m_selectionMoveChanged = false;
+    bool m_selectionResizeUndoMacroOpen = false;
 
     QList<ResizeHandle> m_resizeHandleList;
 };

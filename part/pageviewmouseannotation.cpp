@@ -100,11 +100,14 @@ void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPo
             const QPoint pageOrigin = firstSelected.pageViewItem->uncroppedGeometry().topLeft();
             const QPoint pagePosition = eventPos - pageOrigin;
             if (selectedBoundingRect().contains(pagePosition)) {
-                const bool canMoveSelection = std::all_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [](const AnnotationDescription &selected) {
-                    return selected.annotation->canBeMoved();
-                });
+                m_mousePosition = pagePosition;
+                m_handle = getSelectionHandleAt(pagePosition);
+                if (m_handle != RH_None && m_handle != RH_Content) {
+                    setState(StateFocused, firstSelected);
+                    return;
+                }
+                const bool canMoveSelection = std::all_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [](const AnnotationDescription &selected) { return selected.annotation->canBeMoved(); });
                 if (canMoveSelection) {
-                    m_mousePosition = pagePosition;
                     m_handle = RH_Content;
                     setState(StateMoving, firstSelected);
                 }
@@ -216,7 +219,7 @@ void MouseAnnotation::updateHover(PageViewItem *pageViewItem, const QPoint event
         const QPoint pagePosition = eventPos - pageOrigin;
         m_mousePosition = pagePosition;
         const bool onSelectedPage = pageViewItem && pageViewItem->pageNumber() == firstSelected.pageNumber;
-        m_handle = onSelectedPage && selectedBoundingRect().contains(pagePosition) ? RH_Content : RH_None;
+        m_handle = onSelectedPage ? getSelectionHandleAt(pagePosition) : RH_None;
     } else if (m_focusedAnnotation.isValid() && pageViewItem) {
         m_mousePosition = eventPos - pageViewItem->uncroppedGeometry().topLeft();
         m_handle = getHandleAt(m_mousePosition, m_focusedAnnotation);
@@ -407,6 +410,27 @@ void MouseAnnotation::routePaint(QPainter *painter, const QRect paintRect)
     static const QColor borderColor = QColor::fromHsvF(0, 0, 1.0);
     static const QColor fillColor = QColor::fromHsvF(0, 0, 0.75, 0.66);
 
+    if (m_areaSelectedAnnotations.size() > 1) {
+        const AnnotationDescription &firstSelected = m_areaSelectedAnnotations.constFirst();
+        const QRect boundingRect = selectedBoundingRect();
+        const QPoint origin = firstSelected.pageViewItem->uncroppedGeometry().topLeft();
+        if (paintRect.intersects(boundingRect.translated(origin).adjusted(-handleSizeHalf, -handleSizeHalf, handleSizeHalf, handleSizeHalf))) {
+            painter->save();
+            painter->translate(origin);
+            painter->setPen(QPen(fillColor, 2, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
+            painter->drawRect(boundingRect);
+            if (selectionCanBeResized()) {
+                painter->setPen(borderColor);
+                painter->setBrush(fillColor);
+                for (const ResizeHandle &handle : std::as_const(m_resizeHandleList)) {
+                    painter->drawRect(getHandleRect(handle, boundingRect));
+                }
+            }
+            painter->restore();
+        }
+        return;
+    }
+
     for (const AnnotationDescription &selected : std::as_const(m_areaSelectedAnnotations)) {
         if (!selected.isValid() || (isFocused() && selected.annotation == m_focusedAnnotation.annotation)) {
             continue;
@@ -507,13 +531,15 @@ Qt::CursorShape MouseAnnotation::cursor() const
         if (m_handle == RH_Content) {
             return isMoved() ? Qt::ClosedHandCursor : Qt::OpenHandCursor;
         }
-        return Qt::CrossCursor;
+        if (m_handle == RH_None) {
+            return Qt::CrossCursor;
+        }
     }
 
     if (m_handle != RH_None) {
         if (isMoved()) {
             return Qt::SizeAllCursor;
-        } else if (isFocused() || isResized()) {
+        } else if (isFocused() || isResized() || m_areaSelectedAnnotations.size() > 1) {
             switch (m_handle) {
             case RH_Top:
                 return Qt::SizeVerCursor;
@@ -639,7 +665,17 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
         break;
     case StateResizing:
         m_focusedAnnotation = ad;
-        m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() | Okular::Annotation::BeingResized);
+        if (m_areaSelectedAnnotations.size() > 1) {
+            if (!m_selectionResizeUndoMacroOpen) {
+                m_document->beginUndoMacro(i18n("resize annotations"));
+                m_selectionResizeUndoMacroOpen = true;
+            }
+            for (const AnnotationDescription &selected : std::as_const(m_areaSelectedAnnotations)) {
+                selected.annotation->setFlags(selected.annotation->flags() | Okular::Annotation::BeingResized);
+            }
+        } else {
+            m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() | Okular::Annotation::BeingResized);
+        }
         updateViewport(m_focusedAnnotation);
         break;
     case StateFocused:
@@ -716,7 +752,45 @@ void MouseAnnotation::performCommand(const QPoint newPos)
     } else if (isResized()) {
         QPointF delta1, delta2;
         handleToAdjust(normalizedRotatedMouseDelta, delta1, delta2, m_handle, m_focusedAnnotation.pageViewItem->page()->rotation());
-        m_document->adjustPageAnnotation(m_focusedAnnotation.pageNumber, m_focusedAnnotation.annotation, Okular::NormalizedPoint(delta1.x(), delta1.y()), Okular::NormalizedPoint(delta2.x(), delta2.y()));
+        if (m_areaSelectedAnnotations.size() > 1) {
+            Okular::NormalizedRect groupRect;
+            bool hasGroupRect = false;
+            for (const AnnotationDescription &description : std::as_const(m_areaSelectedAnnotations)) {
+                const Okular::NormalizedRect rect = description.annotation->boundingRectangle();
+                groupRect = hasGroupRect ? groupRect | rect : rect;
+                hasGroupRect = true;
+            }
+
+            const double minWidth = qMin(0.005, (groupRect.right - groupRect.left) / 2.0);
+            const double minHeight = qMin(0.005, (groupRect.bottom - groupRect.top) / 2.0);
+            const double newLeft = qBound(0.0, groupRect.left + delta1.x(), groupRect.right - minWidth);
+            const double newRight = qBound(groupRect.left + minWidth, groupRect.right + delta2.x(), 1.0);
+            const double newTop = qBound(0.0, groupRect.top + delta1.y(), groupRect.bottom - minHeight);
+            const double newBottom = qBound(groupRect.top + minHeight, groupRect.bottom + delta2.y(), 1.0);
+            const double oldWidth = groupRect.right - groupRect.left;
+            const double oldHeight = groupRect.bottom - groupRect.top;
+            const double newWidth = newRight - newLeft;
+            const double newHeight = newBottom - newTop;
+            const double scaleX = oldWidth > 0.000001 ? newWidth / oldWidth : 1.0;
+            const double scaleY = oldHeight > 0.000001 ? newHeight / oldHeight : 1.0;
+
+            for (const AnnotationDescription &description : std::as_const(m_areaSelectedAnnotations)) {
+                const Okular::NormalizedRect rect = description.annotation->boundingRectangle();
+                const double targetLeft = newLeft + (rect.left - groupRect.left) * scaleX;
+                const double targetRight = newLeft + (rect.right - groupRect.left) * scaleX;
+                const double targetTop = newTop + (rect.top - groupRect.top) * scaleY;
+                const double targetBottom = newTop + (rect.bottom - groupRect.top) * scaleY;
+                m_document->adjustPageAnnotation(description.pageNumber,
+                                                 description.annotation,
+                                                 Okular::NormalizedPoint(targetLeft - rect.left, targetTop - rect.top),
+                                                 Okular::NormalizedPoint(targetRight - rect.right, targetBottom - rect.bottom));
+            }
+        } else {
+            m_document->adjustPageAnnotation(m_focusedAnnotation.pageNumber,
+                                             m_focusedAnnotation.annotation,
+                                             Okular::NormalizedPoint(delta1.x(), delta1.y()),
+                                             Okular::NormalizedPoint(delta2.x(), delta2.y()));
+        }
     }
 }
 
@@ -752,8 +826,19 @@ void MouseAnnotation::finishCommand()
             m_selectionMoveChanged = false;
         }
     } else if (isResized()) {
-        m_focusedAnnotation.annotation->setFlags(m_focusedAnnotation.annotation->flags() & ~Okular::Annotation::BeingResized);
-        m_document->adjustPageAnnotation(m_focusedAnnotation.pageNumber, m_focusedAnnotation.annotation, Okular::NormalizedPoint(0.0, 0.0), Okular::NormalizedPoint(0.0, 0.0));
+        const QList<AnnotationDescription> selected = selectedAnnotations();
+        for (const AnnotationDescription &description : selected) {
+            description.annotation->setFlags(description.annotation->flags() & ~Okular::Annotation::BeingResized);
+        }
+        if (selected.size() > 1 && m_selectionResizeUndoMacroOpen) {
+            for (const AnnotationDescription &description : selected) {
+                m_document->adjustPageAnnotation(description.pageNumber, description.annotation, Okular::NormalizedPoint(0.0, 0.0), Okular::NormalizedPoint(0.0, 0.0));
+            }
+            m_document->endUndoMacro();
+            m_selectionResizeUndoMacroOpen = false;
+        } else {
+            m_document->adjustPageAnnotation(m_focusedAnnotation.pageNumber, m_focusedAnnotation.annotation, Okular::NormalizedPoint(0.0, 0.0), Okular::NormalizedPoint(0.0, 0.0));
+        }
     }
 }
 
@@ -810,10 +895,49 @@ MouseAnnotation::ResizeHandle MouseAnnotation::getHandleAt(const QPoint eventPos
     return selected;
 }
 
+MouseAnnotation::ResizeHandle MouseAnnotation::getSelectionHandleAt(const QPoint eventPos) const
+{
+    const QRect boundingRect = selectedBoundingRect();
+    if (boundingRect.isNull()) {
+        return RH_None;
+    }
+
+    ResizeHandle selected = RH_None;
+    if (selectionCanBeResized()) {
+        for (const ResizeHandle &handle : std::as_const(m_resizeHandleList)) {
+            if (getHandleRect(handle, boundingRect).contains(eventPos)) {
+                selected |= handle;
+            }
+        }
+        if ((selected & RH_BottomRight) == RH_BottomRight) {
+            return RH_BottomRight;
+        }
+        if ((selected & RH_TopRight) == RH_TopRight) {
+            return RH_TopRight;
+        }
+        if ((selected & RH_TopLeft) == RH_TopLeft) {
+            return RH_TopLeft;
+        }
+        if ((selected & RH_BottomLeft) == RH_BottomLeft) {
+            return RH_BottomLeft;
+        }
+    }
+    if (selected == RH_None && boundingRect.contains(eventPos)
+        && std::all_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [](const AnnotationDescription &description) { return description.annotation->canBeMoved(); })) {
+        return RH_Content;
+    }
+    return selected;
+}
+
 /* Get the rectangle for a specified resizie handle. */
 QRect MouseAnnotation::getHandleRect(ResizeHandle handle, const AnnotationDescription &ad) const
 {
     const QRect boundingRect = Okular::AnnotationUtils::annotationGeometry(ad.annotation, ad.pageViewItem->uncroppedWidth(), ad.pageViewItem->uncroppedHeight());
+    return getHandleRect(handle, boundingRect);
+}
+
+QRect MouseAnnotation::getHandleRect(ResizeHandle handle, const QRect &boundingRect) const
+{
     int left, top;
 
     if (handle & RH_Top) {
@@ -833,6 +957,12 @@ QRect MouseAnnotation::getHandleRect(ResizeHandle handle, const AnnotationDescri
     }
 
     return QRect(left, top, handleSize, handleSize);
+}
+
+bool MouseAnnotation::selectionCanBeResized() const
+{
+    return m_areaSelectedAnnotations.size() > 1
+        && std::all_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [](const AnnotationDescription &description) { return description.annotation->canBeResized(); });
 }
 
 /* Convert a resize handle delta into two adjust delta coordinates. */

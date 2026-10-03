@@ -162,6 +162,50 @@ private:
     bool m_requestedVisible = true;
     bool m_updateScheduled = false;
 };
+
+class ToolSettingsPopupDismissFilter final : public QObject
+{
+public:
+    explicit ToolSettingsPopupDismissFilter(QDialog *popup)
+        : m_popup(popup)
+    {
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (!m_popup || !m_popup->isVisible()) {
+            return QObject::eventFilter(watched, event);
+        }
+
+        if (event->type() == QEvent::KeyPress) {
+            auto *keyEvent = static_cast<QKeyEvent *>(event);
+            QWidget *modalWidget = QApplication::activeModalWidget();
+            if (keyEvent->key() == Qt::Key_Escape && (!modalWidget || modalWidget == m_popup || m_popup->isAncestorOf(modalWidget))) {
+                m_popup->reject();
+                return true;
+            }
+        } else if (event->type() == QEvent::MouseButtonPress) {
+            QWidget *modalWidget = QApplication::activeModalWidget();
+            if (modalWidget && modalWidget != m_popup && modalWidget->isVisible()) {
+                return QObject::eventFilter(watched, event);
+            }
+
+            auto *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (!m_popup->frameGeometry().contains(mouseEvent->globalPosition().toPoint())) {
+                QWidget *activePopup = QApplication::activePopupWidget();
+                if (!activePopup || !activePopup->isVisible() || !activePopup->frameGeometry().contains(mouseEvent->globalPosition().toPoint())) {
+                    m_popup->reject();
+                }
+            }
+        }
+
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    QDialog *m_popup;
+};
 }
 
 class AnnotationActionHandlerPrivate
@@ -723,7 +767,10 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         popupPosition.setY(qBound(available.top(), popupPosition.y(), available.bottom() - popup.height() + 1));
     }
     popup.move(popupPosition);
+    ToolSettingsPopupDismissFilter dismissFilter(&popup);
+    qApp->installEventFilter(&dismissFilter);
     popup.exec();
+    qApp->removeEventFilter(&dismissFilter);
 
     if (document && selectedAnnotation && selectedAnnotationChanged) {
         const Okular::Page *page = document->page(pageNumber);
@@ -988,7 +1035,7 @@ void AnnotationActionHandlerPrivate::populateQuickAnnotations()
         quickTools.append(annFav);
         if (shortcutNumber != numberKeys.end()) {
             const int shortcutKey = *(shortcutNumber++);
-            if (shortcutKey != Qt::Key_1) {
+            if (shortcutKey != Qt::Key_1 && shortcutKey != Qt::Key_2) {
                 annFav->setShortcut(QKeySequence(shortcutKey));
                 annFav->setShortcutContext(Qt::WidgetWithChildrenShortcut);
             }
