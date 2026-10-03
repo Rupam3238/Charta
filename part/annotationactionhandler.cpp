@@ -28,6 +28,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
+#include <QPointer>
 #include <QSizePolicy>
 #include <QRadioButton>
 #include <QSlider>
@@ -126,6 +127,9 @@ private:
         m_updateScheduled = true;
         QTimer::singleShot(0, this, [this] {
             m_updateScheduled = false;
+            if (!m_host || !m_visibleCanvas) {
+                return;
+            }
             if (m_requestedVisible && !isVisible() && m_host->isVisible()) {
                 show();
             }
@@ -135,7 +139,7 @@ private:
 
     void updateIslandGeometry()
     {
-        if (!m_host || !m_visibleCanvas) {
+        if (!m_host || !m_visibleCanvas || !m_host->isAncestorOf(m_visibleCanvas.data())) {
             return;
         }
         if (layout()) {
@@ -143,7 +147,7 @@ private:
         }
         adjustSize();
         const int margin = 12;
-        const QPoint canvasOrigin = m_visibleCanvas->mapTo(m_host, QPoint(0, 0));
+        const QPoint canvasOrigin = m_visibleCanvas->mapTo(m_host.data(), QPoint(0, 0));
         const QRect canvasRect(canvasOrigin, m_visibleCanvas->size());
         const int x = canvasRect.right() - width() - margin + 1;
         const int y = canvasRect.top() + (canvasRect.height() - height()) / 2;
@@ -151,9 +155,9 @@ private:
         raise();
     }
 
-    QWidget *m_host;
-    QWidget *m_visibleCanvas;
-    QWidget *m_window;
+    QPointer<QWidget> m_host;
+    QPointer<QWidget> m_visibleCanvas;
+    QPointer<QWidget> m_window;
     Anchor m_anchor = Anchor::Left;
     bool m_requestedVisible = true;
     bool m_updateScheduled = false;
