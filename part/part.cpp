@@ -42,6 +42,7 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QJsonArray>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -50,6 +51,7 @@
 #include <QMenuBar>
 #include <QMimeData>
 #include <QMimeDatabase>
+#include <QMouseEvent>
 #include <QPrintDialog>
 #include <QPrintPreviewDialog>
 #include <QPrinter>
@@ -439,6 +441,7 @@ public:
         m_panel->hide();
         m_optionsBar->installEventFilter(this);
         m_host->installEventFilter(this);
+        qApp->installEventFilter(this);
 
         QToolButton *pagesButton = m_optionsBar->findChild<QToolButton *>(QStringLiteral("optionsPagesButton"));
         QToolButton *searchButton = m_optionsBar->findChild<QToolButton *>(QStringLiteral("optionsSearchButton"));
@@ -470,9 +473,48 @@ public:
         });
     }
 
+    ~OptionsPanelHost() override
+    {
+        qApp->removeEventFilter(this);
+    }
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override
     {
+        if (m_escapeReleasePending && event->type() == QEvent::KeyRelease) {
+            auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                keyEvent->accept();
+                m_escapeReleasePending = false;
+                return true;
+            }
+        }
+
+        if (m_activeButton && m_panel->isVisible()) {
+            if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
+                auto *keyEvent = static_cast<QKeyEvent *>(event);
+                QWidget *activePopup = QApplication::activePopupWidget();
+                const bool anotherPopupIsActive = activePopup && activePopup != m_panel && !m_panel->isAncestorOf(activePopup);
+                if (!anotherPopupIsActive && keyEvent->key() == Qt::Key_Escape) {
+                    keyEvent->accept();
+                    if (event->type() == QEvent::KeyPress) {
+                        m_escapeReleasePending = true;
+                        closePanel();
+                    }
+                    return true;
+                }
+            } else if (event->type() == QEvent::MouseButtonPress) {
+                const auto *mouseEvent = static_cast<QMouseEvent *>(event);
+                const QPoint globalPos = mouseEvent->globalPosition().toPoint();
+                const QRect panelGlobalRect(m_panel->mapToGlobal(QPoint(0, 0)), m_panel->size());
+                const QPoint optionsBarPos = m_optionsBar->mapFromGlobal(globalPos);
+                const bool onOptionsBarButton = qobject_cast<QToolButton *>(m_optionsBar->childAt(optionsBarPos)) != nullptr;
+                if (!panelGlobalRect.contains(globalPos) && !onOptionsBarButton) {
+                    closePanel();
+                }
+            }
+        }
+
         if (watched == m_host && event->type() == QEvent::Resize) {
             positionPanel();
         } else if (watched == m_optionsBar) {
@@ -568,6 +610,7 @@ private:
     QStackedWidget *m_stack;
     QListWidget *m_searchResults;
     QToolButton *m_activeButton = nullptr;
+    bool m_escapeReleasePending = false;
 };
 }
 
