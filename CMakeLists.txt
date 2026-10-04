@@ -34,7 +34,7 @@ include(ECMSetupQtPluginMacroNames)
 include(ECMAddAndroidApk)
 
 if (ANDROID AND (FORCE_NOT_REQUIRED_DEPENDENCIES STREQUAL ""))
-    set(FORCE_NOT_REQUIRED_DEPENDENCIES "KF6Wallet;KF6DocTools;Qt6Qml;TIFF;LibSpectre;KExiv2Qt6;DjVuLibre;EPub;Discount;")
+    set(FORCE_NOT_REQUIRED_DEPENDENCIES "KF6Wallet;Qt6Qml;TIFF;LibSpectre;KExiv2Qt6;DjVuLibre;EPub;Discount;")
 endif()
 
 function(set_okular_optional_package_properties _name _props)
@@ -127,10 +127,6 @@ if(KF6Wallet_FOUND)
 else()
     set(HAVE_KWALLET 0)
 endif()
-
-find_package(KF6DocTools ${KF_REQUIRED_VERSION})
-set_okular_optional_package_properties(KF6DocTools PROPERTIES
-    PURPOSE "Required for compiling and installing the user documentation.")
 
 find_package(Qt6Qml)
 set_okular_optional_package_properties(Qt6Qml PROPERTIES
@@ -310,10 +306,6 @@ endif()
 
 if(BUILD_TESTING)
    add_subdirectory( autotests )
-endif()
-
-if(KF6DocTools_FOUND)
-    add_subdirectory(doc)
 endif()
 
 include(OkularConfigureChecks.cmake)
@@ -628,9 +620,6 @@ endif()# End of BUILD_DESKTOP if
 install(FILES okular.categories  DESTINATION  ${KDE_INSTALL_LOGGINGCATEGORIESDIR})
 
 ki18n_install(po)
-if(KF6DocTools_FOUND)
-    kdoctools_install(po)
-endif()
 
 ########### cmake files #################
 

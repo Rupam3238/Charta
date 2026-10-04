@@ -186,7 +186,6 @@ private:
  * all the Pages ('Page' class) of the current document in a vector and
  * notifies all the registered DocumentObservers when some content changes.
  *
- * For a better understanding of hierarchies @see README.internals.png
  * @see DocumentObserver, Page
  */
 class OKULARCORE_EXPORT Document : public QObject
