@@ -10,9 +10,11 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDomDocument>
+#include <QImage>
 #include <QIcon>
 #include <QMenu>
 #include <QMimeData>
+#include <QPixmap>
 
 #include "annotationpropertiesdialog.h"
 
@@ -34,6 +36,73 @@ Q_DECLARE_METATYPE(AnnotationPopup::AnnotPagePair)
 
 namespace
 {
+class ClipboardImageStampAnnotation final : public Okular::StampAnnotation
+{
+public:
+    explicit ClipboardImageStampAnnotation(const QImage &image)
+        : m_imageFile(QDir::tempPath() + QLatin1String("/charta-clipboard-XXXXXX.png"))
+    {
+        setStampIconName(QString());
+        if (m_imageFile.open() && image.save(&m_imageFile, "PNG") && m_imageFile.flush()) {
+            setStampIconName(m_imageFile.fileName());
+        }
+    }
+
+    bool isValid() const
+    {
+        return !stampIconName().isEmpty() && m_imageFile.isOpen();
+    }
+
+private:
+    QTemporaryFile m_imageFile;
+};
+
+QImage clipboardImage(const QMimeData *mimeData)
+{
+    if (!mimeData) {
+        return {};
+    }
+
+    const QVariant imageData = mimeData->imageData();
+    QImage image;
+    if (imageData.canConvert<QImage>()) {
+        image = imageData.value<QImage>();
+    }
+    if (image.isNull() && imageData.canConvert<QPixmap>()) {
+        image = imageData.value<QPixmap>().toImage();
+    }
+    if (!image.isNull()) {
+        return image;
+    }
+
+    for (const QString &format : mimeData->formats()) {
+        if (format.startsWith(QLatin1String("image/"))) {
+            image = QImage::fromData(mimeData->data(format));
+            if (!image.isNull()) {
+                return image;
+            }
+        }
+    }
+
+    return {};
+}
+
+bool clipboardContainsImageFormat(const QMimeData *mimeData)
+{
+    if (!mimeData) {
+        return false;
+    }
+    if (mimeData->hasImage()) {
+        return true;
+    }
+    for (const QString &format : mimeData->formats()) {
+        if (format.startsWith(QLatin1String("image/")) || format == QLatin1String("application/x-qt-image")) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool annotationHasFileAttachment(Okular::Annotation *annotation)
 {
     return (annotation->subType() == Okular::Annotation::AFileAttachment || annotation->subType() == Okular::Annotation::ARichMedia);
@@ -364,6 +433,46 @@ QList<Okular::Annotation *> AnnotationPopup::pasteAnnotationToPage(int pageNumbe
     }
 
     return annotations;
+}
+
+QList<Okular::Annotation *> AnnotationPopup::pasteClipboardImageToPage(int pageNumber, const Okular::NormalizedPoint *targetPoint)
+{
+    if (pageNumber == -1 || !mDocument->isAllowed(Okular::AllowNotes)) {
+        return {};
+    }
+
+    const QMimeData *mimeData = QApplication::clipboard()->mimeData();
+    const QImage image = clipboardImage(mimeData);
+    if (image.isNull()) {
+        if (clipboardContainsImageFormat(mimeData)) {
+            qWarning() << "Clipboard image data is in an unsupported or unreadable format";
+        }
+        return {};
+    }
+
+    const Okular::Page *page = mDocument->page(pageNumber);
+    if (!page || page->width() <= 0 || page->height() <= 0) {
+        return {};
+    }
+
+    const double imageAspectRatio = static_cast<double>(image.width()) / image.height();
+    const double targetWidthPoints = qMin(page->width() * 0.25, page->height() * 0.4 * imageAspectRatio);
+    const double width = targetWidthPoints / page->width();
+    const double height = targetWidthPoints / imageAspectRatio / page->height();
+    const Okular::NormalizedPoint center = targetPoint ? *targetPoint : Okular::NormalizedPoint(0.5, 0.5);
+    const double centerX = qBound(width / 2.0, center.x, 1.0 - width / 2.0);
+    const double centerY = qBound(height / 2.0, center.y, 1.0 - height / 2.0);
+
+    auto *annotation = new ClipboardImageStampAnnotation(image);
+    if (!annotation->isValid()) {
+        delete annotation;
+        qWarning() << "Unable to create a temporary image for clipboard paste";
+        return {};
+    }
+
+    annotation->setBoundingRectangle(Okular::NormalizedRect(centerX - width / 2.0, centerY - height / 2.0, centerX + width / 2.0, centerY + height / 2.0));
+    mDocument->addPageAnnotation(pageNumber, annotation);
+    return {annotation};
 }
 
 bool AnnotationPopup::clipboardHasAnnotations()

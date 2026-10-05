@@ -49,6 +49,7 @@ public:
 
     void exec(const QPoint point = QPoint());
     QList<Okular::Annotation *> pasteAnnotationToPage(int pageNumber, const Okular::NormalizedPoint *targetPoint = nullptr);
+    QList<Okular::Annotation *> pasteClipboardImageToPage(int pageNumber, const Okular::NormalizedPoint *targetPoint = nullptr);
 
     static bool clipboardHasAnnotations();
 

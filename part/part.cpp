@@ -4543,7 +4543,13 @@ void Part::slotCopyTextSelectionOrAnnotation()
 
 void Part::slotPasteAnnotation()
 {
-    if (!m_document->isAllowed(Okular::AllowNotes) || !AnnotationPopup::clipboardHasAnnotations()) {
+    if (!m_document->isAllowed(Okular::AllowNotes)) {
+        return;
+    }
+
+    const QMimeData *mimeData = QApplication::clipboard()->mimeData();
+    const bool hasAnnotations = AnnotationPopup::clipboardHasAnnotations();
+    if (!hasAnnotations && mimeData && !mimeData->text().isEmpty()) {
         return;
     }
 
@@ -4561,7 +4567,8 @@ void Part::slotPasteAnnotation()
     }
 
     AnnotationPopup annotPopup(m_document, AnnotationPopup::SingleAnnotationMode, widget());
-    const QList<Okular::Annotation *> pastedAnnotations = annotPopup.pasteAnnotationToPage(pageNumber, targetPointPtr);
+    const QList<Okular::Annotation *> pastedAnnotations = hasAnnotations ? annotPopup.pasteAnnotationToPage(pageNumber, targetPointPtr)
+                                                                         : annotPopup.pasteClipboardImageToPage(pageNumber, targetPointPtr);
     if (!pastedAnnotations.isEmpty()) {
         m_pageView->setAnnotationSelectionMode(true);
         m_pageView->selectAnnotations(pastedAnnotations, pageNumber);

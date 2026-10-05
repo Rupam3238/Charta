@@ -158,21 +158,6 @@ static inline double normClamp(double value, double def)
     return (value < 0.0 || value > 1.0) ? def : value;
 }
 
-struct TableSelectionPart {
-    PageViewItem *item;
-    Okular::NormalizedRect rectInItem;
-    Okular::NormalizedRect rectInSelection;
-
-    TableSelectionPart(PageViewItem *item_p, const Okular::NormalizedRect &rectInItem_p, const Okular::NormalizedRect &rectInSelection_p);
-};
-
-TableSelectionPart::TableSelectionPart(PageViewItem *item_p, const Okular::NormalizedRect &rectInItem_p, const Okular::NormalizedRect &rectInSelection_p)
-    : item(item_p)
-    , rectInItem(rectInItem_p)
-    , rectInSelection(rectInSelection_p)
-{
-}
-
 // structure used internally by PageView for data storage
 class PageViewPrivate
 {
@@ -208,10 +193,10 @@ public:
     bool mouseOnRect = false;
     bool annotationSelectionMode = false;
     bool temporaryRightButtonSelection = false;
-    bool annotationAreaSelectionDragging = false;
-    PageViewItem *annotationAreaSelectionItem = nullptr;
-    QPoint annotationAreaSelectionStart;
-    QPoint annotationAreaSelectionEnd;
+    bool annotationSelectionDragging = false;
+    PageViewItem *annotationSelectionItem = nullptr;
+    QPoint annotationSelectionStart;
+    QPoint annotationSelectionEnd;
     int mouseMode = 0;
     MouseAnnotation *mouseAnnotation = nullptr;
     QFrame *annotationSelectionPanel = nullptr;
@@ -219,12 +204,6 @@ public:
     QToolButton *annotationCopyButton = nullptr;
     QToolButton *annotationDeleteButton = nullptr;
     Okular::Annotation *annotationPanelAnnotation = nullptr;
-
-    // table selection
-    QList<double> tableSelectionCols;
-    QList<double> tableSelectionRows;
-    QList<TableSelectionPart> tableSelectionParts;
-    bool tableDividersGuessed = false;
 
     int lastSourceLocationViewportPageNumber = -1;
     double lastSourceLocationViewportNormalizedX = 0.0;
@@ -287,9 +266,7 @@ public:
     KToggleAction *aReadingDirection = nullptr;
     QAction *aMouseNormal = nullptr;
     QAction *aMouseZoom = nullptr;
-    QAction *aMouseSelect = nullptr;
     QAction *aMouseTextSelect = nullptr;
-    QAction *aMouseTableSelect = nullptr;
     QAction *aMouseMagnifier = nullptr;
     KToggleAction *aTrimToSelection = nullptr;
     QAction *aSignature = nullptr;
@@ -889,26 +866,12 @@ void PageView::setupActions(KActionCollection *ac)
     ac->setDefaultShortcuts(d->aZoomOut, KStandardShortcut::zoomOut());
 
     // Mouse-Mode actions
-    d->aMouseSelect = new QAction(QIcon::fromTheme(QStringLiteral("select-rectangular")), i18n("Area &Selection"), this);
-    ac->addAction(QStringLiteral("mouse_select"), d->aMouseSelect);
-    connect(d->aMouseSelect, &QAction::triggered, this, &PageView::slotSetMouseSelect);
-    d->aMouseSelect->setCheckable(true);
-    ac->setDefaultShortcut(d->aMouseSelect, Qt::CTRL | Qt::Key_3);
-    d->aMouseSelect->setActionGroup(d->mouseModeActionGroup);
-
     d->aMouseTextSelect = new QAction(QIcon::fromTheme(QStringLiteral("edit-select-text")), i18n("&Text Selection"), this);
     ac->addAction(QStringLiteral("mouse_textselect"), d->aMouseTextSelect);
     connect(d->aMouseTextSelect, &QAction::triggered, this, &PageView::slotSetMouseTextSelect);
     d->aMouseTextSelect->setCheckable(true);
     ac->setDefaultShortcut(d->aMouseTextSelect, Qt::CTRL | Qt::Key_4);
     d->aMouseTextSelect->setActionGroup(d->mouseModeActionGroup);
-
-    d->aMouseTableSelect = new QAction(QIcon::fromTheme(QStringLiteral("table")), i18n("T&able Selection"), this);
-    ac->addAction(QStringLiteral("mouse_tableselect"), d->aMouseTableSelect);
-    connect(d->aMouseTableSelect, &QAction::triggered, this, &PageView::slotSetMouseTableSelect);
-    d->aMouseTableSelect->setCheckable(true);
-    ac->setDefaultShortcut(d->aMouseTableSelect, Qt::CTRL | Qt::Key_5);
-    d->aMouseTableSelect->setActionGroup(d->mouseModeActionGroup);
 
     d->aMouseMagnifier = new QAction(QIcon::fromTheme(QStringLiteral("document-preview")), i18n("&Magnifier"), this);
     ac->addAction(QStringLiteral("mouse_magnifier"), d->aMouseMagnifier);
@@ -921,9 +884,7 @@ void PageView::setupActions(KActionCollection *ac)
     // Mouse mode selection tools menu
     d->aMouseModeMenu = new ToggleActionMenu(i18nc("@action", "Selection Tools"), this);
     d->aMouseModeMenu->setPopupMode(QToolButton::MenuButtonPopup);
-    d->aMouseModeMenu->addAction(d->aMouseSelect);
     d->aMouseModeMenu->addAction(d->aMouseTextSelect);
-    d->aMouseModeMenu->addAction(d->aMouseTableSelect);
     connect(d->aMouseModeMenu->menu(), &QMenu::triggered, d->aMouseModeMenu, &ToggleActionMenu::setDefaultAction);
     ac->addAction(QStringLiteral("mouse_selecttools"), d->aMouseModeMenu);
 
@@ -931,14 +892,6 @@ void PageView::setupActions(KActionCollection *ac)
     case Okular::Settings::EnumMouseMode::TextSelect:
         d->aMouseTextSelect->setChecked(true);
         d->aMouseModeMenu->setDefaultAction(d->aMouseTextSelect);
-        break;
-    case Okular::Settings::EnumMouseMode::RectSelect:
-        d->aMouseSelect->setChecked(true);
-        d->aMouseModeMenu->setDefaultAction(d->aMouseSelect);
-        break;
-    case Okular::Settings::EnumMouseMode::TableSelect:
-        d->aMouseTableSelect->setChecked(true);
-        d->aMouseModeMenu->setDefaultAction(d->aMouseTableSelect);
         break;
     default:
         d->aMouseModeMenu->setDefaultAction(d->aMouseTextSelect);
@@ -1037,12 +990,6 @@ void PageView::setupActions(KActionCollection *ac)
                 break;
             case Okular::Settings::EnumMouseMode::Zoom:
                 d->aMouseZoom->setChecked(true);
-                break;
-            case Okular::Settings::EnumMouseMode::RectSelect:
-                d->aMouseSelect->setChecked(true);
-                break;
-            case Okular::Settings::EnumMouseMode::TableSelect:
-                d->aMouseTableSelect->setChecked(true);
                 break;
             case Okular::Settings::EnumMouseMode::Magnifier:
                 d->aMouseMagnifier->setChecked(true);
