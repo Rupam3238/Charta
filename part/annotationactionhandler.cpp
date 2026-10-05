@@ -5,6 +5,7 @@
 */
 
 #include "annotationactionhandler.h"
+#include "annotationcolorhistory.h"
 
 // qt includes
 #include <QActionGroup>
@@ -251,7 +252,6 @@ public:
         bool partialEraser = false;
         bool initialized = false;
     };
-    static const QList<QPair<KLocalizedString, QColor>> defaultColors;
     static const QList<double> widthStandardValues;
     static const QList<double> opacityStandardValues;
 
@@ -309,6 +309,7 @@ public:
     void updateConfigActions(const QString &annotType = QLatin1String(""));
     void populateQuickAnnotations();
     KSelectAction *colorPickerAction(AnnotationColor colorType);
+    void rebuildColorPickerAction(KSelectAction *action, AnnotationColor colorType);
 
     const QIcon widthIcon(double width);
     const QIcon stampIcon(const QString &stampIconName);
@@ -381,19 +382,6 @@ public:
 
     int selectedBuiltinTool;
     bool textToolsEnabled;
-};
-
-const QList<QPair<KLocalizedString, QColor>> AnnotationActionHandlerPrivate::defaultColors = {{ki18nc("@item:inlistbox Color name", "Red"), Qt::red},
-                                                                                              {ki18nc("@item:inlistbox Color name", "Orange"), QColor(255, 85, 0)},
-                                                                                              {ki18nc("@item:inlistbox Color name", "Yellow"), Qt::yellow},
-                                                                                              {ki18nc("@item:inlistbox Color name", "Green"), Qt::green},
-                                                                                              {ki18nc("@item:inlistbox Color name", "Cyan"), Qt::cyan},
-                                                                                              {ki18nc("@item:inlistbox Color name", "Blue"), Qt::blue},
-                                                                                              {ki18nc("@item:inlistbox Color name", "Magenta"), Qt::magenta},
-                                                                                              {ki18nc("@item:inlistbox Color name", "White"), Qt::white},
-                                                                                              {ki18nc("@item:inlistbox Color name", "Gray"), Qt::gray},
-                                                                                              {ki18nc("@item:inlistbox Color name", "Black"), Qt::black}
-
 };
 
 const QList<double> AnnotationActionHandlerPrivate::widthStandardValues = {1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5};
@@ -621,17 +609,15 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         row->addWidget(swatch);
         controlLayout->addLayout(row);
         QList<QToolButton *> colorPresets;
-        if (!fillColor) {
-            const QList<QColor> presetColors = {QColor(QStringLiteral("#ff5964")),
-                                                QColor(QStringLiteral("#ffad42")),
-                                                QColor(QStringLiteral("#f3d34a")),
-                                                QColor(QStringLiteral("#27bfd6")),
-                                                QColor(QStringLiteral("#568ee0")),
-                                                QColor(QStringLiteral("#a879d8")),
-                                                QColor(QStringLiteral("#f4f5f7")),
-                                                QColor(QStringLiteral("#151a20"))};
+        {
+            const QList<QColor> presetColors = Okular::AnnotationColorHistory::recentColors();
             auto *presetRow = new QHBoxLayout;
             presetRow->setSpacing(4);
+            if (presetColors.isEmpty()) {
+                auto *emptyState = new QLabel(i18n("No recent colors"), controlParent);
+                emptyState->setMinimumHeight(28);
+                presetRow->addWidget(emptyState);
+            }
             for (const QColor &preset : presetColors) {
                 auto *button = new QToolButton(controlParent);
                 button->setCheckable(true);
@@ -657,6 +643,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
                 QToolButton *button = colorPresets.at(index);
                 const QColor preset = presetColors.at(index);
                 QObject::connect(button, &QToolButton::clicked, q, [this, button, colorPresets, preset, swatch, setSwatch, key, selectedAnnotation, &selectedAnnotationChanged, &selectedColorChanged] {
+                    Okular::AnnotationColorHistory::addRecentColor(preset);
                     for (QToolButton *presetButton : colorPresets) {
                         presetButton->setChecked(presetButton == button);
                     }
@@ -685,6 +672,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             if (!selected.isValid()) {
                 return;
             }
+            Okular::AnnotationColorHistory::addRecentColor(selected);
             for (QToolButton *presetButton : colorPresets) {
                 presetButton->setChecked(false);
             }
@@ -1169,26 +1157,53 @@ void AnnotationActionHandlerPrivate::populateQuickAnnotations()
     }
 }
 
+void AnnotationActionHandlerPrivate::rebuildColorPickerAction(KSelectAction *action, AnnotationColor colorType)
+{
+    while (!action->actions().isEmpty()) {
+        delete action->removeAction(action->actions().constFirst());
+    }
+
+    const QList<QColor> recentColors = Okular::AnnotationColorHistory::recentColors();
+    if (recentColors.isEmpty()) {
+        auto *emptyState = new QAction(i18nc("@item:inlistbox", "No recent colors"), action);
+        emptyState->setEnabled(false);
+        action->addAction(emptyState);
+    }
+
+    const QColor selectedColor = colorType == AnnotationColor::Color ? currentColor : currentInnerColor;
+    QAction *selectedAction = nullptr;
+    for (const QColor &color : recentColors) {
+        auto *colorAction = new QAction(GuiUtils::createColorIcon({color}, QIcon(), GuiUtils::VisualizeTransparent), color.name(QColor::HexArgb), action);
+        action->addAction(colorAction);
+        QObject::connect(colorAction, &QAction::triggered, q, [this, colorType, color]() { slotSetColor(colorType, color); });
+        if (color == selectedColor) {
+            selectedAction = colorAction;
+        }
+    }
+    if (colorType == AnnotationColor::InnerColor) {
+        auto *transparentAction = new QAction(GuiUtils::createColorIcon({Qt::transparent}, QIcon(), GuiUtils::VisualizeTransparent), i18nc("@item:inlistbox Color name", "Transparent"), action);
+        action->addAction(transparentAction);
+        QObject::connect(transparentAction, &QAction::triggered, q, [this, colorType]() { slotSetColor(colorType, Qt::transparent); });
+        if (selectedColor == Qt::transparent) {
+            selectedAction = transparentAction;
+        }
+    }
+
+    auto *customColorAction = new QAction(QIcon::fromTheme(QStringLiteral("color-picker")), i18nc("@item:inlistbox", "Custom Color…"), action);
+    action->addAction(customColorAction);
+    QObject::connect(customColorAction, &QAction::triggered, q, [this, colorType]() { slotSetColor(colorType); });
+    if (selectedAction) {
+        action->setCurrentAction(selectedAction);
+    }
+}
+
 KSelectAction *AnnotationActionHandlerPrivate::colorPickerAction(AnnotationColor colorType)
 {
-    auto colorList = defaultColors;
-    QString aText(i18nc("@action:intoolbar Current annotation config option", "Color"));
-    if (colorType == AnnotationColor::InnerColor) {
-        aText = i18nc("@action:intoolbar Current annotation config option", "Fill Color");
-        colorList.append(QPair<KLocalizedString, Qt::GlobalColor>(ki18nc("@item:inlistbox Color name", "Transparent"), Qt::transparent));
-    }
-    KSelectAction *aColorPicker = new KSelectAction(QIcon(), aText, q);
-    aColorPicker->setToolBarMode(KSelectAction::MenuMode);
-    for (const auto &colorNameValue : colorList) {
-        QColor color(colorNameValue.second);
-        QAction *colorAction = new QAction(GuiUtils::createColorIcon({color}, QIcon(), GuiUtils::VisualizeTransparent), colorNameValue.first.toString(), q);
-        aColorPicker->addAction(colorAction);
-        QObject::connect(colorAction, &QAction::triggered, q, [this, colorType, color]() { slotSetColor(colorType, color); });
-    }
-    QAction *aCustomColor = new QAction(QIcon::fromTheme(QStringLiteral("color-picker")), i18nc("@item:inlistbox", "Custom Color…"), q);
-    aColorPicker->addAction(aCustomColor);
-    QObject::connect(aCustomColor, &QAction::triggered, q, [this, colorType]() { slotSetColor(colorType); });
-    return aColorPicker;
+    const QString actionText = colorType == AnnotationColor::InnerColor ? i18nc("@action:intoolbar Current annotation config option", "Fill Color") : i18nc("@action:intoolbar Current annotation config option", "Color");
+    auto *colorPicker = new KSelectAction(QIcon(), actionText, q);
+    colorPicker->setToolBarMode(KSelectAction::MenuMode);
+    rebuildColorPickerAction(colorPicker, colorType);
+    return colorPicker;
 }
 
 const QIcon AnnotationActionHandlerPrivate::widthIcon(double width)
@@ -1254,6 +1269,9 @@ void AnnotationActionHandlerPrivate::slotSetColor(AnnotationColor colorType, con
         if (!selectedColor.isValid()) {
             return;
         }
+    }
+    if (colorType != AnnotationColor::InnerColor || selectedColor != Qt::transparent) {
+        Okular::AnnotationColorHistory::addRecentColor(selectedColor);
     }
     if (colorType == AnnotationColor::Color) {
         currentColor = selectedColor;
@@ -1513,6 +1531,10 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     // Annotation settings actions
     d->aColor = d->colorPickerAction(AnnotationActionHandlerPrivate::AnnotationColor::Color);
     d->aInnerColor = d->colorPickerAction(AnnotationActionHandlerPrivate::AnnotationColor::InnerColor);
+    connect(Okular::Settings::self(), &Okular::Settings::recentAnnotationColorsChanged, this, [this] {
+        d->rebuildColorPickerAction(d->aColor, AnnotationActionHandlerPrivate::AnnotationColor::Color);
+        d->rebuildColorPickerAction(d->aInnerColor, AnnotationActionHandlerPrivate::AnnotationColor::InnerColor);
+    }, Qt::QueuedConnection);
     d->aFont = new QAction(QIcon::fromTheme(QStringLiteral("font-face")), i18nc("@action:intoolbar Current annotation config option", "Font"), this);
     d->aAdvancedSettings = new QAction(QIcon::fromTheme(QStringLiteral("settings-configure")), i18nc("@action:intoolbar Current annotation advanced settings", "Annotation Settings"), this);
 

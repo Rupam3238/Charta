@@ -12,6 +12,7 @@
   <label>Same as colorModesChanged(), but kconfig_compiler does not allow to inherit signals, so appending a '2'.</label>
  </signal>
  <signal name="primaryAnnotationToolBarChanged" />
+ <signal name="recentAnnotationColorsChanged" />
  <group name="Dlg Performance" >
   <entry key="EnableCompositing" type="Bool" >
    <default>true</default>
@@ -42,6 +43,9 @@
   </entry>
  </group>
  <group name="Reviews" >
+  <entry key="RecentAnnotationColors" type="StringList">
+   <emit signal="recentAnnotationColorsChanged" />
+  </entry>
   <entry key="ReviewsSearchCaseSensitive" type="Bool">
    <default>false</default>
   </entry>

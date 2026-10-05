@@ -511,6 +511,7 @@ if(BUILD_DESKTOP)
     part/embeddedfilesdialog.cpp
     part/actionbar.cpp
     part/annotationactionhandler.cpp
+    part/annotationcolorhistory.cpp
     part/annotwindow.cpp
     part/annotationmodel.cpp
     part/annotationpopup.cpp
