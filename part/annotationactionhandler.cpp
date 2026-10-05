@@ -25,6 +25,7 @@
 #include <QHash>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QKeySequence>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -167,15 +168,28 @@ private:
 class ToolSettingsPopupDismissFilter final : public QObject
 {
 public:
-    explicit ToolSettingsPopupDismissFilter(QDialog *popup, QObject *parent)
+    explicit ToolSettingsPopupDismissFilter(QDialog *popup, QAction *action, QObject *parent)
         : QObject(parent)
         , m_popup(popup)
+        , m_action(action)
     {
     }
 
     bool awaitingEscapeRelease() const
     {
         return m_escapeReleasePending;
+    }
+
+    bool matchesToolShortcut(const QKeyEvent *keyEvent) const
+    {
+        if (!m_action) {
+            return false;
+        }
+        const QKeySequence pressedShortcut(keyEvent->key() | keyEvent->modifiers());
+        const QList<QKeySequence> shortcuts = m_action->shortcuts();
+        return std::any_of(shortcuts.cbegin(), shortcuts.cend(), [&pressedShortcut](const QKeySequence &shortcut) {
+            return shortcut.count() == 1 && shortcut == pressedShortcut;
+        });
     }
 
 protected:
@@ -206,12 +220,21 @@ protected:
                 keyEvent->accept();
                 return true;
             }
+            if (matchesToolShortcut(keyEvent) && (!modalWidget || modalWidget == m_popup || m_popup->isAncestorOf(modalWidget))) {
+                keyEvent->accept();
+                return true;
+            }
         } else if (event->type() == QEvent::KeyPress) {
             auto *keyEvent = static_cast<QKeyEvent *>(event);
             QWidget *modalWidget = QApplication::activeModalWidget();
             if (keyEvent->key() == Qt::Key_Escape && (!modalWidget || modalWidget == m_popup || m_popup->isAncestorOf(modalWidget))) {
                 keyEvent->accept();
                 m_escapeReleasePending = true;
+                m_popup->reject();
+                return true;
+            }
+            if (matchesToolShortcut(keyEvent) && (!modalWidget || modalWidget == m_popup || m_popup->isAncestorOf(modalWidget))) {
+                keyEvent->accept();
                 m_popup->reject();
                 return true;
             }
@@ -235,6 +258,7 @@ protected:
 
 private:
     QDialog *m_popup;
+    QPointer<QAction> m_action;
     bool m_escapeReleasePending = false;
 };
 }
@@ -831,7 +855,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         popupPosition.setY(qBound(available.top(), popupPosition.y(), available.bottom() - popup.height() + 1));
     }
     popup.move(popupPosition);
-    auto *dismissFilter = new ToolSettingsPopupDismissFilter(&popup, qApp);
+    auto *dismissFilter = new ToolSettingsPopupDismissFilter(&popup, action, qApp);
     qApp->installEventFilter(dismissFilter);
     activeToolSettingsPopup = &popup;
     activeToolSettingsAction = action;
