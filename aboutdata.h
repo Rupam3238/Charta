@@ -35,7 +35,6 @@ inline KAboutData okularAboutData()
     about.addAuthor(i18n("Piotr Szymanski"), i18n("Created the upstream viewer from the KPDF codebase"), QStringLiteral("djurban@pld-dc.org"));
     about.addAuthor(i18n("Enrico Ros"), i18n("KPDF developer"), QStringLiteral("eros.kde@email.it"));
     about.addCredit(i18n("Eugene Trounev"), i18n("Annotations artwork"), QStringLiteral("eugene.trounev@gmail.com"));
-    about.addCredit(i18n("Jiri Baum - NICTA"), i18n("Table selection tool"), QStringLiteral("jiri@baum.com.au"));
     about.addCredit(i18n("Fabio D'Urso"), i18n("Annotation improvements"), QStringLiteral("fabiodurso@hotmail.it"));
 
     return about;

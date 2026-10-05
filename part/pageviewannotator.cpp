@@ -2165,20 +2165,20 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
                 }
                 // Exit the signature mode.
                 setSignatureMode(false);
-                selectBuiltinTool(-1, ShowTip::No);
+                selectBuiltinTool(-1);
             }
 #else
             if (signEngine->isAccepted()) {
                 // Exit the signature mode.
                 setSignatureMode(false);
-                selectBuiltinTool(-1, ShowTip::No);
+                selectBuiltinTool(-1);
             }
 #endif
 
             else if (signEngine->isAborted()) {
                 // Exit the signature mode.
                 setSignatureMode(false);
-                selectBuiltinTool(-1, ShowTip::No);
+                selectBuiltinTool(-1);
             }
             m_continuousMode = false;
         }
@@ -2348,17 +2348,17 @@ void PageViewAnnotator::resetPageViewItems()
     cancelPendingFreehandHandoff();
 }
 
-void PageViewAnnotator::selectBuiltinTool(int toolId, ShowTip showTip)
+void PageViewAnnotator::selectBuiltinTool(int toolId)
 {
-    selectTool(m_builtinToolsDefinition, toolId, showTip);
+    selectTool(m_builtinToolsDefinition, toolId);
 }
 
 void PageViewAnnotator::selectQuickTool(int toolId)
 {
-    selectTool(m_quickToolsDefinition, toolId, ShowTip::Yes);
+    selectTool(m_quickToolsDefinition, toolId);
 }
 
-void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId, ShowTip showTip)
+void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId)
 {
     if (m_temporaryPreviousEngine) {
         endTemporaryEraser(true);
@@ -2450,43 +2450,6 @@ void PageViewAnnotator::selectTool(AnnotationTools *toolsDefinition, int toolId,
                 }
             }
 
-            if (showTip == ShowTip::Yes) {
-                // display the tooltip
-                const QString annotType = toolElement.attribute(QStringLiteral("type"));
-                QString tip;
-
-                if (annotType == QLatin1String("ellipse")) {
-                    tip = i18nc("Annotation tool", "Draw an ellipse (drag to select a zone)");
-                } else if (annotType == QLatin1String("highlight")) {
-                    tip = i18nc("Annotation tool", "Highlight text");
-                } else if (annotType == QLatin1String("ink")) {
-                    tip = i18nc("Annotation tool", "Draw a freehand line");
-                } else if (annotType == QLatin1String("note-inline")) {
-                    tip = i18nc("Annotation tool", "Inline Text Annotation (drag to select a zone)");
-                } else if (annotType == QLatin1String("note-linked")) {
-                    tip = i18nc("Annotation tool", "Put a pop-up note");
-                } else if (annotType == QLatin1String("polygon")) {
-                    tip = i18nc("Annotation tool", "Draw a polygon (click on the first point to close it)");
-                } else if (annotType == QLatin1String("rectangle")) {
-                    tip = i18nc("Annotation tool", "Draw a rectangle");
-                } else if (annotType == QLatin1String("squiggly")) {
-                    tip = i18nc("Annotation tool", "Squiggle text");
-                } else if (annotType == QLatin1String("stamp")) {
-                    tip = i18nc("Annotation tool", "Put a stamp symbol");
-                } else if (annotType == QLatin1String("straight-line")) {
-                    tip = i18nc("Annotation tool", "Draw a straight line");
-                } else if (annotType == QLatin1String("strikeout")) {
-                    tip = i18nc("Annotation tool", "Strike out text");
-                } else if (annotType == QLatin1String("underline")) {
-                    tip = i18nc("Annotation tool", "Underline text");
-                } else if (annotType == QLatin1String("typewriter")) {
-                    tip = i18nc("Annotation tool", "Typewriter Annotation (drag to select a zone)");
-                }
-
-                if (!tip.isEmpty()) {
-                    m_pageView->displayMessage(tip, QString(), PageViewMessage::Annotation);
-                }
-            }
         }
 
         // consistency warning
@@ -2534,7 +2497,7 @@ void PageViewAnnotator::endTemporaryEraser(bool cancel)
 
 void PageViewAnnotator::selectLastTool()
 {
-    selectTool(m_lastToolsDefinition, m_lastToolId, ShowTip::No);
+    selectTool(m_lastToolsDefinition, m_lastToolId);
 }
 
 void PageViewAnnotator::selectStampTool(const QString &stampSymbol)
@@ -2545,7 +2508,7 @@ void PageViewAnnotator::selectStampTool(const QString &stampSymbol)
     engineElement.setAttribute(QStringLiteral("hoverIcon"), stampSymbol);
     annotationElement.setAttribute(QStringLiteral("icon"), stampSymbol);
     saveBuiltinAnnotationTools();
-    selectBuiltinTool(STAMP_TOOL_ID, ShowTip::Yes);
+    selectBuiltinTool(STAMP_TOOL_ID);
 }
 
 void PageViewAnnotator::detachAnnotation()
@@ -2553,7 +2516,7 @@ void PageViewAnnotator::detachAnnotation()
     if (m_lastToolId == -1) {
         return;
     }
-    selectBuiltinTool(-1, ShowTip::No);
+    selectBuiltinTool(-1);
     if (!signatureMode()) {
         if (m_actionHandler) {
             m_actionHandler->deselectAllAnnotationActions();

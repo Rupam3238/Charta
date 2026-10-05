@@ -336,6 +336,8 @@ public:
     QHash<QString, DrawingToolSettings> drawingToolSettings;
     QHash<QObject *, QAction *> settingsButtonActions;
     QAction *pendingMousePopupAction = nullptr;
+    QPointer<QDialog> activeToolSettingsPopup;
+    QAction *activeToolSettingsAction = nullptr;
     bool deselectingTools = false;
     QAction *temporaryToolPreviousAction = nullptr;
     QAction *temporaryToolAction = nullptr;
@@ -843,7 +845,11 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
     popup.move(popupPosition);
     auto *dismissFilter = new ToolSettingsPopupDismissFilter(&popup, qApp);
     qApp->installEventFilter(dismissFilter);
+    activeToolSettingsPopup = &popup;
+    activeToolSettingsAction = action;
     popup.exec();
+    activeToolSettingsPopup = nullptr;
+    activeToolSettingsAction = nullptr;
     if (!dismissFilter->awaitingEscapeRelease()) {
         qApp->removeEventFilter(dismissFilter);
         delete dismissFilter;
@@ -1215,7 +1221,7 @@ void AnnotationActionHandlerPrivate::selectTool(int toolId)
         annotator->setEraserMode(false);
     }
     selectedBuiltinTool = toolId;
-    annotator->selectBuiltinTool(toolId, PageViewAnnotator::ShowTip::Yes);
+    annotator->selectBuiltinTool(toolId);
     parseTool(toolId);
 }
 
@@ -1398,7 +1404,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         }
         d->aBrowseTool->setChecked(false);
         d->annotator->setEraserMode(false);
-        d->annotator->selectBuiltinTool(-1, PageViewAnnotator::ShowTip::No);
+        d->annotator->selectBuiltinTool(-1);
         d->annotator->setAnnotationSelectionMode(true);
         d->selectModeSwitchingToBrowse = true;
         d->aBrowseTool->trigger();
@@ -1553,6 +1559,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
                 d->agTools->checkedAction()->setChecked(false);
                 d->selectTool(-1);
             } else if (d->restoringTemporaryTool) {
+                return;
+            } else if (d->activeToolSettingsAction == action && d->activeToolSettingsPopup) {
+                d->activeToolSettingsPopup->reject();
                 return;
             } else if ((mouseRepeat || d->drawingToolKinds.contains(action)) && d->showToolSettings(action)) {
                 return;

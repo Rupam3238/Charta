@@ -75,9 +75,7 @@
   <Menu name="tools"><text>&amp;Tools</text>
     <Action name="mouse_drag"/>
     <Action name="mouse_zoom"/>
-    <Action name="mouse_select"/>
     <Action name="mouse_textselect"/>
-    <Action name="mouse_tableselect"/>
     <Action name="mouse_magnifier"/>
     <Separator/>
     <Action name="mouse_toggle_annotate"/>

@@ -376,9 +376,9 @@ void AnnotationToolBarTest::testAnnotationToolBarActionsEnabledState()
     QCOMPARE(aStamp->isEnabled(), aStampEnabled);
 
     // trigger a reparsing of the tools to ensure that the enabled/disabled state is not changed (bug: 424296)
-    QAction *aMouseSelect = ac->action(QStringLiteral("mouse_select"));
+    QAction *aMouseTextSelect = ac->action(QStringLiteral("mouse_textselect"));
     QAction *aMouseNormal = ac->action(QStringLiteral("mouse_drag"));
-    aMouseSelect->trigger();
+    aMouseTextSelect->trigger();
     aMouseNormal->trigger();
 
     QCOMPARE(aQuickTools->isEnabled(), aQuickToolsEnabled);

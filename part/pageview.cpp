@@ -109,7 +109,8 @@
 #include "videowidget.h"
 
 // Without this the code in DocumentPrivate::setDefaultViewMode
-// that casts Okular::Generator::PageLayout to View::ViewModeModality data won't work
+// that casts Okular::Generator::PageLayout to View::ViewModeModality data won't
+// work
 // Would be possibly better in document.cpp but we can't do it there since Okular::Settings doesn't exist in core
 // This is a bit of a missing feature/documentation in what the QVariant in View API mean
 static_assert(static_cast<int>(Okular::Generator::PageLayout::SinglePage) == Okular::Settings::EnumViewMode::Single);
@@ -147,10 +148,7 @@ protected:
 
 static const std::array<float, 16> kZoomValues {0.12, 0.25, 0.33, 0.50, 0.66, 0.75, 1.00, 1.25, 1.50, 2.00, 4.00, 8.00, 16.00, 25.00, 50.00, 100.00};
 
-// This is the length of the text that will be shown when the user is searching for a specific piece of text.
 static const int searchTextPreviewLength = 21;
-
-// When following a link, only a preview of this length will be used to set the text of the action.
 static const int linkTextPreviewLength = 30;
 
 static inline double normClamp(double value, double def)
@@ -158,7 +156,6 @@ static inline double normClamp(double value, double def)
     return (value < 0.0 || value > 1.0) ? def : value;
 }
 
-// structure used internally by PageView for data storage
 class PageViewPrivate
 {
 public:
@@ -170,14 +167,12 @@ public:
 #endif
     QString selectedText() const;
 
-    // the document, pageviewItems and the 'visible cache'
     PageView *q;
     Okular::Document *document = nullptr;
     QList<PageViewItem *> items;
     QList<PageViewItem *> visibleItems;
     MagnifierView *magnifierView = nullptr;
 
-    // view layout (columns in Settings), zoom and mouse
     PageView::ZoomMode zoomMode = PageView::ZoomFitWidth;
     float zoomFactor = 1.0;
     QPoint mouseGrabOffset;
@@ -1191,80 +1186,6 @@ QString PageViewPrivate::selectedText() const
     return text;
 }
 
-QMimeData *PageView::getTableContents() const
-{
-    QString selText;
-    QString selHtml;
-    QList<double> xs = d->tableSelectionCols;
-    QList<double> ys = d->tableSelectionRows;
-    xs.prepend(0.0);
-    xs.append(1.0);
-    ys.prepend(0.0);
-    ys.append(1.0);
-    selHtml = QString::fromLatin1(
-        "<html><head>"
-        "<meta content=\"text/html; charset=utf-8\" http-equiv=\"Content-Type\">"
-        "</head><body><table>");
-    for (int r = 0; r + 1 < ys.length(); r++) {
-        selHtml += QLatin1String("<tr>");
-        for (int c = 0; c + 1 < xs.length(); c++) {
-            Okular::NormalizedRect cell(xs[c], ys[r], xs[c + 1], ys[r + 1]);
-            if (c) {
-                selText += QLatin1Char('\t');
-            }
-            QString txt;
-            for (const TableSelectionPart &tsp : std::as_const(d->tableSelectionParts)) {
-                // first, crop the cell to this part
-                if (!tsp.rectInSelection.intersects(cell)) {
-                    continue;
-                }
-                Okular::NormalizedRect cellPart = tsp.rectInSelection & cell; // intersection
-
-                // second, convert it from table coordinates to part coordinates
-                cellPart.left -= tsp.rectInSelection.left;
-                cellPart.left /= (tsp.rectInSelection.right - tsp.rectInSelection.left);
-                cellPart.right -= tsp.rectInSelection.left;
-                cellPart.right /= (tsp.rectInSelection.right - tsp.rectInSelection.left);
-                cellPart.top -= tsp.rectInSelection.top;
-                cellPart.top /= (tsp.rectInSelection.bottom - tsp.rectInSelection.top);
-                cellPart.bottom -= tsp.rectInSelection.top;
-                cellPart.bottom /= (tsp.rectInSelection.bottom - tsp.rectInSelection.top);
-
-                // third, convert from part coordinates to item coordinates
-                cellPart.left *= (tsp.rectInItem.right - tsp.rectInItem.left);
-                cellPart.left += tsp.rectInItem.left;
-                cellPart.right *= (tsp.rectInItem.right - tsp.rectInItem.left);
-                cellPart.right += tsp.rectInItem.left;
-                cellPart.top *= (tsp.rectInItem.bottom - tsp.rectInItem.top);
-                cellPart.top += tsp.rectInItem.top;
-                cellPart.bottom *= (tsp.rectInItem.bottom - tsp.rectInItem.top);
-                cellPart.bottom += tsp.rectInItem.top;
-
-                // now get the text
-                Okular::RegularAreaRect rects;
-                rects.append(cellPart);
-                txt += tsp.item->page()->text(&rects, Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
-            }
-            QString html = txt;
-            selText += txt.replace(QLatin1Char('\n'), QLatin1Char(' '));
-            html.replace(QLatin1Char('&'), QLatin1String("&amp;")).replace(QLatin1Char('<'), QLatin1String("&lt;")).replace(QLatin1Char('>'), QLatin1String("&gt;"));
-            // Remove newlines, do not turn them into <br>, because
-            // Excel interprets <br> within cell as new cell...
-            html.replace(QLatin1Char('\n'), QLatin1String(" "));
-            selHtml += QStringLiteral("<td>") + html + QStringLiteral("</td>");
-        }
-        selText += QLatin1Char('\n');
-        selHtml += QLatin1String("</tr>\n");
-    }
-    selHtml += QLatin1String("</table></body></html>\n");
-
-    QMimeData *md = new QMimeData();
-    md->setText(selText);
-    md->setHtml(selHtml);
-
-    return md;
-}
-
 void PageView::copyTextSelection(TextCopyMode mode) const
 {
     switch (d->mouseMode) {
@@ -1276,11 +1197,6 @@ void PageView::copyTextSelection(TextCopyMode mode) const
                 cb->setText(text, QClipboard::Clipboard);
             }
         }
-    } break;
-
-    case Okular::Settings::EnumMouseMode::TableSelect: {
-        QClipboard *cb = QApplication::clipboard();
-        cb->setMimeData(getTableContents(), QClipboard::Clipboard);
     } break;
 
     case Okular::Settings::EnumMouseMode::TextSelect: {
@@ -1417,8 +1333,8 @@ void PageView::notifySetup(const QList<Okular::Page *> &pageSet, int setupFlags)
     d->annotator->resetPageViewItems();
     d->mouseAnnotation->reset();
     updateAnnotationSelectionPanel();
-    d->annotationAreaSelectionDragging = false;
-    d->annotationAreaSelectionItem = nullptr;
+    d->annotationSelectionDragging = false;
+    d->annotationSelectionItem = nullptr;
 
     // delete all widgets (one for each page in pageSet)
     qDeleteAll(d->items);
@@ -2044,7 +1960,7 @@ void PageView::paintEvent(QPaintEvent *pe)
     selectionRectInternal.adjust(1, 1, -1, -1);
     // color for blending
     QColor selBlendColor = (selectionRect.width() > 8 || selectionRect.height() > 8) ? d->mouseSelectionColor : Qt::red;
-    const auto paintAnnotationAreaMarquee = [this](QPainter &painter, const QRect &rect) {
+    const auto paintAnnotationSelectionMarquee = [this](QPainter &painter, const QRect &rect) {
         painter.save();
         QColor fill = palette().color(QPalette::Active, QPalette::Highlight);
         fill.setAlpha(32);
@@ -2085,9 +2001,6 @@ void PageView::paintEvent(QPaintEvent *pe)
 
         // note: this check will take care of all things requiring alpha blending (not only selection)
         bool wantCompositing = !selectionRect.isNull() && contentsRect.intersects(selectionRect);
-        // also alpha-blend when there is a table selection...
-        wantCompositing |= !d->tableSelectionParts.isEmpty();
-
         if (wantCompositing && Okular::Settings::enableCompositing()) {
             // create pixmap and open a painter over it (contents{left,top} becomes pixmap {0,0})
             QPixmap doubleBuffer(contentsRect.size() * devicePixelRatioF());
@@ -2127,45 +2040,10 @@ void PageView::paintEvent(QPaintEvent *pe)
                 pixmapPainter.setPen(selBlendColor);
                 pixmapPainter.drawRect(selectionRect.adjusted(0, 0, -1, -1));
             }
-            // 2b) Layer 1b: paint (blend) transparent selection (table)
-            for (const TableSelectionPart &tsp : std::as_const(d->tableSelectionParts)) {
-                QRect selectionPartRect = tsp.rectInItem.geometry(tsp.item->uncroppedWidth(), tsp.item->uncroppedHeight());
-                selectionPartRect.translate(tsp.item->uncroppedGeometry().topLeft());
-                QRect selectionPartRectInternal = selectionPartRect;
-                selectionPartRectInternal.adjust(1, 1, -1, -1);
-                if (!selectionPartRect.isNull() && selectionPartRect.intersects(contentsRect) && !selectionPartRectInternal.contains(contentsRect)) {
-                    QRect blendRect = selectionPartRectInternal.intersected(contentsRect);
-                    // skip rectangles covered by the selection's border
-                    if (blendRect.isValid()) {
-                        // grab current pixmap into a new one to colorize contents
-                        QPixmap blendedPixmap(blendRect.width() * devicePixelRatioF(), blendRect.height() * devicePixelRatioF());
-                        blendedPixmap.setDevicePixelRatio(devicePixelRatioF());
-                        QPainter p(&blendedPixmap);
-                        p.drawPixmap(0,
-                                     0,
-                                     doubleBuffer,
-                                     (blendRect.left() - contentsRect.left()) * devicePixelRatioF(),
-                                     (blendRect.top() - contentsRect.top()) * devicePixelRatioF(),
-                                     blendRect.width() * devicePixelRatioF(),
-                                     blendRect.height() * devicePixelRatioF());
-
-                        QColor blCol = d->mouseSelectionColor.darker(140);
-                        blCol.setAlphaF(0.2);
-                        p.fillRect(blendedPixmap.rect(), blCol);
-                        p.end();
-                        // copy the blended pixmap back to its place
-                        pixmapPainter.drawPixmap(blendRect.left(), blendRect.top(), blendedPixmap);
-                    }
-                    // draw border (red if the selection is too small)
-                    pixmapPainter.setPen(d->mouseSelectionColor);
-                    pixmapPainter.drawRect(selectionPartRect.adjusted(0, 0, -1, -1));
-                }
-            }
-            drawTableDividers(&pixmapPainter);
-            if (d->annotationAreaSelectionDragging) {
-                const QRect selectionRect = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
+            if (d->annotationSelectionDragging) {
+                const QRect selectionRect = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
                 if (selectionRect.intersects(contentsRect)) {
-                    paintAnnotationAreaMarquee(pixmapPainter, selectionRect);
+                    paintAnnotationSelectionMarquee(pixmapPainter, selectionRect);
                 }
             }
             // 3a) Layer 1: give annotator painting control
@@ -2192,22 +2070,10 @@ void PageView::paintEvent(QPaintEvent *pe)
                 screenPainter.setPen(palette().color(QPalette::Active, QPalette::Highlight).darker(110));
                 screenPainter.drawRect(selectionRect);
             }
-            // 2b) Layer 1b: paint opaque selection (table)
-            for (const TableSelectionPart &tsp : std::as_const(d->tableSelectionParts)) {
-                QRect selectionPartRect = tsp.rectInItem.geometry(tsp.item->uncroppedWidth(), tsp.item->uncroppedHeight());
-                selectionPartRect.translate(tsp.item->uncroppedGeometry().topLeft());
-                QRect selectionPartRectInternal = selectionPartRect;
-                selectionPartRectInternal.adjust(1, 1, -1, -1);
-                if (!selectionPartRect.isNull() && selectionPartRect.intersects(contentsRect) && !selectionPartRectInternal.contains(contentsRect)) {
-                    screenPainter.setPen(palette().color(QPalette::Active, QPalette::Highlight).darker(110));
-                    screenPainter.drawRect(selectionPartRect);
-                }
-            }
-            drawTableDividers(&screenPainter);
-            if (d->annotationAreaSelectionDragging) {
-                const QRect selectionRect = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
+            if (d->annotationSelectionDragging) {
+                const QRect selectionRect = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
                 if (selectionRect.intersects(contentsRect)) {
-                    paintAnnotationAreaMarquee(screenPainter, selectionRect);
+                    paintAnnotationSelectionMarquee(screenPainter, selectionRect);
                 }
             }
             // 3a) Layer 1: give annotator painting control
@@ -2221,38 +2087,6 @@ void PageView::paintEvent(QPaintEvent *pe)
             if (Okular::Settings::debugDrawBoundaries()) {
                 screenPainter.setPen(Qt::red);
                 screenPainter.drawRect(contentsRect);
-            }
-        }
-    }
-}
-
-void PageView::drawTableDividers(QPainter *screenPainter)
-{
-    if (!d->tableSelectionParts.isEmpty()) {
-        screenPainter->setPen(d->mouseSelectionColor.darker());
-        if (d->tableDividersGuessed) {
-            QPen p = screenPainter->pen();
-            p.setStyle(Qt::DashLine);
-            screenPainter->setPen(p);
-        }
-        for (const TableSelectionPart &tsp : std::as_const(d->tableSelectionParts)) {
-            QRect selectionPartRect = tsp.rectInItem.geometry(tsp.item->uncroppedWidth(), tsp.item->uncroppedHeight());
-            selectionPartRect.translate(tsp.item->uncroppedGeometry().topLeft());
-            QRect selectionPartRectInternal = selectionPartRect;
-            selectionPartRectInternal.adjust(1, 1, -1, -1);
-            for (double col : std::as_const(d->tableSelectionCols)) {
-                if (col >= tsp.rectInSelection.left && col <= tsp.rectInSelection.right) {
-                    col = (col - tsp.rectInSelection.left) / (tsp.rectInSelection.right - tsp.rectInSelection.left);
-                    const int x = selectionPartRect.left() + col * selectionPartRect.width() + 0.5;
-                    screenPainter->drawLine(x, selectionPartRectInternal.top(), x, selectionPartRectInternal.top() + selectionPartRectInternal.height());
-                }
-            }
-            for (double row : std::as_const(d->tableSelectionRows)) {
-                if (row >= tsp.rectInSelection.top && row <= tsp.rectInSelection.bottom) {
-                    row = (row - tsp.rectInSelection.top) / (tsp.rectInSelection.bottom - tsp.rectInSelection.top);
-                    const int y = selectionPartRect.top() + row * selectionPartRect.height() + 0.5;
-                    screenPainter->drawLine(selectionPartRectInternal.left(), y, selectionPartRectInternal.left() + selectionPartRectInternal.width(), y);
-                }
             }
         }
     }
@@ -2353,10 +2187,10 @@ void PageView::keyPressEvent(QKeyEvent *e)
         }
         break;
     case Qt::Key_Escape:
-        if (d->annotationAreaSelectionDragging) {
-            const QRect marquee = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized().adjusted(-2, -2, 2, 2);
-            d->annotationAreaSelectionDragging = false;
-            d->annotationAreaSelectionItem = nullptr;
+        if (d->annotationSelectionDragging) {
+            const QRect marquee = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized().adjusted(-2, -2, 2, 2);
+            d->annotationSelectionDragging = false;
+            d->annotationSelectionItem = nullptr;
             d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
             viewport()->update(marquee.translated(-contentAreaPosition()));
         }
@@ -2367,7 +2201,7 @@ void PageView::keyPressEvent(QKeyEvent *e)
             updateCursor();
         }
         Q_EMIT escPressed();
-        selectionClear(d->tableDividersGuessed ? ClearOnlyDividers : ClearAllSelection);
+        selectionClear();
         textSelectionClear();
         d->mousePressPos = QPointF();
         if (d->aPrevAction) {
@@ -2528,15 +2362,15 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
     const bool selectionButton = leftButton || (d->temporaryRightButtonSelection && rightButton);
 
     PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
-    if (d->annotationSelectionMode && d->annotationAreaSelectionDragging) {
-        const QRect oldSelection = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
-        d->annotationAreaSelectionEnd = eventPos;
-        const QRect newSelection = QRect(d->annotationAreaSelectionStart, d->annotationAreaSelectionEnd).normalized();
+    if (d->annotationSelectionMode && d->annotationSelectionDragging) {
+        const QRect oldSelection = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
+        d->annotationSelectionEnd = eventPos;
+        const QRect newSelection = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
         viewport()->update((oldSelection | newSelection).adjusted(-2, -2, 2, 2).translated(-contentAreaPosition()));
-        if (d->temporaryRightButtonSelection && d->annotationAreaSelectionItem) {
-            const QRect selectionRect = newSelection.translated(-d->annotationAreaSelectionItem->uncroppedGeometry().topLeft())
-                                           .intersected(QRect(QPoint(0, 0), d->annotationAreaSelectionItem->uncroppedGeometry().size()));
-            d->mouseAnnotation->selectAnnotationsInRect(d->annotationAreaSelectionItem, selectionRect);
+        if (d->temporaryRightButtonSelection && d->annotationSelectionItem) {
+            const QRect selectionRect = newSelection.translated(-d->annotationSelectionItem->uncroppedGeometry().topLeft())
+                                           .intersected(QRect(QPoint(0, 0), d->annotationSelectionItem->uncroppedGeometry().size()));
+            d->mouseAnnotation->selectAnnotationsInRect(d->annotationSelectionItem, selectionRect);
             updateAnnotationSelectionPanel();
             updateCursor();
         }
@@ -2584,7 +2418,7 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
                     d->scroller->handleInput(QScroller::InputMove, e->pos() + d->mouseGrabOffset, e->timestamp());
                 }
             }
-        } else if (rightButton && !d->mousePressPos.isNull() && d->aMouseSelect) {
+        } else if (rightButton && !d->mousePressPos.isNull()) {
             // A right-button drag temporarily uses annotation selection in Browse mode.
             qreal deltaX = d->mousePressPos.x() - e->globalPosition().x(), deltaY = d->mousePressPos.y() - e->globalPosition().y();
             if (deltaX > 5 || deltaX < -5 || deltaY > 5 || deltaY < -5) {
@@ -2593,10 +2427,10 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
                 if (selectionPage && d->annotator->beginTemporarySelectionTool()) {
                     d->temporaryRightButtonSelection = true;
                     d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
-                    d->annotationAreaSelectionDragging = true;
-                    d->annotationAreaSelectionItem = selectionPage;
-                    d->annotationAreaSelectionStart = startPos;
-                    d->annotationAreaSelectionEnd = eventPos;
+                    d->annotationSelectionDragging = true;
+                    d->annotationSelectionItem = selectionPage;
+                    d->annotationSelectionStart = startPos;
+                    d->annotationSelectionEnd = eventPos;
                     d->scroller->stop();
                     updateAnnotationSelectionPanel();
                     updateCursor();
@@ -2605,15 +2439,13 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
                 break;
             }
         } else {
-            /* Forward move events which are still not yet consumed by "mouse grab" or aMouseSelect */
+            /* Forward move events which are still not yet consumed by "mouse grab" */
             d->mouseAnnotation->routeMouseMoveEvent(pageItem, eventPos, leftButton, e->modifiers());
             updateCursor();
         }
     } break;
 
     case Okular::Settings::EnumMouseMode::Zoom:
-    case Okular::Settings::EnumMouseMode::RectSelect:
-    case Okular::Settings::EnumMouseMode::TableSelect:
     case Okular::Settings::EnumMouseMode::TrimSelect:
         // set second corner of selection
         if (d->mouseSelecting) {
@@ -2698,10 +2530,10 @@ void PageView::mousePressEvent(QMouseEvent *e)
                 }
                 d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                 updateAnnotationSelectionPanel();
-                d->annotationAreaSelectionDragging = true;
-                d->annotationAreaSelectionItem = pageItem;
-                d->annotationAreaSelectionStart = eventPos;
-                d->annotationAreaSelectionEnd = eventPos;
+                d->annotationSelectionDragging = true;
+                d->annotationSelectionItem = pageItem;
+                d->annotationSelectionStart = eventPos;
+                d->annotationSelectionEnd = eventPos;
                 d->scroller->stop();
             }
         }
@@ -2763,104 +2595,9 @@ void PageView::mousePressEvent(QMouseEvent *e)
         updateMagnifier(eventPos);
         break;
 
-    case Okular::Settings::EnumMouseMode::RectSelect: // set first corner of the selection rect
     case Okular::Settings::EnumMouseMode::TrimSelect:
         if (leftButton) {
             selectionStart(eventPos, palette().color(QPalette::Active, QPalette::Highlight).lighter(120), false);
-        }
-        break;
-    case Okular::Settings::EnumMouseMode::TableSelect:
-        if (leftButton) {
-            if (d->tableSelectionParts.isEmpty()) {
-                selectionStart(eventPos, palette().color(QPalette::Active, QPalette::Highlight).lighter(120), false);
-            } else {
-                QRect updatedRect;
-                for (const TableSelectionPart &tsp : std::as_const(d->tableSelectionParts)) {
-                    QRect selectionPartRect = tsp.rectInItem.geometry(tsp.item->uncroppedWidth(), tsp.item->uncroppedHeight());
-                    selectionPartRect.translate(tsp.item->uncroppedGeometry().topLeft());
-
-                    // This will update the whole table rather than just the added/removed divider
-                    // (which can span more than one part).
-                    updatedRect = updatedRect.united(selectionPartRect);
-
-                    if (!selectionPartRect.contains(eventPos)) {
-                        continue;
-                    }
-
-                    // At this point it's clear we're either adding or removing a divider manually, so obviously the user is happy with the guess (if any).
-                    d->tableDividersGuessed = false;
-
-                    // There's probably a neat trick to finding which edge it's closest to,
-                    // but this way has the advantage of simplicity.
-                    const int fromLeft = abs(selectionPartRect.left() - eventPos.x());
-                    const int fromRight = abs(selectionPartRect.left() + selectionPartRect.width() - eventPos.x());
-                    const int fromTop = abs(selectionPartRect.top() - eventPos.y());
-                    const int fromBottom = abs(selectionPartRect.top() + selectionPartRect.height() - eventPos.y());
-                    const int colScore = fromTop < fromBottom ? fromTop : fromBottom;
-                    const int rowScore = fromLeft < fromRight ? fromLeft : fromRight;
-
-                    if (colScore < rowScore) {
-                        bool deleted = false;
-                        for (int i = 0; i < d->tableSelectionCols.length(); i++) {
-                            const double col = (d->tableSelectionCols[i] - tsp.rectInSelection.left) / (tsp.rectInSelection.right - tsp.rectInSelection.left);
-                            const int colX = selectionPartRect.left() + col * selectionPartRect.width() + 0.5;
-                            if (abs(colX - eventPos.x()) <= 3) {
-                                d->tableSelectionCols.removeAt(i);
-                                deleted = true;
-
-                                break;
-                            }
-                        }
-                        if (!deleted) {
-                            double col = eventPos.x() - selectionPartRect.left();
-                            col /= selectionPartRect.width(); // at this point, it's normalised within the part
-                            col *= (tsp.rectInSelection.right - tsp.rectInSelection.left);
-                            col += tsp.rectInSelection.left; // at this point, it's normalised within the whole table
-
-                            d->tableSelectionCols.append(col);
-                            std::sort(d->tableSelectionCols.begin(), d->tableSelectionCols.end());
-                        }
-                    } else {
-                        bool deleted = false;
-                        for (int i = 0; i < d->tableSelectionRows.length(); i++) {
-                            const double row = (d->tableSelectionRows[i] - tsp.rectInSelection.top) / (tsp.rectInSelection.bottom - tsp.rectInSelection.top);
-                            const int rowY = selectionPartRect.top() + row * selectionPartRect.height() + 0.5;
-                            if (abs(rowY - eventPos.y()) <= 3) {
-                                d->tableSelectionRows.removeAt(i);
-                                deleted = true;
-
-                                break;
-                            }
-                        }
-                        if (!deleted) {
-                            double row = eventPos.y() - selectionPartRect.top();
-                            row /= selectionPartRect.height(); // at this point, it's normalised within the part
-                            row *= (tsp.rectInSelection.bottom - tsp.rectInSelection.top);
-                            row += tsp.rectInSelection.top; // at this point, it's normalised within the whole table
-
-                            d->tableSelectionRows.append(row);
-                            std::sort(d->tableSelectionRows.begin(), d->tableSelectionRows.end());
-                        }
-                    }
-                }
-                updatedRect.translate(-contentAreaPosition());
-                viewport()->update(updatedRect);
-            }
-        } else if (rightButton && !d->tableSelectionParts.isEmpty()) {
-            QMenu menu(this);
-            QAction *copyToClipboard = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), i18n("Copy Table Contents to Clipboard"));
-
-            const bool copyAllowed = d->document->isAllowed(Okular::AllowCopy);
-
-            if (!copyAllowed) {
-                copyToClipboard->setEnabled(false);
-                copyToClipboard->setText(i18n("Copy forbidden by DRM"));
-            }
-
-            const QAction *choice = menu.exec(e->globalPosition().toPoint());
-            if (choice == copyToClipboard) {
-                copyTextSelection(TextCopyMode::AsProvided);
-            }
         }
         break;
     case Okular::Settings::EnumMouseMode::TextSelect:
@@ -2981,20 +2718,20 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
         }
         const bool selectionButton = leftButton || (d->temporaryRightButtonSelection && rightButton);
         if (selectionButton) {
-            if (d->annotationAreaSelectionDragging && d->annotationAreaSelectionItem) {
-                if ((eventPos - d->annotationAreaSelectionStart).manhattanLength() >= QApplication::startDragDistance()) {
-                    const QRect selectionRect = QRect(d->annotationAreaSelectionStart, eventPos)
+            if (d->annotationSelectionDragging && d->annotationSelectionItem) {
+                if ((eventPos - d->annotationSelectionStart).manhattanLength() >= QApplication::startDragDistance()) {
+                    const QRect selectionRect = QRect(d->annotationSelectionStart, eventPos)
                                                    .normalized()
-                                                   .translated(-d->annotationAreaSelectionItem->uncroppedGeometry().topLeft())
-                                                   .intersected(QRect(QPoint(0, 0), d->annotationAreaSelectionItem->uncroppedGeometry().size()));
-                    d->mouseAnnotation->selectAnnotationsInRect(d->annotationAreaSelectionItem, selectionRect);
+                                                   .translated(-d->annotationSelectionItem->uncroppedGeometry().topLeft())
+                                                   .intersected(QRect(QPoint(0, 0), d->annotationSelectionItem->uncroppedGeometry().size()));
+                    d->mouseAnnotation->selectAnnotationsInRect(d->annotationSelectionItem, selectionRect);
                 } else {
                     d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                 }
                 updateAnnotationSelectionPanel();
-                const QRect repaintRect = QRect(d->annotationAreaSelectionStart, eventPos).normalized().adjusted(-2, -2, 2, 2);
-                d->annotationAreaSelectionDragging = false;
-                d->annotationAreaSelectionItem = nullptr;
+                const QRect repaintRect = QRect(d->annotationSelectionStart, eventPos).normalized().adjusted(-2, -2, 2, 2);
+                d->annotationSelectionDragging = false;
+                d->annotationSelectionItem = nullptr;
                 viewport()->update(repaintRect.translated(-contentAreaPosition()));
             }
         }
@@ -3162,264 +2899,6 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
 
         break;
     }
-    case Okular::Settings::EnumMouseMode::RectSelect: {
-        // if it is a left release checks if is over a previous link press
-        if (leftButton && mouseReleaseOverLink(d->mouseOverLinkObject)) {
-            selectionClear();
-            break;
-        }
-
-        // if mouse is released and selection is null this is a rightClick
-        if (rightButton && !d->mouseSelecting) {
-            PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
-            if (pageItem) {
-                QMenu *menu = nullptr;
-                AnnotationPopup annotPopup(d->document, AnnotationPopup::MultiAnnotationMode, this);
-                if (addAnnotationActionsForPoint(annotPopup, pageItem, eventPos, &menu)) {
-                    menu->exec(e->globalPosition().toPoint());
-                    menu->deleteLater();
-                    break;
-                }
-            }
-            Q_EMIT rightClick(pageItem ? pageItem->page() : nullptr, e->globalPosition().toPoint());
-            break;
-        }
-
-        // if a selection is defined, display a popup
-        if ((!leftButton && !d->aPrevAction) || (!rightButton && d->aPrevAction) || !d->mouseSelecting) {
-            break;
-        }
-
-        QRect selectionRect = d->mouseSelectionRect.normalized();
-        if (selectionRect.width() <= 8 && selectionRect.height() <= 8) {
-            selectionClear();
-            if (d->aPrevAction) {
-                d->aPrevAction->trigger();
-                d->aPrevAction = nullptr;
-            }
-            break;
-        }
-
-        // if we support text generation
-        QString selectedText;
-        if (d->document->supportsSearching()) {
-            // grab text in selection by extracting it from all intersected pages
-            const Okular::Page *okularPage = nullptr;
-            for (const PageViewItem *item : std::as_const(d->items)) {
-                if (!item->isVisible()) {
-                    continue;
-                }
-
-                const QRect &itemRect = item->croppedGeometry();
-                if (selectionRect.intersects(itemRect)) {
-                    // request the textpage if there isn't one
-                    okularPage = item->page();
-                    qCDebug(OkularUiDebug) << "checking if page" << item->pageNumber() << "has text:" << okularPage->hasTextPage();
-                    if (!okularPage->hasTextPage()) {
-                        d->document->requestTextPage(okularPage->number());
-                    }
-                    // grab text in the rect that intersects itemRect
-                    QRect relativeRect = selectionRect.intersected(itemRect);
-                    relativeRect.translate(-item->uncroppedGeometry().topLeft());
-                    Okular::RegularAreaRect rects;
-                    rects.append(Okular::NormalizedRect(relativeRect, item->uncroppedWidth(), item->uncroppedHeight()));
-                    selectedText += okularPage->text(&rects);
-                }
-            }
-        }
-
-        // popup that ask to copy:text and copy/save:image
-        QMenu menu(this);
-        menu.setObjectName(QStringLiteral("PopupMenu"));
-        QAction *textToClipboard = nullptr;
-        QAction *textWithoutLineBreaksToClipboard = nullptr;
-#if HAVE_SPEECH
-        const QAction *speakText = nullptr;
-#endif
-        const QAction *imageToClipboard = nullptr;
-        const QAction *imageToFile = nullptr;
-        if (d->document->supportsSearching() && !selectedText.isEmpty()) {
-            menu.addAction(new OKMenuTitle(&menu, i18np("Text (1 character)", "Text (%1 characters)", selectedText.length())));
-            textToClipboard = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), i18n("Copy to Clipboard"));
-            textToClipboard->setObjectName(QStringLiteral("CopyTextToClipboard"));
-            textWithoutLineBreaksToClipboard = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy-without-line-breaks")), i18n("Copy Text (Without line breaks)"));
-            textWithoutLineBreaksToClipboard->setObjectName(QStringLiteral("CopyTextWithoutLineBreaksToClipboard"));
-            bool copyAllowed = d->document->isAllowed(Okular::AllowCopy);
-            if (!copyAllowed) {
-                textToClipboard->setEnabled(false);
-                textToClipboard->setText(i18n("Copy forbidden by DRM"));
-                textWithoutLineBreaksToClipboard->setEnabled(false);
-                textWithoutLineBreaksToClipboard->setText(i18n("Copy forbidden by DRM"));
-            }
-#if HAVE_SPEECH
-            if (Okular::Settings::useTTS()) {
-                speakText = menu.addAction(QIcon::fromTheme(QStringLiteral("text-speak")), i18n("Speak Text"));
-            }
-#endif
-            if (copyAllowed) {
-                addSearchWithinDocumentAction(&menu, selectedText);
-                addWebShortcutsMenu(&menu, selectedText);
-            }
-        }
-        menu.addAction(new OKMenuTitle(&menu, i18n("Image (%1 × %2 pixels)", selectionRect.width(), selectionRect.height())));
-        imageToClipboard = menu.addAction(QIcon::fromTheme(QStringLiteral("image-x-generic")), i18n("Copy to Clipboard"));
-        imageToFile = menu.addAction(QIcon::fromTheme(QStringLiteral("document-save")), i18n("Save to File…"));
-        const QAction *choice = menu.exec(e->globalPosition().toPoint());
-        // check if the user really selected an action
-        if (choice) {
-            // IMAGE operation chosen
-            if (choice == imageToClipboard || choice == imageToFile) {
-                // renders page into a pixmap
-                QPixmap copyPix(selectionRect.width(), selectionRect.height());
-                QPainter copyPainter(&copyPix);
-                copyPainter.translate(-selectionRect.left(), -selectionRect.top());
-                drawDocumentOnPainter(selectionRect, &copyPainter);
-                copyPainter.end();
-
-                if (choice == imageToClipboard) {
-                    // [2] copy pixmap to clipboard
-                    QClipboard *cb = QApplication::clipboard();
-                    cb->setPixmap(copyPix, QClipboard::Clipboard);
-                    if (cb->supportsSelection()) {
-                        cb->setPixmap(copyPix, QClipboard::Selection);
-                    }
-                    d->messageWindow->display(i18n("Image [%1 × %2] copied to clipboard.", copyPix.width(), copyPix.height()));
-                } else if (choice == imageToFile) {
-                    // [3] save pixmap to file
-                    QString fileName = QFileDialog::getSaveFileName(this, i18n("Save file"), QString(), i18n("Images (*.png *.jpeg)"));
-                    if (fileName.isEmpty()) {
-                        d->messageWindow->display(i18n("File not saved."), QString(), PageViewMessage::Warning);
-                    } else {
-                        QMimeDatabase db;
-                        QMimeType mime = db.mimeTypeForUrl(QUrl::fromLocalFile(fileName));
-                        QString type;
-                        if (!mime.isDefault()) {
-                            type = QStringLiteral("PNG");
-                        } else {
-                            type = mime.name().section(QLatin1Char('/'), -1).toUpper();
-                        }
-                        copyPix.save(fileName, qPrintable(type));
-                        d->messageWindow->display(i18n("Image [%1 × %2] saved to %3 file.", copyPix.width(), copyPix.height(), type));
-                    }
-                }
-            }
-            // TEXT operation chosen
-            else {
-                if (choice == textToClipboard) {
-                    // [1.1] copy text to clipboard
-                    QClipboard *cb = QApplication::clipboard();
-                    cb->setText(selectedText, QClipboard::Clipboard);
-                    if (cb->supportsSelection()) {
-                        cb->setText(selectedText, QClipboard::Selection);
-                    }
-                } else if (choice == textWithoutLineBreaksToClipboard) {
-                    // [1.2] copy text without line breaks to clipboard
-                    QClipboard *cb = QApplication::clipboard();
-                    cb->setText(Okular::removeLineBreaks(selectedText), QClipboard::Clipboard);
-                    if (cb->supportsSelection()) {
-                        cb->setText(Okular::removeLineBreaks(selectedText), QClipboard::Selection);
-                    }
-                }
-#if HAVE_SPEECH
-                else if (choice == speakText) {
-                    // [2] speech selection using TTS
-                    d->tts()->say(selectedText);
-                }
-#endif
-            }
-        }
-        // clear widget selection and invalidate rect
-        selectionClear();
-
-        // restore previous action if came from it using right button
-        if (d->aPrevAction) {
-            d->aPrevAction->trigger();
-            d->aPrevAction = nullptr;
-        }
-    } break;
-
-    case Okular::Settings::EnumMouseMode::TableSelect: {
-        // if it is a left release checks if is over a previous link press
-        if (leftButton && mouseReleaseOverLink(d->mouseOverLinkObject)) {
-            selectionClear();
-            break;
-        }
-
-        // if mouse is released and selection is null this is a rightClick
-        if (rightButton && !d->mouseSelecting) {
-            PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
-            if (pageItem) {
-                QMenu *menu = nullptr;
-                AnnotationPopup annotPopup(d->document, AnnotationPopup::MultiAnnotationMode, this);
-                if (addAnnotationActionsForPoint(annotPopup, pageItem, eventPos, &menu)) {
-                    menu->exec(e->globalPosition().toPoint());
-                    menu->deleteLater();
-                    break;
-                }
-            }
-            Q_EMIT rightClick(pageItem ? pageItem->page() : nullptr, e->globalPosition().toPoint());
-            break;
-        }
-
-        QRect selectionRect = d->mouseSelectionRect.normalized();
-        if (selectionRect.width() <= 8 && selectionRect.height() <= 8 && d->tableSelectionParts.isEmpty()) {
-            selectionClear();
-            if (d->aPrevAction) {
-                d->aPrevAction->trigger();
-                d->aPrevAction = nullptr;
-            }
-            break;
-        }
-
-        if (d->mouseSelecting) {
-            // break up the selection into page-relative pieces
-            d->tableSelectionParts.clear();
-            const Okular::Page *okularPage = nullptr;
-            for (PageViewItem *item : std::as_const(d->items)) {
-                if (!item->isVisible()) {
-                    continue;
-                }
-
-                const QRect &itemRect = item->croppedGeometry();
-                if (selectionRect.intersects(itemRect)) {
-                    // request the textpage if there isn't one
-                    okularPage = item->page();
-                    qCDebug(OkularUiDebug) << "checking if page" << item->pageNumber() << "has text:" << okularPage->hasTextPage();
-                    if (!okularPage->hasTextPage()) {
-                        d->document->requestTextPage(okularPage->number());
-                    }
-                    // grab text in the rect that intersects itemRect
-                    QRect rectInItem = selectionRect.intersected(itemRect);
-                    rectInItem.translate(-item->uncroppedGeometry().topLeft());
-                    QRect rectInSelection = selectionRect.intersected(itemRect);
-                    rectInSelection.translate(-selectionRect.topLeft());
-                    d->tableSelectionParts.append(
-                        TableSelectionPart(item, Okular::NormalizedRect(rectInItem, item->uncroppedWidth(), item->uncroppedHeight()), Okular::NormalizedRect(rectInSelection, selectionRect.width(), selectionRect.height())));
-                }
-            }
-
-            QRect updatedRect = d->mouseSelectionRect.normalized().adjusted(0, 0, 1, 1);
-            updatedRect.translate(-contentAreaPosition());
-            d->mouseSelecting = false;
-            d->mouseSelectionRect.setCoords(0, 0, 0, 0);
-            d->tableSelectionCols.clear();
-            d->tableSelectionRows.clear();
-            guessTableDividers();
-            viewport()->update(updatedRect);
-        }
-
-        if (!d->document->isAllowed(Okular::AllowCopy)) {
-            d->messageWindow->display(i18n("Copy forbidden by DRM"), QString(), PageViewMessage::Info, -1);
-            break;
-        }
-
-        QClipboard *cb = QApplication::clipboard();
-        if (cb->supportsSelection()) {
-            cb->setMimeData(getTableContents(), QClipboard::Selection);
-        }
-
-    } break;
-
     case Okular::Settings::EnumMouseMode::TextSelect:
         // if it is a left release checks if is over a previous link press
         if (leftButton && mouseReleaseOverLink(d->mouseOverLinkObject)) {
@@ -3520,102 +2999,6 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
 
     // reset mouse press / 'drag start' position
     d->mousePressPos = QPointF();
-}
-
-void PageView::guessTableDividers()
-{
-    QList<QPair<double, int>> colTicks, rowTicks, colSelectionTicks, rowSelectionTicks;
-
-    for (const TableSelectionPart &tsp : std::as_const(d->tableSelectionParts)) {
-        // add ticks for the edges of this area...
-        colSelectionTicks.append(qMakePair(tsp.rectInSelection.left, +1));
-        colSelectionTicks.append(qMakePair(tsp.rectInSelection.right, -1));
-        rowSelectionTicks.append(qMakePair(tsp.rectInSelection.top, +1));
-        rowSelectionTicks.append(qMakePair(tsp.rectInSelection.bottom, -1));
-
-        // get the words in this part
-        Okular::RegularAreaRect rects;
-        rects.append(tsp.rectInItem);
-        const Okular::TextEntity::List words = tsp.item->page()->words(&rects, Okular::TextPage::CentralPixelTextAreaInclusionBehaviour);
-
-        for (const Okular::TextEntity &te : words) {
-            if (te.text().isEmpty()) {
-                continue;
-            }
-
-            Okular::NormalizedRect wordArea = te.area();
-
-            // convert it from item coordinates to part coordinates
-            wordArea.left -= tsp.rectInItem.left;
-            wordArea.left /= (tsp.rectInItem.right - tsp.rectInItem.left);
-            wordArea.right -= tsp.rectInItem.left;
-            wordArea.right /= (tsp.rectInItem.right - tsp.rectInItem.left);
-            wordArea.top -= tsp.rectInItem.top;
-            wordArea.top /= (tsp.rectInItem.bottom - tsp.rectInItem.top);
-            wordArea.bottom -= tsp.rectInItem.top;
-            wordArea.bottom /= (tsp.rectInItem.bottom - tsp.rectInItem.top);
-
-            // convert from part coordinates to table coordinates
-            wordArea.left *= (tsp.rectInSelection.right - tsp.rectInSelection.left);
-            wordArea.left += tsp.rectInSelection.left;
-            wordArea.right *= (tsp.rectInSelection.right - tsp.rectInSelection.left);
-            wordArea.right += tsp.rectInSelection.left;
-            wordArea.top *= (tsp.rectInSelection.bottom - tsp.rectInSelection.top);
-            wordArea.top += tsp.rectInSelection.top;
-            wordArea.bottom *= (tsp.rectInSelection.bottom - tsp.rectInSelection.top);
-            wordArea.bottom += tsp.rectInSelection.top;
-
-            // add to the ticks arrays...
-            colTicks.append(qMakePair(wordArea.left, +1));
-            colTicks.append(qMakePair(wordArea.right, -1));
-            rowTicks.append(qMakePair(wordArea.top, +1));
-            rowTicks.append(qMakePair(wordArea.bottom, -1));
-        }
-    }
-
-    int tally = 0;
-
-    std::sort(colSelectionTicks.begin(), colSelectionTicks.end());
-    std::sort(rowSelectionTicks.begin(), rowSelectionTicks.end());
-
-    for (int i = 0; i < colSelectionTicks.length(); ++i) {
-        tally += colSelectionTicks[i].second;
-        if (tally == 0 && i + 1 < colSelectionTicks.length() && colSelectionTicks[i + 1].first != colSelectionTicks[i].first) {
-            colTicks.append(qMakePair(colSelectionTicks[i].first, +1));
-            colTicks.append(qMakePair(colSelectionTicks[i + 1].first, -1));
-        }
-    }
-    Q_ASSERT(tally == 0);
-
-    for (int i = 0; i < rowSelectionTicks.length(); ++i) {
-        tally += rowSelectionTicks[i].second;
-        if (tally == 0 && i + 1 < rowSelectionTicks.length() && rowSelectionTicks[i + 1].first != rowSelectionTicks[i].first) {
-            rowTicks.append(qMakePair(rowSelectionTicks[i].first, +1));
-            rowTicks.append(qMakePair(rowSelectionTicks[i + 1].first, -1));
-        }
-    }
-    Q_ASSERT(tally == 0);
-
-    std::sort(colTicks.begin(), colTicks.end());
-    std::sort(rowTicks.begin(), rowTicks.end());
-
-    for (int i = 0; i < colTicks.length(); ++i) {
-        tally += colTicks[i].second;
-        if (tally == 0 && i + 1 < colTicks.length() && colTicks[i + 1].first != colTicks[i].first) {
-            d->tableSelectionCols.append((colTicks[i].first + colTicks[i + 1].first) / 2);
-            d->tableDividersGuessed = true;
-        }
-    }
-    Q_ASSERT(tally == 0);
-
-    for (int i = 0; i < rowTicks.length(); ++i) {
-        tally += rowTicks[i].second;
-        if (tally == 0 && i + 1 < rowTicks.length() && rowTicks[i + 1].first != rowTicks[i].first) {
-            d->tableSelectionRows.append((rowTicks[i].first + rowTicks[i + 1].first) / 2);
-            d->tableDividersGuessed = true;
-        }
-    }
-    Q_ASSERT(tally == 0);
 }
 
 void PageView::mouseDoubleClickEvent(QMouseEvent *e)
@@ -3782,7 +3165,7 @@ bool PageView::viewportEvent(QEvent *e)
     if (e->type() == QEvent::ToolTip
         // Show tool tips only for those modes that change the cursor
         // to a hand when hovering over the link.
-        && (d->mouseMode == Okular::Settings::EnumMouseMode::Browse || d->mouseMode == Okular::Settings::EnumMouseMode::RectSelect || d->mouseMode == Okular::Settings::EnumMouseMode::TextSelect ||
+        && (d->mouseMode == Okular::Settings::EnumMouseMode::Browse || d->mouseMode == Okular::Settings::EnumMouseMode::TextSelect ||
             d->mouseMode == Okular::Settings::EnumMouseMode::TrimSelect)) {
         QHelpEvent *he = static_cast<QHelpEvent *>(e);
         if (d->mouseAnnotation->isMouseOver()) {
@@ -4290,24 +3673,11 @@ std::unique_ptr<Okular::RegularAreaRect> PageView::textSelectionForItem(const Pa
     return selectionArea;
 }
 
-void PageView::selectionClear(const ClearMode mode)
+void PageView::selectionClear()
 {
     QRect updatedRect = d->mouseSelectionRect.normalized().adjusted(-2, -2, 2, 2);
     d->mouseSelecting = false;
     d->mouseSelectionRect.setCoords(0, 0, 0, 0);
-    d->tableSelectionCols.clear();
-    d->tableSelectionRows.clear();
-    d->tableDividersGuessed = false;
-    for (const TableSelectionPart &tsp : std::as_const(d->tableSelectionParts)) {
-        QRect selectionPartRect = tsp.rectInItem.geometry(tsp.item->uncroppedWidth(), tsp.item->uncroppedHeight());
-        selectionPartRect.translate(tsp.item->uncroppedGeometry().topLeft());
-        // should check whether this is on-screen here?
-        updatedRect = updatedRect.united(selectionPartRect);
-    }
-    if (mode != ClearOnlyDividers) {
-        d->tableSelectionParts.clear();
-    }
-    d->tableSelectionParts.clear();
     updatedRect.translate(-contentAreaPosition());
     viewport()->update(updatedRect);
 }
@@ -4587,8 +3957,8 @@ void PageView::updateCursor()
 void PageView::setAnnotationSelectionMode(bool enabled)
 {
     if (d->annotationSelectionMode && !enabled) {
-        d->annotationAreaSelectionDragging = false;
-        d->annotationAreaSelectionItem = nullptr;
+        d->annotationSelectionDragging = false;
+        d->annotationSelectionItem = nullptr;
         d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
     }
     d->annotationSelectionMode = enabled;
@@ -4637,7 +4007,6 @@ void PageView::updateCursor(const QPoint p)
         case Okular::Settings::EnumMouseMode::Magnifier:
             setCursor(Qt::CrossCursor);
             return;
-        case Okular::Settings::EnumMouseMode::RectSelect:
         case Okular::Settings::EnumMouseMode::TrimSelect:
             if (d->mouseSelecting) {
                 setCursor(Qt::CrossCursor);
@@ -5635,22 +5004,6 @@ void PageView::slotSetMouseMagnifier()
     }
 }
 
-void PageView::slotSetMouseSelect()
-{
-    selectionClear();
-    textSelectionClear();
-    d->mouseMode = Okular::Settings::EnumMouseMode::RectSelect;
-    Okular::Settings::setMouseMode(d->mouseMode);
-    // change the text in messageWindow (and show it if hidden)
-    d->messageWindow->display(i18n("Draw a rectangle around the text/graphics to copy."), QString(), PageViewMessage::Info, -1);
-    // force an update of the cursor
-    updateCursor();
-    Okular::Settings::self()->save();
-    if (d->annotator) {
-        d->annotator->detachAnnotation();
-    }
-}
-
 void PageView::slotSetMouseTextSelect()
 {
     selectionClear();
@@ -5659,22 +5012,6 @@ void PageView::slotSetMouseTextSelect()
     Okular::Settings::setMouseMode(d->mouseMode);
     // change the text in messageWindow (and show it if hidden)
     d->messageWindow->display(i18n("Select text"), QString(), PageViewMessage::Info, -1);
-    // force an update of the cursor
-    updateCursor();
-    Okular::Settings::self()->save();
-    if (d->annotator) {
-        d->annotator->detachAnnotation();
-    }
-}
-
-void PageView::slotSetMouseTableSelect()
-{
-    selectionClear();
-    textSelectionClear();
-    d->mouseMode = Okular::Settings::EnumMouseMode::TableSelect;
-    Okular::Settings::setMouseMode(d->mouseMode);
-    // change the text in messageWindow (and show it if hidden)
-    d->messageWindow->display(i18n("Draw a rectangle around the table, then click near edges to divide up; press Esc to clear."), QString(), PageViewMessage::Info, -1);
     // force an update of the cursor
     updateCursor();
     Okular::Settings::self()->save();

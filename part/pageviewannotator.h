@@ -121,9 +121,8 @@ public:
     // enable/disable the text-selection annotation actions
     void setTextToolsEnabled(bool enabled);
 
-    enum class ShowTip { Yes, No };
     // selects the active tool
-    void selectBuiltinTool(int toolId, ShowTip showTip);
+    void selectBuiltinTool(int toolId);
     // selects a stamp tool and sets the stamp symbol
     void selectStampTool(const QString &stampSymbol);
     // selects the active quick tool
@@ -179,7 +178,7 @@ private:
     // save the builtin annotation tools to Okular settings
     void saveBuiltinAnnotationTools();
     // selects the active tool
-    void selectTool(AnnotationTools *toolsDefinition, int toolId, ShowTip showTip);
+    void selectTool(AnnotationTools *toolsDefinition, int toolId);
     // returns the engine QDomElement of the the currently active tool
     QDomElement currentEngineElement();
     // returns the annotation QDomElement of the the currently active tool

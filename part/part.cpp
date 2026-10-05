@@ -3946,7 +3946,7 @@ void Part::slotUpdateHamburgerMenu()
     menu->addSeparator();
     menu->addAction(ac->action(QStringLiteral("mouse_drag")));
     if (!visibleMainToolbar || !visibleMainToolbar->actions().contains(ac->action(QStringLiteral("mouse_selecttools")))) {
-        menu->addAction(ac->action(QStringLiteral("mouse_select")));
+        menu->addAction(ac->action(QStringLiteral("drawing_select")));
     }
     menu->addAction(m_copy);
     menu->addAction(m_copyWithoutLineBreaks);

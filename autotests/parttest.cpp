@@ -100,7 +100,6 @@ private Q_SLOTS:
     void testRClickOverLinkWhileLinkTextIsSelected();
     void testRClickOnSelectionModeShoulShowFollowTheLinkMenu();
     void testClickAnywhereAfterSelectionShouldUnselect();
-    void testeRectSelectionStartingOnLinks();
     void testCheckBoxReadOnly();
     void testCrashTextEditDestroy();
     void testAnnotWindow();
@@ -997,64 +996,6 @@ void PartTest::testClickAnywhereAfterSelectionShouldUnselect()
 
     // check if copied text is empty what means no text selected
     QVERIFY(QApplication::clipboard()->text().isEmpty());
-}
-
-void PartTest::testeRectSelectionStartingOnLinks()
-{
-    QVariantList dummyArgs;
-    Okular::Part part(nullptr, dummyArgs);
-    QVERIFY(openDocument(&part, QStringLiteral(KDESRCDIR "data/pdf_with_links.pdf")));
-    // hide info messages as they interfere with selection area
-    Okular::Settings::self()->setShowEmbeddedContentMessages(false);
-    Okular::Settings::self()->setShowOSD(false);
-
-    part.widget()->show();
-    if (qgetenv("KDECI_CANNOT_CREATE_WINDOWS") == "1") {
-        QSKIP("KDE CI can't create a window on this platform, skipping some gui tests");
-    }
-
-    QVERIFY(QTest::qWaitForWindowExposed(part.widget()));
-
-    part.m_document->setViewportPage(0);
-
-    // wait for pixmap
-    QTRY_VERIFY(part.m_document->page(0)->hasPixmap(part.m_pageView));
-
-    const int width = part.m_pageView->horizontalScrollBar()->maximum() + part.m_pageView->viewport()->width();
-    const int height = part.m_pageView->verticalScrollBar()->maximum() + part.m_pageView->viewport()->height();
-
-    // enter text-selection mode
-    QVERIFY(QMetaObject::invokeMethod(part.m_pageView, "slotSetMouseSelect"));
-
-    const double mouseStartY = height * 0.127;
-    const double mouseEndY = height * 0.127;
-    const double mouseStartX = width * 0.28;
-    const double mouseEndX = width * 0.382;
-
-    // Need to do this because the pop-menu will have his own mainloop and will block tests until
-    // the menu disappear
-    PageView *view = part.m_pageView;
-    bool menuClosed = false;
-    QTimer::singleShot(2000, view, [view, &menuClosed]() {
-        QApplication::clipboard()->clear();
-
-        // check if popup menu is active and visible
-        QMenu *menu = qobject_cast<QMenu *>(view->findChild<QMenu *>(QStringLiteral("PopupMenu")));
-        QVERIFY(menu);
-        QVERIFY(menu->isVisible());
-
-        // check if the copy selected text to clipboard is present
-        QAction *copyAct = qobject_cast<QAction *>(menu->findChild<QAction *>(QStringLiteral("CopyTextToClipboard")));
-        QVERIFY(copyAct);
-
-        menu->close();
-        menuClosed = true;
-    });
-
-    simulateMouseSelection(mouseStartX, mouseStartY, mouseEndX, mouseEndY, part.m_pageView->viewport());
-
-    // wait menu get closed
-    QTRY_VERIFY(menuClosed);
 }
 
 void PartTest::simulateMouseSelection(double startX, double startY, double endX, double endY, QWidget *target)
@@ -2295,22 +2236,10 @@ void PartTest::testMouseModeMenu()
     QVERIFY(mouseModeAction);
     QMenu *mouseModeActionMenu = mouseModeAction->menu();
 
-    // Test that actions are usable (not disabled)
+    QCOMPARE(mouseModeActionMenu->actions().count(), 1);
     QVERIFY(mouseModeActionMenu->actions().at(0)->isEnabled());
-    QVERIFY(mouseModeActionMenu->actions().at(1)->isEnabled());
-    QVERIFY(mouseModeActionMenu->actions().at(2)->isEnabled());
-
-    // Test activating area selection mode
     mouseModeActionMenu->actions().at(0)->trigger();
-    QCOMPARE(Okular::Settings::mouseMode(), (int)Okular::Settings::EnumMouseMode::RectSelect);
-
-    // Test activating text selection mode
-    mouseModeActionMenu->actions().at(1)->trigger();
     QCOMPARE(Okular::Settings::mouseMode(), (int)Okular::Settings::EnumMouseMode::TextSelect);
-
-    // Test activating table selection mode
-    mouseModeActionMenu->actions().at(2)->trigger();
-    QCOMPARE(Okular::Settings::mouseMode(), (int)Okular::Settings::EnumMouseMode::TableSelect);
 }
 
 void PartTest::testFullScreenRequest()

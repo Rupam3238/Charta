@@ -368,9 +368,7 @@
    <choices>
     <choice name="Browse" />
     <choice name="Zoom" />
-    <choice name="RectSelect" />
     <choice name="TextSelect" />
-    <choice name="TableSelect" />
     <choice name="Magnifier" />
     <choice name="TrimSelect" />
    </choices>

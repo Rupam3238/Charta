@@ -70,8 +70,6 @@ public:
     // Zoom mode ( last 4 are internally used only! )
     enum ZoomMode { ZoomFixed = 0, ZoomFitWidth = 1, ZoomFitPage = 2, ZoomFitAuto = 3, ZoomIn, ZoomOut, ZoomRefreshCurrent, ZoomActual };
 
-    enum ClearMode { ClearAllSelection, ClearOnlyDividers };
-
     enum FinishSigningResult {
         Success,
         Failed,
@@ -221,10 +219,7 @@ private:
     PageViewItem *pickItemOnPoint(int x, int y);
     // start / modify / clear selection rectangle
     void selectionStart(const QPoint pos, const QColor &color, bool aboveAll = false);
-    void selectionClear(const ClearMode mode = ClearAllSelection);
-    QMimeData *getTableContents() const;
-    void drawTableDividers(QPainter *screenPainter);
-    void guessTableDividers();
+    void selectionClear();
     // update either text or rectangle selection
     void updateSelection(const QPoint pos);
     // compute the zoom factor value for FitWidth and FitPage mode
@@ -327,9 +322,7 @@ private Q_SLOTS:
     void slotSetMouseNormal();
     void slotSetMouseZoom();
     void slotSetMouseMagnifier();
-    void slotSetMouseSelect();
     void slotSetMouseTextSelect();
-    void slotSetMouseTableSelect();
     void slotSignature();
     void slotAutoScrollUp();
     void slotAutoScrollDown();
