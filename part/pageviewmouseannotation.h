@@ -21,6 +21,7 @@
 #define _OKULAR_PAGEVIEWMOUSEANNOTATION_H_
 
 #include <QObject>
+#include <QPolygonF>
 
 #include "core/annotations.h"
 #include "pageviewutils.h"
@@ -87,6 +88,7 @@ public:
     /* Process a mouse move event. eventPos: Mouse position in content area coordinates. */
     void routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoint eventPos, bool leftButtonPressed, Qt::KeyboardModifiers modifiers = Qt::NoModifier);
     void selectAnnotationsInRect(PageViewItem *pageViewItem, const QRect &selectionRect);
+    void selectAnnotationsInLasso(PageViewItem *pageViewItem, const QPolygonF &selectionPath);
 
     /* Process a key event. */
     void routeKeyPressEvent(const QKeyEvent *e);

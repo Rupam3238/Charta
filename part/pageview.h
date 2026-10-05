@@ -139,6 +139,7 @@ public:
 
     void updateCursor();
     void setAnnotationSelectionMode(bool enabled);
+    void setAnnotationSelectionMode(bool enabled, bool lassoMode);
     bool allowsAnnotationViewportMovement() const;
 
     void highlightSignatureFormWidget(const Okular::FormFieldSignature *form);

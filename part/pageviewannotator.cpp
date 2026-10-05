@@ -1937,6 +1937,11 @@ void PageViewAnnotator::setAnnotationSelectionMode(bool enabled)
     m_pageView->setAnnotationSelectionMode(enabled);
 }
 
+void PageViewAnnotator::setAnnotationSelectionMode(bool enabled, bool lassoMode)
+{
+    m_pageView->setAnnotationSelectionMode(enabled, lassoMode);
+}
+
 bool PageViewAnnotator::beginTemporarySelectionTool()
 {
     return m_actionHandler && m_actionHandler->beginTemporaryTool(AnnotationActionHandler::TemporaryTool::Select);

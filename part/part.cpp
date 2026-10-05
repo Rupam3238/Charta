@@ -1445,7 +1445,7 @@ void Part::setupActions()
 
     KToggleAction *blackscreenAction = new KToggleAction(i18n("Switch Blackscreen Mode"), ac);
     ac->addAction(QStringLiteral("switch_blackscreen_mode"), blackscreenAction);
-    ac->setDefaultShortcut(blackscreenAction, QKeySequence(Qt::Key_B));
+    ac->setDefaultShortcut(blackscreenAction, QKeySequence());
     blackscreenAction->setIcon(QIcon::fromTheme(QStringLiteral("view-presentation")));
     blackscreenAction->setEnabled(false);
 

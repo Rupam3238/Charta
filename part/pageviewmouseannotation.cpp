@@ -21,7 +21,11 @@
 
 #include <qevent.h>
 #include <qpainter.h>
+#include <QPainterPathStroker>
+#include <QPolygonF>
 #include <qtooltip.h>
+
+#include <cmath>
 
 #include "core/document.h"
 #include "core/page.h"
@@ -35,6 +39,209 @@ static const int handleShortSize = 6;
 static const int handlePadding = handleLongSize / 2;
 static const int handleHitExpansion = 4;
 static const double minimumNormalizedResizeDimension = 0.005;
+
+static QPointF annotationPagePoint(const Okular::NormalizedPoint &point, double width, double height)
+{
+    return QPointF(point.x * width, point.y * height);
+}
+
+static QPainterPath annotationLassoGeometry(const Okular::Annotation *annotation, PageViewItem *pageViewItem)
+{
+    const double width = pageViewItem->uncroppedWidth();
+    const double height = pageViewItem->uncroppedHeight();
+    const QRect bounds = Okular::AnnotationUtils::annotationGeometry(annotation, width, height).normalized();
+    QPainterPath geometry;
+    qreal strokeWidth = qMax<qreal>(1.0, annotation->style().width() * width / pageViewItem->page()->width());
+
+    switch (annotation->subType()) {
+    case Okular::Annotation::AInk: {
+        const auto *ink = static_cast<const Okular::InkAnnotation *>(annotation);
+        const auto paths = ink->transformedInkPaths();
+        const auto pressures = ink->sessionPressures();
+        const qreal pressureStrokeWidth = ink->sessionPressureStrokeWidth() > 0.0 ? ink->sessionPressureStrokeWidth() : annotation->style().width();
+        for (qsizetype pathIndex = 0; pathIndex < paths.size(); ++pathIndex) {
+            const auto &points = paths.at(pathIndex);
+            if (points.isEmpty()) {
+                continue;
+            }
+            if (points.size() == 1) {
+                const QPointF point = annotationPagePoint(points.constFirst(), width, height);
+                geometry.addEllipse(point, strokeWidth / 2.0, strokeWidth / 2.0);
+                continue;
+            }
+            QPainterPath centerline;
+            centerline.moveTo(annotationPagePoint(points.constFirst(), width, height));
+            for (qsizetype pointIndex = 1; pointIndex < points.size(); ++pointIndex) {
+                centerline.lineTo(annotationPagePoint(points.at(pointIndex), width, height));
+            }
+            const auto pressurePath = pressures.value(pathIndex);
+            if (pressurePath.size() == points.size() && pressurePath.size() > 1) {
+                for (qsizetype pointIndex = 1; pointIndex < points.size(); ++pointIndex) {
+                    QPainterPath segment;
+                    segment.moveTo(annotationPagePoint(points.at(pointIndex - 1), width, height));
+                    segment.lineTo(annotationPagePoint(points.at(pointIndex), width, height));
+                    QPainterPathStroker stroker;
+                    stroker.setWidth(qMax<qreal>(0.5, pressurePath.at(pointIndex) * pressureStrokeWidth * width / pageViewItem->page()->width()));
+                    stroker.setCapStyle(Qt::RoundCap);
+                    geometry = geometry.united(stroker.createStroke(segment));
+                }
+            } else {
+                QPainterPathStroker stroker;
+                stroker.setWidth(strokeWidth);
+                stroker.setCapStyle(Qt::RoundCap);
+                stroker.setJoinStyle(Qt::RoundJoin);
+                geometry = geometry.united(stroker.createStroke(centerline));
+            }
+        }
+        return geometry;
+    }
+    case Okular::Annotation::ALine: {
+        const auto *line = static_cast<const Okular::LineAnnotation *>(annotation);
+        const auto points = line->transformedLinePoints();
+        if (!points.isEmpty()) {
+            QPainterPath centerline;
+            centerline.moveTo(annotationPagePoint(points.constFirst(), width, height));
+            for (qsizetype pointIndex = 1; pointIndex < points.size(); ++pointIndex) {
+                centerline.lineTo(annotationPagePoint(points.at(pointIndex), width, height));
+            }
+            if (line->lineClosed()) {
+                centerline.closeSubpath();
+            }
+            if (points.size() == 2) {
+                const QPointF start = annotationPagePoint(points.constFirst(), width, height);
+                const QPointF end = annotationPagePoint(points.constLast(), width, height);
+                const QPointF delta = end - start;
+                const qreal length = std::hypot(delta.x(), delta.y());
+                if (length > 0.0) {
+                    const QPointF direction = delta / length;
+                    const QPointF perpendicular(-direction.y(), direction.x());
+                    const qreal pageScale = width / pageViewItem->page()->width();
+                    const qreal size = qMin<qreal>(6.0 * line->style().width() * pageScale, length / 2.0);
+                    const auto addEndStyle = [&centerline, &direction, &perpendicular, size](QPointF tip, Okular::LineAnnotation::TermStyle style, qreal insideDirection) {
+                        const QPointF along = direction * insideDirection;
+                        switch (style) {
+                        case Okular::LineAnnotation::Square: {
+                            const QPointF base = tip + along * size;
+                            centerline.moveTo(tip + perpendicular * (size / 2.0));
+                            centerline.lineTo(base + perpendicular * (size / 2.0));
+                            centerline.lineTo(base - perpendicular * (size / 2.0));
+                            centerline.lineTo(tip - perpendicular * (size / 2.0));
+                            centerline.closeSubpath();
+                            break;
+                        }
+                        case Okular::LineAnnotation::Circle:
+                            centerline.addEllipse(tip + along * (size / 2.0), size / 2.0, size / 2.0);
+                            break;
+                        case Okular::LineAnnotation::Diamond: {
+                            const QPointF middle = tip + along * (size / 2.0);
+                            const QPointF far = tip + along * size;
+                            centerline.moveTo(tip);
+                            centerline.lineTo(middle + perpendicular * (size / 2.0));
+                            centerline.lineTo(far);
+                            centerline.lineTo(middle - perpendicular * (size / 2.0));
+                            centerline.closeSubpath();
+                            break;
+                        }
+                        case Okular::LineAnnotation::OpenArrow:
+                        case Okular::LineAnnotation::ROpenArrow:
+                        case Okular::LineAnnotation::ClosedArrow:
+                        case Okular::LineAnnotation::RClosedArrow: {
+                            const QPointF base = tip + along * size;
+                            centerline.moveTo(base + perpendicular * (size / 2.0));
+                            centerline.lineTo(tip);
+                            centerline.lineTo(base - perpendicular * (size / 2.0));
+                            if (style == Okular::LineAnnotation::ClosedArrow || style == Okular::LineAnnotation::RClosedArrow) {
+                                centerline.closeSubpath();
+                            }
+                            break;
+                        }
+                        case Okular::LineAnnotation::Butt:
+                            centerline.moveTo(tip + perpendicular * (size / 2.0));
+                            centerline.lineTo(tip - perpendicular * (size / 2.0));
+                            break;
+                        case Okular::LineAnnotation::Slash: {
+                            const QPointF offset = along * (std::cos(M_PI / 3.0) * size / 2.0);
+                            centerline.moveTo(tip + offset + perpendicular * (size / 2.0));
+                            centerline.lineTo(tip - offset - perpendicular * (size / 2.0));
+                            break;
+                        }
+                        case Okular::LineAnnotation::None:
+                            break;
+                        }
+                    };
+                    addEndStyle(start, line->lineStartStyle(), 1.0);
+                    const qreal endDirection = line->lineEndStyle() == Okular::LineAnnotation::ROpenArrow || line->lineEndStyle() == Okular::LineAnnotation::RClosedArrow ? 1.0 : -1.0;
+                    addEndStyle(end, line->lineEndStyle(), endDirection);
+                }
+            }
+            if (line->lineInnerColor().isValid()) {
+                geometry = centerline;
+            }
+            QPainterPathStroker stroker;
+            stroker.setWidth(strokeWidth);
+            stroker.setCapStyle(Qt::SquareCap);
+            stroker.setJoinStyle(Qt::MiterJoin);
+            geometry = geometry.united(stroker.createStroke(centerline));
+            return geometry;
+        }
+        break;
+    }
+    case Okular::Annotation::AGeom: {
+        const auto *shape = static_cast<const Okular::GeomAnnotation *>(annotation);
+        if (shape->geometricalType() == Okular::GeomAnnotation::InscribedCircle) {
+            geometry.addEllipse(bounds);
+        } else {
+            geometry.addRect(bounds);
+        }
+        if (!shape->geometricalInnerColor().isValid()) {
+            QPainterPathStroker stroker;
+            stroker.setWidth(strokeWidth);
+            geometry = stroker.createStroke(geometry);
+        }
+        return geometry;
+    }
+    case Okular::Annotation::AHighlight: {
+        const auto *highlight = static_cast<const Okular::HighlightAnnotation *>(annotation);
+        for (const auto &quad : highlight->highlightQuads()) {
+            QPolygonF points;
+            for (int index = 0; index < 4; ++index) {
+                points << annotationPagePoint(quad.transformedPoint(index), width, height);
+            }
+            QPainterPath quadPath;
+            quadPath.addPolygon(points);
+            if (highlight->highlightType() == Okular::HighlightAnnotation::Underline || highlight->highlightType() == Okular::HighlightAnnotation::StrikeOut) {
+                QPainterPath linePath;
+                if (highlight->highlightType() == Okular::HighlightAnnotation::Underline) {
+                    linePath.moveTo((3.0 * points.at(0) + points.at(3)) / 4.0);
+                    linePath.lineTo((3.0 * points.at(1) + points.at(2)) / 4.0);
+                } else {
+                    linePath.moveTo((points.at(0) + points.at(3)) / 2.0);
+                    linePath.lineTo((points.at(1) + points.at(2)) / 2.0);
+                }
+                QPainterPathStroker stroker;
+                stroker.setWidth(2.0);
+                geometry = geometry.united(stroker.createStroke(linePath));
+            } else if (highlight->highlightType() == Okular::HighlightAnnotation::Squiggly) {
+                QPainterPath squigglyPath;
+                squigglyPath.moveTo(points.at(0));
+                squigglyPath.lineTo(points.at(1));
+                squigglyPath.lineTo((points.at(1) + points.at(2)) / 2.0);
+                squigglyPath.lineTo((points.at(0) + points.at(3)) / 2.0);
+                squigglyPath.closeSubpath();
+                geometry = geometry.united(squigglyPath);
+            } else {
+                geometry = geometry.united(quadPath);
+            }
+        }
+        return geometry;
+    }
+    default:
+        break;
+    }
+
+    geometry.addRect(bounds);
+    return geometry;
+}
 
 bool AnnotationDescription::isValid() const
 {
@@ -330,6 +537,34 @@ void MouseAnnotation::selectAnnotationsInRect(PageViewItem *pageViewItem, const 
     }
 
     m_pageView->viewport()->update();
+}
+
+void MouseAnnotation::selectAnnotationsInLasso(PageViewItem *pageViewItem, const QPolygonF &selectionPath)
+{
+    if (!pageViewItem || selectionPath.size() < 3) {
+        selectAnnotations({});
+        return;
+    }
+
+    QPainterPath region;
+    region.addPolygon(selectionPath);
+    region.closeSubpath();
+    QPainterPathStroker boundaryStroker;
+    boundaryStroker.setWidth(1.5);
+    region = region.united(boundaryStroker.createStroke(region));
+
+    QList<AnnotationDescription> selected;
+    for (Okular::Annotation *annotation : pageViewItem->page()->annotations()) {
+        const QPainterPath geometry = annotationLassoGeometry(annotation, pageViewItem);
+        if (region.intersects(geometry)) {
+            AnnotationDescription description;
+            description.annotation = annotation;
+            description.pageViewItem = pageViewItem;
+            description.pageNumber = pageViewItem->pageNumber();
+            selected.append(description);
+        }
+    }
+    selectAnnotations(selected);
 }
 
 void MouseAnnotation::routeKeyPressEvent(const QKeyEvent *e)

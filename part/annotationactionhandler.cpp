@@ -367,6 +367,7 @@ public:
     QAction *temporaryToolPreviousAction = nullptr;
     QAction *temporaryToolAction = nullptr;
     bool restoringTemporaryTool = false;
+    bool selectionToolWasActiveOnPress = false;
     bool freeformHighlightActive = false;
     QActionGroup *agTools;
     QAction *agLastAction;
@@ -388,6 +389,8 @@ public:
     QAction *aShowToolBar;
     KToggleAction *aToolBarVisibility;
     KToggleAction *aSelectTool;
+    KToggleAction *aLassoSelectTool = nullptr;
+    ToggleActionMenu *aSelectTools = nullptr;
     KToggleAction *aEraserTool;
     KToggleAction *aDrawingBrowse;
     QAction *aBrowseTool;
@@ -1359,6 +1362,13 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     KToggleAction *aInlineNote = new KToggleAction(QIcon::fromTheme(QStringLiteral("tool-text")), i18nc("@action:intoolbar Annotation tool", "Text"), this);
     KToggleAction *aPopupNote = new KToggleAction(QIcon::fromTheme(QStringLiteral("edit-comment")), i18nc("@action:intoolbar Annotation tool", "Popup Note"), this);
     d->aSelectTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("edit-select-all")), i18nc("@action:intoolbar Drawing tool", "Select"), this);
+    d->aLassoSelectTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("edit-select-lasso")), i18nc("@action:intoolbar Drawing tool", "Lasso Select"), this);
+    d->aSelectTools = new ToggleActionMenu(i18nc("@action:intoolbar Drawing tool", "Selection Tool"), this);
+    d->aSelectTools->setPopupMode(QToolButton::MenuButtonPopup);
+    d->aSelectTools->addAction(d->aSelectTool);
+    d->aSelectTools->addAction(d->aLassoSelectTool);
+    d->aSelectTools->setDefaultAction(d->aSelectTool);
+    connect(d->aSelectTools->menu(), &QMenu::triggered, d->aSelectTools, &ToggleActionMenu::setDefaultAction);
     d->aEraserTool = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-eraser")), i18nc("@action:intoolbar Drawing tool", "Eraser"), this);
     d->aBrowseTool = ac->action(QStringLiteral("mouse_drag"));
     Q_ASSERT(d->aBrowseTool);
@@ -1439,22 +1449,26 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     }
 
     d->agTools->addAction(d->aSelectTool);
+    d->agTools->addAction(d->aLassoSelectTool);
     d->agTools->addAction(d->aEraserTool);
-    connect(d->aSelectTool, &QAction::toggled, this, [this](bool checked) {
+    const auto selectionToolToggled = [this](bool checked, bool lassoMode, QAction *action) {
         if (!checked || d->restoringTemporaryTool) {
             return;
         }
+        d->aSelectTools->setDefaultAction(action);
         d->aBrowseTool->setChecked(false);
         d->annotator->setEraserMode(false);
         d->annotator->selectBuiltinTool(-1);
-        d->annotator->setAnnotationSelectionMode(true);
+        d->annotator->setAnnotationSelectionMode(true, lassoMode);
         d->selectModeSwitchingToBrowse = true;
         d->aBrowseTool->trigger();
         d->selectModeSwitchingToBrowse = false;
         if (d->aBrowseTool->isCheckable()) {
             d->aBrowseTool->setChecked(false);
         }
-    });
+    };
+    connect(d->aSelectTool, &QAction::toggled, this, [this, selectionToolToggled](bool checked) { selectionToolToggled(checked, false, d->aSelectTool); });
+    connect(d->aLassoSelectTool, &QAction::toggled, this, [this, selectionToolToggled](bool checked) { selectionToolToggled(checked, true, d->aLassoSelectTool); });
     connect(d->aEraserTool, &QAction::toggled, this, [this](bool checked) {
         if (d->restoringTemporaryTool) {
             return;
@@ -1510,7 +1524,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
 
     QAction *aMouseTextSelect = ac->action(QStringLiteral("mouse_textselect"));
     Q_ASSERT(aMouseTextSelect);
-    d->drawingTools = {d->aDrawingBrowse, d->aSelectTool, aFreehandLine, aHighlighter, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aMouseTextSelect, aTypewriter};
+    d->drawingTools = {d->aDrawingBrowse, d->aSelectTools, aFreehandLine, aHighlighter, d->aEraserTool, aStraightLine, aArrow, aRectangle, aEllipse, aPolygon, aMouseTextSelect, aTypewriter};
 
     // Quick annotations action
     d->aQuickTools = new ToggleActionMenu(i18nc("@action:intoolbar Show list of quick annotation tools", "Quick Annotations"), this);
@@ -1600,7 +1614,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         if (action == d->agLastAction) {
             const bool mouseRepeat = d->pendingMousePopupAction == action;
             d->pendingMousePopupAction = nullptr;
-            if (d->deselectingTools) {
+            if ((action == d->aSelectTool || action == d->aLassoSelectTool) && !d->deselectingTools && !d->restoringTemporaryTool) {
+                action->setChecked(true);
+            } else if (d->deselectingTools) {
                 d->agLastAction = nullptr;
                 d->agTools->checkedAction()->setChecked(false);
                 d->selectTool(-1);
@@ -1632,6 +1648,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     auto *drawingToolCategory = new KActionCategory(i18n("Drawing Toolbar"), ac);
     drawingToolCategory->addAction(QStringLiteral("drawing_browse"), d->aDrawingBrowse);
     drawingToolCategory->addAction(QStringLiteral("drawing_select"), d->aSelectTool);
+    drawingToolCategory->addAction(QStringLiteral("drawing_lasso_select"), d->aLassoSelectTool);
     drawingToolCategory->addAction(QStringLiteral("annotation_freehand_line"), aFreehandLine);
     drawingToolCategory->addAction(QStringLiteral("annotation_highlight_tools"), aHighlighter);
     drawingToolCategory->addAction(QStringLiteral("drawing_eraser"), d->aEraserTool);
@@ -1678,6 +1695,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     ac->setDefaultShortcut(d->aBrowseTool, QKeySequence(Qt::CTRL | Qt::Key_1));
     ac->setDefaultShortcut(d->aDrawingBrowse, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_B));
     ac->setDefaultShortcut(d->aSelectTool, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_S));
+    ac->setDefaultShortcut(d->aLassoSelectTool, QKeySequence(Qt::Key_B));
     ac->setDefaultShortcut(d->aEraserTool, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_E));
     ac->setDefaultShortcut(aStraightLine, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_L));
     ac->setDefaultShortcut(aEllipse, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_O));
@@ -1778,6 +1796,12 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
         "QToolBar { background: #202630; border: 1px solid #3b4653; border-radius: 10px; spacing: 1px; padding: 4px; margin: 0; }"
         "QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px; padding: 2px; margin: 0; }"
         "QToolButton:hover { color: #f2f5f8; background: #303a46; }"
+        "QToolButton[chartaRole='selection']:hover, QToolButton[chartaRole='selection']:open { color: #aab6c2; background: transparent; }"
+        "QToolButton[chartaRole='selection'] { padding-right: 6px; }"
+        "QToolButton[chartaRole='selection']::menu-button { width: 6px; right: 3px; border: none; background: transparent; }"
+        "QToolButton[chartaRole='selection']::menu-button:hover { background: transparent; }"
+        "QToolButton[chartaRole='selection']::menu-arrow { width: 5px; height: 5px; }"
+        "QToolButton[chartaRole='selection']:hover::menu-arrow, QToolButton[chartaRole='selection']:open::menu-arrow { color: #ffffff; }"
         "QToolButton:checked { color: #ffffff; background: #16414c; border-color: #27bfd6; }"
         "QToolButton:focus { border-color: #27bfd6; }"
         "QToolButton[chartaRole='erase']:checked { background: #393541; border-color: #b59ad8; }"
@@ -1795,8 +1819,27 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
             }
         }
     }
+    if (auto *selectionButton = qobject_cast<QToolButton *>(drawingToolBar->widgetForAction(d->aSelectTools));
+        selectionButton && !selectionButton->property("selectionRepeatPopupConnected").toBool()) {
+        selectionButton->setProperty("selectionRepeatPopupConnected", true);
+        connect(selectionButton, &QToolButton::pressed, this, [this] {
+            d->selectionToolWasActiveOnPress = d->agTools->checkedAction() == d->aSelectTools->defaultAction();
+        });
+        connect(selectionButton, &QToolButton::clicked, this, [this, selectionButton] {
+            if (d->selectionToolWasActiveOnPress) {
+                selectionButton->showMenu();
+            }
+            d->selectionToolWasActiveOnPress = false;
+        });
+        QMenu *selectionMenu = d->aSelectTools->menu();
+        connect(selectionMenu, &QMenu::aboutToShow, this, [selectionMenu] {
+            QTimer::singleShot(0, selectionMenu, [selectionMenu] {
+                selectionMenu->move(selectionMenu->pos() - QPoint(8, 0));
+            });
+        });
+    }
     for (qsizetype index = 0; index < d->drawingTools.size(); ++index) {
-        const QString role = index == 3 ? QStringLiteral("highlight") : (index == 4 ? QStringLiteral("erase") : (index >= 5 && index <= 9 ? QStringLiteral("shape") : (index == 11 ? QStringLiteral("text") : QStringLiteral("navigation"))));
+        const QString role = index == 1 ? QStringLiteral("selection") : (index == 3 ? QStringLiteral("highlight") : (index == 4 ? QStringLiteral("erase") : (index >= 5 && index <= 9 ? QStringLiteral("shape") : (index == 11 ? QStringLiteral("text") : QStringLiteral("navigation")))));
         if (QWidget *toolButton = drawingToolBar->widgetForAction(d->drawingTools.at(index))) {
             toolButton->setProperty("chartaRole", role);
             toolButton->style()->unpolish(toolButton);
@@ -1930,7 +1973,7 @@ bool AnnotationActionHandler::beginTemporaryTool(TemporaryTool tool)
         return false;
     }
 
-    QAction *temporaryAction = tool == TemporaryTool::Select ? static_cast<QAction *>(d->aSelectTool) : static_cast<QAction *>(d->aEraserTool);
+    QAction *temporaryAction = tool == TemporaryTool::Select ? d->aSelectTools->defaultAction() : static_cast<QAction *>(d->aEraserTool);
     if (previousAction == temporaryAction) {
         return false;
     }

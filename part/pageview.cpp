@@ -31,12 +31,15 @@
 #include <QHBoxLayout>
 #include <QImage>
 #include <QInputDialog>
+#include <QLineF>
 #include <QLoggingCategory>
 #include <QMenu>
 #include <QMimeData>
 #include <QMimeDatabase>
 #include <QNativeGestureEvent>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPolygonF>
 #include <QPushButton>
 #include <QScrollBar>
 #include <QScroller>
@@ -187,11 +190,13 @@ public:
     QSet<int> pagesWithTextSelection;
     bool mouseOnRect = false;
     bool annotationSelectionMode = false;
+    bool annotationSelectionLassoMode = false;
     bool temporaryRightButtonSelection = false;
     bool annotationSelectionDragging = false;
     PageViewItem *annotationSelectionItem = nullptr;
     QPoint annotationSelectionStart;
     QPoint annotationSelectionEnd;
+    QPolygonF annotationSelectionPath;
     int mouseMode = 0;
     MouseAnnotation *mouseAnnotation = nullptr;
     QFrame *annotationSelectionPanel = nullptr;
@@ -1972,6 +1977,21 @@ void PageView::paintEvent(QPaintEvent *pe)
         painter.drawRect(rect.adjusted(1, 1, -1, -1));
         painter.restore();
     };
+    const auto paintAnnotationLasso = [this](QPainter &painter) {
+        if (d->annotationSelectionPath.size() < 2) {
+            return;
+        }
+        QPainterPath path;
+        path.moveTo(d->annotationSelectionPath.constFirst());
+        for (qsizetype index = 1; index < d->annotationSelectionPath.size(); ++index) {
+            path.lineTo(d->annotationSelectionPath.at(index));
+        }
+        painter.save();
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(palette().color(QPalette::Active, QPalette::Highlight), 1.5, Qt::DashLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawPath(path);
+        painter.restore();
+    };
 
     // subdivide region into rects
     QRegion rgn = pe->region();
@@ -2041,9 +2061,13 @@ void PageView::paintEvent(QPaintEvent *pe)
                 pixmapPainter.drawRect(selectionRect.adjusted(0, 0, -1, -1));
             }
             if (d->annotationSelectionDragging) {
-                const QRect selectionRect = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
-                if (selectionRect.intersects(contentsRect)) {
-                    paintAnnotationSelectionMarquee(pixmapPainter, selectionRect);
+                if (d->annotationSelectionLassoMode) {
+                    paintAnnotationLasso(pixmapPainter);
+                } else {
+                    const QRect selectionRect = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
+                    if (selectionRect.intersects(contentsRect)) {
+                        paintAnnotationSelectionMarquee(pixmapPainter, selectionRect);
+                    }
                 }
             }
             // 3a) Layer 1: give annotator painting control
@@ -2071,9 +2095,13 @@ void PageView::paintEvent(QPaintEvent *pe)
                 screenPainter.drawRect(selectionRect);
             }
             if (d->annotationSelectionDragging) {
-                const QRect selectionRect = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
-                if (selectionRect.intersects(contentsRect)) {
-                    paintAnnotationSelectionMarquee(screenPainter, selectionRect);
+                if (d->annotationSelectionLassoMode) {
+                    paintAnnotationLasso(screenPainter);
+                } else {
+                    const QRect selectionRect = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
+                    if (selectionRect.intersects(contentsRect)) {
+                        paintAnnotationSelectionMarquee(screenPainter, selectionRect);
+                    }
                 }
             }
             // 3a) Layer 1: give annotator painting control
@@ -2188,9 +2216,12 @@ void PageView::keyPressEvent(QKeyEvent *e)
         break;
     case Qt::Key_Escape:
         if (d->annotationSelectionDragging) {
-            const QRect marquee = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized().adjusted(-2, -2, 2, 2);
+            const QRect marquee = (d->annotationSelectionLassoMode ? d->annotationSelectionPath.boundingRect().toAlignedRect()
+                                                                   : QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized())
+                                      .adjusted(-2, -2, 2, 2);
             d->annotationSelectionDragging = false;
             d->annotationSelectionItem = nullptr;
+            d->annotationSelectionPath.clear();
             d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
             viewport()->update(marquee.translated(-contentAreaPosition()));
         }
@@ -2363,11 +2394,18 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
 
     PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
     if (d->annotationSelectionMode && d->annotationSelectionDragging) {
-        const QRect oldSelection = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
+        const QRect oldSelection = d->annotationSelectionLassoMode ? d->annotationSelectionPath.boundingRect().toAlignedRect()
+                                                                    : QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
         d->annotationSelectionEnd = eventPos;
-        const QRect newSelection = QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
+        if (d->annotationSelectionLassoMode) {
+            if (d->annotationSelectionPath.isEmpty() || QLineF(d->annotationSelectionPath.constLast(), eventPos).length() >= 2.0) {
+                d->annotationSelectionPath.append(eventPos);
+            }
+        }
+        const QRect newSelection = d->annotationSelectionLassoMode ? d->annotationSelectionPath.boundingRect().toAlignedRect()
+                                                                    : QRect(d->annotationSelectionStart, d->annotationSelectionEnd).normalized();
         viewport()->update((oldSelection | newSelection).adjusted(-2, -2, 2, 2).translated(-contentAreaPosition()));
-        if (d->temporaryRightButtonSelection && d->annotationSelectionItem) {
+        if (d->temporaryRightButtonSelection && d->annotationSelectionItem && !d->annotationSelectionLassoMode) {
             const QRect selectionRect = newSelection.translated(-d->annotationSelectionItem->uncroppedGeometry().topLeft())
                                            .intersected(QRect(QPoint(0, 0), d->annotationSelectionItem->uncroppedGeometry().size()));
             d->mouseAnnotation->selectAnnotationsInRect(d->annotationSelectionItem, selectionRect);
@@ -2431,6 +2469,10 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
                     d->annotationSelectionItem = selectionPage;
                     d->annotationSelectionStart = startPos;
                     d->annotationSelectionEnd = eventPos;
+                    d->annotationSelectionPath.clear();
+                    if (d->annotationSelectionLassoMode) {
+                        d->annotationSelectionPath << startPos << eventPos;
+                    }
                     d->scroller->stop();
                     updateAnnotationSelectionPanel();
                     updateCursor();
@@ -2522,11 +2564,13 @@ void PageView::mousePressEvent(QMouseEvent *e)
         if (e->button() == Qt::LeftButton) {
             PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
             if (pageItem) {
-                d->mouseAnnotation->routeMousePressEvent(pageItem, eventPos, true);
-                if (d->mouseAnnotation->isActive()) {
-                    d->scroller->stop();
-                    updateAnnotationSelectionPanel();
-                    return;
+                if (!d->annotationSelectionLassoMode) {
+                    d->mouseAnnotation->routeMousePressEvent(pageItem, eventPos, true);
+                    if (d->mouseAnnotation->isActive()) {
+                        d->scroller->stop();
+                        updateAnnotationSelectionPanel();
+                        return;
+                    }
                 }
                 d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                 updateAnnotationSelectionPanel();
@@ -2534,6 +2578,10 @@ void PageView::mousePressEvent(QMouseEvent *e)
                 d->annotationSelectionItem = pageItem;
                 d->annotationSelectionStart = eventPos;
                 d->annotationSelectionEnd = eventPos;
+                d->annotationSelectionPath.clear();
+                if (d->annotationSelectionLassoMode) {
+                    d->annotationSelectionPath << eventPos;
+                }
                 d->scroller->stop();
             }
         }
@@ -2719,7 +2767,21 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
         const bool selectionButton = leftButton || (d->temporaryRightButtonSelection && rightButton);
         if (selectionButton) {
             if (d->annotationSelectionDragging && d->annotationSelectionItem) {
-                if ((eventPos - d->annotationSelectionStart).manhattanLength() >= QApplication::startDragDistance()) {
+                if (d->annotationSelectionLassoMode) {
+                    if (d->annotationSelectionPath.isEmpty() || QLineF(d->annotationSelectionPath.constLast(), eventPos).length() >= 2.0) {
+                        d->annotationSelectionPath.append(eventPos);
+                    }
+                    if (d->annotationSelectionPath.size() >= 3 && (eventPos - d->annotationSelectionStart).manhattanLength() >= QApplication::startDragDistance()) {
+                        QPolygonF pagePath;
+                        const QPoint pageOrigin = d->annotationSelectionItem->uncroppedGeometry().topLeft();
+                        for (const QPointF &point : std::as_const(d->annotationSelectionPath)) {
+                            pagePath << point - QPointF(pageOrigin);
+                        }
+                        d->mouseAnnotation->selectAnnotationsInLasso(d->annotationSelectionItem, pagePath);
+                    } else {
+                        d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+                    }
+                } else if ((eventPos - d->annotationSelectionStart).manhattanLength() >= QApplication::startDragDistance()) {
                     const QRect selectionRect = QRect(d->annotationSelectionStart, eventPos)
                                                    .normalized()
                                                    .translated(-d->annotationSelectionItem->uncroppedGeometry().topLeft())
@@ -2729,9 +2791,12 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                     d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                 }
                 updateAnnotationSelectionPanel();
-                const QRect repaintRect = QRect(d->annotationSelectionStart, eventPos).normalized().adjusted(-2, -2, 2, 2);
+                const QRect repaintRect = (d->annotationSelectionLassoMode ? d->annotationSelectionPath.boundingRect().toAlignedRect()
+                                                                            : QRect(d->annotationSelectionStart, eventPos).normalized())
+                                              .adjusted(-2, -2, 2, 2);
                 d->annotationSelectionDragging = false;
                 d->annotationSelectionItem = nullptr;
+                d->annotationSelectionPath.clear();
                 viewport()->update(repaintRect.translated(-contentAreaPosition()));
             }
         }
@@ -3956,12 +4021,25 @@ void PageView::updateCursor()
 
 void PageView::setAnnotationSelectionMode(bool enabled)
 {
+    setAnnotationSelectionMode(enabled, d->annotationSelectionLassoMode);
+}
+
+void PageView::setAnnotationSelectionMode(bool enabled, bool lassoMode)
+{
     if (d->annotationSelectionMode && !enabled) {
+        const QRect oldLassoBounds = d->annotationSelectionPath.boundingRect().toAlignedRect().adjusted(-2, -2, 2, 2);
         d->annotationSelectionDragging = false;
         d->annotationSelectionItem = nullptr;
+        d->annotationSelectionPath.clear();
         d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+        if (oldLassoBounds.isValid()) {
+            viewport()->update(oldLassoBounds.translated(-contentAreaPosition()));
+        }
     }
     d->annotationSelectionMode = enabled;
+    if (enabled) {
+        d->annotationSelectionLassoMode = lassoMode;
+    }
     updateAnnotationSelectionPanel();
     updateCursor();
 }

@@ -74,6 +74,7 @@ public:
     void setEraserWidth(double width);
     double eraserWidth() const;
     void setAnnotationSelectionMode(bool enabled);
+    void setAnnotationSelectionMode(bool enabled, bool lassoMode);
     bool beginTemporarySelectionTool();
     bool beginTemporaryEraserTool();
     void endTemporaryTool();
