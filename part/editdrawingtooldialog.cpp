@@ -60,7 +60,7 @@ EditDrawingToolDialog::EditDrawingToolDialog(const QDomElement &initialState, QW
 
     m_penWidth = new QSpinBox(widget);
     m_penWidth->setObjectName(QStringLiteral("penWidth"));
-    m_penWidth->setRange(0, 50);
+    m_penWidth->setRange(1, 200);
     KLocalization::setupSpinBoxFormatString(m_penWidth, ki18nc("@label:spinbox Suffix for the pen width, e.g. '10 px'", "%v px"));
     tmplabel->setBuddy(m_penWidth);
     widgetLayout->addWidget(m_penWidth, 2, 1);

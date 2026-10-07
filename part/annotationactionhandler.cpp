@@ -263,6 +263,45 @@ private:
 };
 }
 
+class ResponsiveSlider : public QSlider
+{
+public:
+    using QSlider::QSlider;
+
+protected:
+    int pixelPosToRangeValue(int pos) const
+    {
+        QStyleOptionSlider opt;
+        initStyleOption(&opt);
+
+        const QRect groove = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderGroove, this);
+        const QRect handle = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderHandle, this);
+        const int span = qMax(1, groove.width() - handle.width());
+
+        return QStyle::sliderValueFromPosition(minimum(), maximum(), pos - groove.x(), span, opt.upsideDown);
+    }
+
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        if (event->button() != Qt::LeftButton) {
+            QSlider::mousePressEvent(event);
+            return;
+        }
+
+        QStyleOptionSlider opt;
+        initStyleOption(&opt);
+        const QRect handleRect = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderHandle, this);
+        if (!handleRect.contains(event->pos())) {
+            event->accept();
+            const int value = pixelPosToRangeValue(event->pos().x());
+            setValue(value);
+            return;
+        }
+
+        QSlider::mousePressEvent(event);
+    }
+};
+
 class AnnotationActionHandlerPrivate
 {
 public:
@@ -502,9 +541,12 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         "QDialog#toolSettingsPanel { background: transparent; }"
         "QWidget#toolSettingsContents { background: #202630; color: #edf1f5; border: 1px solid #3b4653; border-radius: 13px; }"
         "QLabel { color: #c8d1db; background: transparent; }"
-        "QSlider::groove:horizontal { height: 4px; border-radius: 2px; background: #3a4552; }"
-        "QSlider::sub-page:horizontal { border-radius: 2px; background: #27bfd6; }"
-        "QSlider::handle:horizontal { width: 12px; margin: -5px 0; border-radius: 6px; background: #27bfd6; border: 1px solid #d6edf1; }"
+        "QSlider { min-height: 18px; }"
+        "QSlider::groove:horizontal { height: 5px; border-radius: 3px; background: #313d4b; }"
+        "QSlider::sub-page:horizontal { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #49d2ff, stop:1 #6de7cf); border-radius: 3px; }"
+        "QSlider::handle:horizontal { width: 12px; height: 12px; margin: -4px 0; border-radius: 6px; background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #effcff, stop:1 #66d8f3); border: 1px solid rgba(255,255,255,0.9); }"
+        "QSlider::handle:horizontal:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffffff, stop:1 #7fe5ff); }"
+        "QSlider::handle:horizontal:pressed { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #dffaff, stop:1 #35c8ea); }"
         "QDoubleSpinBox, QComboBox, QToolButton { color: #edf1f5; background: #29323d; border: 1px solid #465361; border-radius: 4px; padding: 4px; }"
         "QDoubleSpinBox:focus, QComboBox:focus, QToolButton:focus { border: 1px solid #27bfd6; }"
         "QToolButton:hover { background: #35414e; }"
@@ -572,15 +614,17 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         row->addWidget(currentValue);
         controlLayout->addLayout(row);
 
-        auto *slider = new QSlider(Qt::Horizontal, controlParent);
-        const int scale = decimals == 0 ? 1 : 2;
+        auto *slider = new ResponsiveSlider(Qt::Horizontal, controlParent);
+        const int scale = decimals == 0 ? 1 : 10;
         slider->setRange(qRound(minimum * scale), qRound(maximum * scale));
         slider->setSingleStep(1);
+        slider->setPageStep(qMax(5, (qRound(maximum * scale) - qRound(minimum * scale)) / 10));
+        slider->setTracking(true);
 
         auto *spinBox = new QDoubleSpinBox(controlParent);
         spinBox->setRange(minimum, maximum);
         spinBox->setDecimals(decimals);
-        spinBox->setSingleStep(decimals == 0 ? 1.0 : 0.5);
+        spinBox->setSingleStep(decimals == 0 ? 1.0 : (minimum < 1.0 ? 0.1 : 0.5));
         spinBox->setSuffix(i18n(" px"));
         spinBox->setFixedWidth(110);
         auto *controlRow = new QHBoxLayout;
@@ -739,8 +783,9 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         fontSizeRow->addWidget(new QLabel(i18n("Font size"), contents));
         fontSizeRow->addStretch(1);
         auto *fontSize = new QDoubleSpinBox(contents);
-        fontSize->setRange(1.0, 200.0);
+        fontSize->setRange(0.5, 200.0);
         fontSize->setDecimals(1);
+        fontSize->setSingleStep(0.5);
         fontSize->setSuffix(i18n(" pt"));
         fontSize->setFixedWidth(110);
         const double initialPointSize = currentFont.pointSizeF() > 0.0 ? currentFont.pointSizeF() : 10.0;
@@ -769,7 +814,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             }
         });
     } else {
-        addWidthControl(*kindIt == DrawingToolKind::Eraser ? 1.0 : 0.5, *kindIt == DrawingToolKind::Eraser ? 64.0 : (isFreeformHighlight ? 48.0 : 20.0), *kindIt == DrawingToolKind::Eraser ? 0 : 1);
+        addWidthControl(0.1, *kindIt == DrawingToolKind::Eraser ? 100.0 : 200.0, *kindIt == DrawingToolKind::Eraser ? 0 : 1);
     }
 
     if (*kindIt != DrawingToolKind::Eraser) {
@@ -809,8 +854,10 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         opacityRow->addStretch(1);
         opacityRow->addWidget(opacityValue);
         layout->addLayout(opacityRow);
-        auto *opacitySlider = new QSlider(Qt::Horizontal, contents);
+        auto *opacitySlider = new ResponsiveSlider(Qt::Horizontal, contents);
         opacitySlider->setRange(0, 100);
+        opacitySlider->setPageStep(10);
+        opacitySlider->setTracking(true);
         opacitySlider->setValue(drawingToolSettings.value(key).fillOpacity);
         layout->addWidget(opacitySlider);
         opacityValue->setText(i18n("%1%", opacitySlider->value()));

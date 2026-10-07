@@ -445,13 +445,14 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
 
     setFrameStyle(QFrame::NoFrame);
     setStyleSheet(QStringLiteral(
-        "QScrollBar:vertical, QScrollBar:horizontal { background: transparent; border: 0; margin: 3px; }"
-        "QScrollBar:vertical { width: 8px; }"
-        "QScrollBar:horizontal { height: 8px; }"
-        "QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: #586574; border-radius: 4px; min-height: 32px; min-width: 32px; }"
-        "QScrollBar::handle:vertical { margin: 0px 1px; }"
-        "QScrollBar[areaHovered=\"true\"]::handle:vertical { background: #27bfd6; margin: 0px -2px; }"
-        "QScrollBar::handle:horizontal:hover { background: #27bfd6; }"
+        "QScrollBar:vertical, QScrollBar:horizontal { background: transparent; border: 0; margin: 0; }"
+        "QScrollBar:vertical { width: 4px; }"
+        "QScrollBar:horizontal { height: 4px; }"
+        "QScrollBar:vertical[areaHovered=true] { width: 9px; }"
+        "QScrollBar:horizontal[areaHovered=true] { height: 9px; }"
+        "QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: rgba(109, 125, 141, 0.9); border: 0; border-radius: 2px; min-height: 16px; min-width: 16px; }"
+        "QScrollBar:vertical[areaHovered=true]::handle:vertical, QScrollBar:horizontal[areaHovered=true]::handle:horizontal { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #7ad7f4, stop:1 #42bfd8); border-radius: 3px; }"
+        "QScrollBar::handle:vertical:pressed, QScrollBar::handle:horizontal:pressed { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #9deefe, stop:1 #48cfe7); }"
         "QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }"
         "QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }"));
 
@@ -2352,6 +2353,16 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
 {
     d->previousMouseMovePos = e->globalPosition();
 
+    const bool nearRightEdge = e->pos().x() >= viewport()->width() - 22;
+    auto *vScroll = verticalScrollBar();
+    const bool areaHovered = vScroll->property("areaHovered").toBool();
+    if (areaHovered != nearRightEdge) {
+        vScroll->setProperty("areaHovered", nearRightEdge);
+        vScroll->style()->unpolish(vScroll);
+        vScroll->style()->polish(vScroll);
+        vScroll->update();
+    }
+
     // don't perform any mouse action when no document is shown
     if (d->items.isEmpty()) {
         return;
@@ -2516,6 +2527,18 @@ void PageView::mouseMoveEvent(QMouseEvent *e)
         updateCursor();
         break;
     }
+}
+
+void PageView::leaveEvent(QEvent *event)
+{
+    auto *vScroll = verticalScrollBar();
+    if (vScroll->property("areaHovered").toBool()) {
+        vScroll->setProperty("areaHovered", false);
+        vScroll->style()->unpolish(vScroll);
+        vScroll->style()->polish(vScroll);
+        vScroll->update();
+    }
+    QAbstractScrollArea::leaveEvent(event);
 }
 
 void PageView::mousePressEvent(QMouseEvent *e)
