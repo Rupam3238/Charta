@@ -578,7 +578,7 @@ public:
     bool textToolsEnabled;
 };
 
-const QList<double> AnnotationActionHandlerPrivate::widthStandardValues = {1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5};
+const QList<double> AnnotationActionHandlerPrivate::widthStandardValues = {0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 20, 50};
 
 const QList<double> AnnotationActionHandlerPrivate::opacityStandardValues = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
 
@@ -744,15 +744,17 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
 
         auto *slider = new ResponsiveSlider(Qt::Horizontal, controlParent);
         const int scale = decimals == 0 ? 1 : 10;
-        slider->setRange(qRound(minimum * scale), qRound(maximum * scale));
+        const int minSliderValue = qRound(std::max(minimum, 0.25) * scale);
+        const int maxSliderValue = qRound(maximum * scale);
+        slider->setRange(minSliderValue, maxSliderValue);
         slider->setSingleStep(1);
-        slider->setPageStep(qMax(5, (qRound(maximum * scale) - qRound(minimum * scale)) / 10));
+        slider->setPageStep(qMax(5, (maxSliderValue - minSliderValue) / 10));
         slider->setTracking(true);
 
         auto *spinBox = new QDoubleSpinBox(controlParent);
-        spinBox->setRange(minimum, maximum);
+        spinBox->setRange(std::max(minimum, 0.25), maximum);
         spinBox->setDecimals(decimals);
-        spinBox->setSingleStep(decimals == 0 ? 1.0 : (minimum < 1.0 ? 0.1 : 0.5));
+        spinBox->setSingleStep(0.25);
         spinBox->setSuffix(i18n(" px"));
         spinBox->setFixedWidth(110);
         auto *controlRow = new QHBoxLayout;
@@ -761,19 +763,49 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         controlRow->addWidget(spinBox);
         controlLayout->addLayout(controlRow);
 
-        const double initialWidth = drawingToolSettings.value(key).width;
+        const QList<double> presetWidths = {1.0, 5.0, 20.0, 50.0};
+        auto *presetRow = new QHBoxLayout;
+        presetRow->setSpacing(6);
+        QList<QToolButton *> presetButtons;
+        for (double presetWidth : presetWidths) {
+            auto *presetButton = new QToolButton(controlParent);
+            presetButton->setText(i18n("%1 px", presetWidth));
+            presetButton->setToolTip(i18n("Set width to %1 px", presetWidth));
+            presetButton->setCheckable(true);
+            presetButton->setAutoRaise(true);
+            presetButton->setFixedWidth(58);
+            presetRow->addWidget(presetButton);
+            presetButtons.append(presetButton);
+        }
+        controlLayout->addLayout(presetRow);
+
+        const auto updatePresetSelection = [presetButtons, spinBox](double width) {
+            for (QToolButton *presetButton : std::as_const(presetButtons)) {
+                const bool isSelected = qFuzzyCompare(presetButton->text().remove(QLatin1String(" px")).toDouble(), width);
+                presetButton->setChecked(isSelected);
+            }
+            spinBox->setValue(width);
+        };
+
+        const double initialWidth = qMax(0.25, drawingToolSettings.value(key).width);
         spinBox->setValue(initialWidth);
         slider->setValue(qRound(initialWidth * scale));
         currentValue->setText(i18n("%1 px", spinBox->value()));
 
+        const auto updateSpinStep = [spinBox]() {
+            spinBox->setSingleStep(0.25);
+        };
+        updateSpinStep();
+
         QObject::connect(slider, &QSlider::valueChanged, spinBox, [spinBox, scale](int value) { spinBox->setValue(static_cast<double>(value) / scale); });
         QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, slider, [slider, scale](double value) { slider->setValue(qRound(value * scale)); });
+        QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, spinBox, updateSpinStep);
         QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, currentValue, [currentValue](double value) { currentValue->setText(i18n("%1 px", value)); });
         QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, q, [this, key, kind = *kindIt, selectedAnnotation, &selectedAnnotationChanged, &selectedWidthChanged](double value) {
             drawingToolSettings[key].width = value;
             if (selectedAnnotation) {
                 selectedAnnotationChanged = true;
-            selectedWidthChanged = true;
+                selectedWidthChanged = true;
                 return;
             }
             if (kind == DrawingToolKind::Eraser) {
@@ -782,6 +814,24 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
                 annotator->setDrawingToolWidthPixels(value);
             }
         });
+        for (QToolButton *presetButton : std::as_const(presetButtons)) {
+            const double presetWidth = presetButton->text().remove(QLatin1String(" px")).toDouble();
+            QObject::connect(presetButton, &QToolButton::clicked, q, [this, key, kind = *kindIt, selectedAnnotation, &selectedAnnotationChanged, &selectedWidthChanged, presetWidth, updatePresetSelection]() {
+                updatePresetSelection(presetWidth);
+                drawingToolSettings[key].width = presetWidth;
+                if (selectedAnnotation) {
+                    selectedAnnotationChanged = true;
+                    selectedWidthChanged = true;
+                    return;
+                }
+                if (kind == DrawingToolKind::Eraser) {
+                    annotator->setEraserWidth(presetWidth);
+                } else {
+                    annotator->setDrawingToolWidthPixels(presetWidth);
+                }
+            });
+        }
+        updatePresetSelection(initialWidth);
     };
 
     auto addColorControl = [&](const QString &label, bool fillColor) {

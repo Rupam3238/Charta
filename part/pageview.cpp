@@ -638,7 +638,8 @@ void PageView::selectAnnotations(const QList<Okular::Annotation *> &annotations,
 void PageView::updateAnnotationSelectionPanel()
 {
     const QList<AnnotationDescription> selected = d->mouseAnnotation->selectedAnnotations();
-    Okular::Annotation *annotation = d->annotationSelectionMode && !selected.isEmpty() ? selected.constFirst().annotation : nullptr;
+    const bool allowSelectionPanel = d->annotationSelectionMode || d->mouseMode == Okular::Settings::EnumMouseMode::Browse;
+    Okular::Annotation *annotation = allowSelectionPanel && !selected.isEmpty() ? selected.constFirst().annotation : nullptr;
     if (annotation != d->annotationPanelAnnotation) {
         d->annotationPanelAnnotation = annotation;
     }
