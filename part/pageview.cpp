@@ -2196,9 +2196,9 @@ void PageView::keyPressEvent(QKeyEvent *e)
 
     case Qt::Key_Left:
     case Qt::Key_H:
-        if (horizontalScrollBar()->maximum() == 0) {
-            // if we cannot scroll we go to the previous page vertically
-            int next_page = d->document->currentPage() - viewColumns();
+        if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Single || horizontalScrollBar()->maximum() == 0) {
+            // in single-page view, left/right keys should navigate between pages instead of panning across the page
+            int next_page = d->document->currentPage() - 1;
             d->document->setViewportPage(next_page);
         } else {
             d->scroller->scrollTo(d->scroller->finalPosition() + QPoint(-stepsize * horizontalScrollBar()->singleStep(), 0), d->currentShortScrollDuration);
@@ -2206,9 +2206,9 @@ void PageView::keyPressEvent(QKeyEvent *e)
         break;
     case Qt::Key_Right:
     case Qt::Key_L:
-        if (horizontalScrollBar()->maximum() == 0) {
-            // if we cannot scroll we advance the page vertically
-            int next_page = d->document->currentPage() + viewColumns();
+        if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Single || horizontalScrollBar()->maximum() == 0) {
+            // in single-page view, left/right keys should navigate between pages instead of panning across the page
+            int next_page = d->document->currentPage() + 1;
             d->document->setViewportPage(next_page);
         } else {
             d->scroller->scrollTo(d->scroller->finalPosition() + QPoint(stepsize * horizontalScrollBar()->singleStep(), 0), d->currentShortScrollDuration);
@@ -3760,8 +3760,8 @@ double PageView::zoomFactorFitMode(ZoomMode mode)
     const bool facingCentered = Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::FacingFirstCentered || (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Facing && pageCount == 1);
     const bool overrideCentering = facingCentered && pageCount < 3;
     const int nCols = overrideCentering ? 1 : viewColumns();
-    const int colWidth = viewport()->width() / nCols - kcolWidthMargin;
-    const double rowHeight = viewport()->height() - krowHeightMargin;
+    const int colWidth = viewport()->width() / nCols;
+    const double rowHeight = viewport()->height();
     const PageViewItem *currentItem = d->items[qMax(0, (int)d->document->currentPage())];
     // prevent segmentation fault when opening a new document;
     if (!currentItem) {
@@ -4531,7 +4531,9 @@ void PageView::slotRelayoutPages()
     const bool facingPages = facing || centerFirstPage;
     const bool centerLastPage = centerFirstPage && pageCount % 2 == 0;
     const bool continuousView = getContinuousMode();
-    const int rowHeightMargin = continuousView ? 0 : krowHeightMargin;
+    const bool fitModeBorderless = d->zoomMode == ZoomFitWidth || d->zoomMode == ZoomFitPage || d->zoomMode == ZoomFitAuto;
+    const int colWidthMargin = fitModeBorderless ? 0 : kcolWidthMargin;
+    const int rowHeightMargin = continuousView ? 0 : (fitModeBorderless ? 0 : krowHeightMargin);
     const int nCols = overrideCentering ? 1 : viewColumns();
     const bool singlePageViewMode = Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Single;
 
@@ -4562,11 +4564,11 @@ void PageView::slotRelayoutPages()
     // 1) find the maximum columns width and rows height for a grid in
     // which each page must well-fit inside a cell
     for (PageViewItem *item : std::as_const(d->items)) {
-        // update internal page size (leaving a little margin in case of Fit* modes)
-        updateItemSize(item, colWidth[cIdx] - kcolWidthMargin, viewportHeight - krowHeightMargin);
+        // update internal page size; in fit modes, use the full available width/height so the page reaches the viewport edges.
+        updateItemSize(item, colWidth[cIdx] - colWidthMargin, viewportHeight - rowHeightMargin);
         // find row's maximum height and column's max width
-        if (item->croppedWidth() + kcolWidthMargin > colWidth[cIdx]) {
-            colWidth[cIdx] = item->croppedWidth() + kcolWidthMargin;
+        if (item->croppedWidth() + colWidthMargin > colWidth[cIdx]) {
+            colWidth[cIdx] = item->croppedWidth() + colWidthMargin;
         }
         if (item->croppedHeight() + rowHeightMargin > rowHeight[rIdx]) {
             rowHeight[rIdx] = item->croppedHeight() + rowHeightMargin;
