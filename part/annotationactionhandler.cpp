@@ -67,9 +67,10 @@ class DrawingToolBarIsland final : public KToolBar
 public:
     enum class Anchor { Left, Right };
 
-    DrawingToolBarIsland(QWidget *host, QWidget *visibleCanvas)
-        : KToolBar(QStringLiteral("drawingToolBar"), host, false)
+    DrawingToolBarIsland(QWidget *host, QWidget *visibleCanvas, QWidget *geometryOwner = nullptr)
+        : KToolBar(QStringLiteral("drawingToolBar"), geometryOwner ? geometryOwner : host, false)
         , m_host(host)
+        , m_geometryOwner(geometryOwner)
         , m_visibleCanvas(visibleCanvas)
         , m_window(host->window())
     {
@@ -90,16 +91,48 @@ public:
         scheduleIslandUpdate();
     }
 
+    void setCompactView(QWidget *compactView)
+    {
+        m_compactView = compactView;
+        scheduleIslandUpdate();
+    }
+
+    void setCompactPresentation(bool compact)
+    {
+        if (!m_geometryOwner) {
+            setVisible(!compact);
+            return;
+        }
+        if (m_compactView) {
+            m_compactView->setVisible(compact);
+        }
+        setVisible(!compact);
+        if (m_geometryOwner->layout()) {
+            m_geometryOwner->layout()->activate();
+        }
+        m_geometryOwner->adjustSize();
+        updateIslandGeometry();
+    }
+
     void setRequestedVisible(bool visible)
     {
         m_requestedVisible = visible;
-        setVisible(visible);
+        if (m_geometryOwner) {
+            m_geometryOwner->setVisible(visible);
+        } else {
+            setVisible(visible);
+        }
         scheduleIslandUpdate();
     }
 
     bool requestedVisible() const
     {
         return m_requestedVisible;
+    }
+
+    void refreshGeometry()
+    {
+        scheduleIslandUpdate();
     }
 
 protected:
@@ -132,8 +165,12 @@ private:
             if (!m_host || !m_visibleCanvas) {
                 return;
             }
-            if (m_requestedVisible && !isVisible() && m_host->isVisible()) {
-                show();
+            if (m_requestedVisible && (!m_geometryOwner || !m_geometryOwner->isVisible()) && m_host->isVisible()) {
+                if (m_geometryOwner) {
+                    m_geometryOwner->show();
+                } else {
+                    show();
+                }
             }
             updateIslandGeometry();
         });
@@ -141,28 +178,105 @@ private:
 
     void updateIslandGeometry()
     {
+        QWidget *geometryOwner = m_geometryOwner ? m_geometryOwner : this;
         if (!m_host || !m_visibleCanvas || !m_host->isAncestorOf(m_visibleCanvas.data())) {
             return;
         }
-        if (layout()) {
-            layout()->activate();
+        if (geometryOwner->layout()) {
+            geometryOwner->layout()->activate();
         }
-        adjustSize();
+        geometryOwner->adjustSize();
         const int margin = 12;
         const QPoint canvasOrigin = m_visibleCanvas->mapTo(m_host.data(), QPoint(0, 0));
         const QRect canvasRect(canvasOrigin, m_visibleCanvas->size());
-        const int x = canvasRect.right() - width() - margin + 1;
-        const int y = canvasRect.top() + (canvasRect.height() - height()) / 2;
-        move(x, y);
-        raise();
+        const int x = canvasRect.right() - geometryOwner->width() - margin + 1;
+        const int y = canvasRect.top() + (canvasRect.height() - geometryOwner->height()) / 2;
+        geometryOwner->move(x, y);
+        geometryOwner->raise();
     }
 
     QPointer<QWidget> m_host;
+    QPointer<QWidget> m_geometryOwner;
     QPointer<QWidget> m_visibleCanvas;
     QPointer<QWidget> m_window;
+    QPointer<QWidget> m_compactView;
     Anchor m_anchor = Anchor::Left;
     bool m_requestedVisible = true;
     bool m_updateScheduled = false;
+};
+
+class CompactToolBarView final : public QWidget
+{
+public:
+    CompactToolBarView(KToolBar *toolbar, QAction *modeAction, QWidget *parent = nullptr)
+        : QWidget(parent)
+        , m_toolbar(toolbar)
+        , m_modeAction(modeAction)
+    {
+        setObjectName(QStringLiteral("drawingToolBarCompactView"));
+        auto *layout = new QVBoxLayout(this);
+        layout->setContentsMargins(2, 2, 2, 2);
+        layout->setSpacing(2);
+        setStyleSheet(QStringLiteral(
+            "QWidget { background: #202630; border: 1px solid #3b4653; border-radius: 10px; }"
+            "QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px; padding: 2px; margin: 0; }"
+            "QToolButton:hover { color: #f2f5f8; background: #303a46; }"
+            "QToolButton:checked { color: #ffffff; background: #16414c; border-color: #27bfd6; }"
+            "QToolButton:focus { border-color: #27bfd6; }"));
+
+        m_activeToolButton = new QToolButton(this);
+        m_activeToolButton->setAutoRaise(true);
+        m_activeToolButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        m_activeToolButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        connect(m_activeToolButton, &QToolButton::clicked, this, [this] {
+            if (auto *activeAction = m_activeAction) {
+                if (auto *realButton = qobject_cast<QToolButton *>(m_toolbar->widgetForAction(activeAction))) {
+                    realButton->animateClick();
+                    return;
+                }
+                activeAction->trigger();
+            }
+        });
+
+        m_toggleButton = new QToolButton(this);
+        m_toggleButton->setAutoRaise(true);
+        m_toggleButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        m_toggleButton->setDefaultAction(modeAction);
+
+        layout->addWidget(m_activeToolButton);
+        layout->addWidget(m_toggleButton);
+        setVisible(false);
+    }
+
+    void setActiveAction(QAction *action)
+    {
+        m_activeAction = action;
+        if (!m_activeToolButton) {
+            return;
+        }
+        if (!action) {
+            m_activeToolButton->setIcon(QIcon());
+            m_activeToolButton->setToolTip(QString());
+            m_activeToolButton->setEnabled(false);
+            return;
+        }
+        m_activeToolButton->setEnabled(action->isEnabled());
+        m_activeToolButton->setIcon(action->icon());
+        m_activeToolButton->setText(action->text());
+        m_activeToolButton->setToolTip(action->toolTip().isEmpty() ? action->text() : action->toolTip());
+
+        if (auto *realButton = qobject_cast<QToolButton *>(m_toolbar->widgetForAction(action))) {
+            m_activeToolButton->setIcon(realButton->icon());
+            m_activeToolButton->setToolTip(realButton->toolTip().isEmpty() ? action->text() : realButton->toolTip());
+        }
+    }
+
+private:
+    KToolBar *m_toolbar = nullptr;
+    QAction *m_modeAction = nullptr;
+    QAction *m_activeAction = nullptr;
+    QToolButton *m_activeToolButton = nullptr;
+    QToolButton *m_toggleButton = nullptr;
 };
 
 class ToolSettingsPopupDismissFilter final : public QObject
@@ -430,11 +544,13 @@ public:
     KToggleAction *aSelectTool;
     KToggleAction *aLassoSelectTool = nullptr;
     ToggleActionMenu *aSelectTools = nullptr;
+    KToggleAction *aCompactMode = nullptr;
     KToggleAction *aEraserTool;
     KToggleAction *aDrawingBrowse;
     QAction *aBrowseTool;
     QAction *aMouseSelectTools;
     KToolBar *drawingToolBar = nullptr;
+    CompactToolBarView *compactToolBarView = nullptr;
     bool selectModeSwitchingToBrowse = false;
 
     QAction *aCustomStamp;
@@ -1398,6 +1514,8 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->aToolBarVisibility = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18n("&Annotations"), this);
     d->aHideToolBar = new QAction(QIcon::fromTheme(QStringLiteral("dialog-close")), i18nc("@action:intoolbar Hide the drawing toolbar", "Hide drawing tools"), this);
     d->aShowToolBar = new QAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18nc("@action:intoolbar Show the drawing toolbar", "Show drawing tools"), this);
+    d->aCompactMode = new KToggleAction(QIcon::fromTheme(QStringLiteral("charta"), QIcon(QStringLiteral(":/branding/charta.svg"))), i18nc("@action:intoolbar Switch drawing toolbar between expanded and compact presentation", "Compact"), this);
+    d->aCompactMode->setChecked(false);
 
     // Text markup actions
     KToggleAction *aHighlighter = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-highlight")), i18nc("@action:intoolbar Annotation tool", "Highlighter"), this);
@@ -1832,11 +1950,29 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
         if (!pageView) {
             return;
         }
-        auto *island = new DrawingToolBarIsland(pageView, pageView->viewport());
+        auto *floatingHost = new QWidget(pageView);
+        floatingHost->setObjectName(QStringLiteral("drawingToolBarHost"));
+        floatingHost->setAttribute(Qt::WA_StyledBackground, false);
+        floatingHost->setContentsMargins(0, 0, 0, 0);
+        auto *floatingLayout = new QVBoxLayout(floatingHost);
+        floatingLayout->setContentsMargins(0, 0, 0, 0);
+        floatingLayout->setSpacing(0);
+
+        auto *island = new DrawingToolBarIsland(pageView, pageView->viewport(), floatingHost);
         island->setAnchor(DrawingToolBarIsland::Anchor::Right);
         drawingToolBar = island;
         drawingToolBar->setWindowTitle(i18n("Drawing Tools"));
         d->drawingToolBar = drawingToolBar;
+
+        d->compactToolBarView = new CompactToolBarView(island, d->aCompactMode, floatingHost);
+        island->setCompactView(d->compactToolBarView);
+        d->compactToolBarView->hide();
+
+        floatingLayout->addWidget(island);
+        floatingLayout->addWidget(d->compactToolBarView);
+        floatingHost->adjustSize();
+        floatingHost->hide();
+        d->compactToolBarView->setVisible(false);
     }
     auto *island = static_cast<DrawingToolBarIsland *>(drawingToolBar);
     drawingToolBar->setStyleSheet(QStringLiteral(
@@ -1865,6 +2001,22 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
                 drawingToolBar->addAction(action);
             }
         }
+        drawingToolBar->addAction(d->aCompactMode);
+    }
+    if (d->compactToolBarView) {
+        QAction *checkedAction = d->agTools->checkedAction();
+        d->compactToolBarView->setActiveAction(checkedAction ? checkedAction : d->drawingTools.constFirst());
+        connect(d->agTools, &QActionGroup::triggered, this, [this](QAction *action) {
+            if (d->compactToolBarView) {
+                d->compactToolBarView->setActiveAction(action);
+            }
+        });
+        connect(d->aCompactMode, &QAction::toggled, this, [this, island](bool compact) {
+            island->setCompactPresentation(compact);
+            if (d->compactToolBarView) {
+                d->compactToolBarView->setVisible(compact);
+            }
+        });
     }
     if (auto *selectionButton = qobject_cast<QToolButton *>(drawingToolBar->widgetForAction(d->aSelectTools));
         selectionButton && !selectionButton->property("selectionRepeatPopupConnected").toBool()) {
@@ -1908,6 +2060,9 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
         connect(d->aToolBarVisibility, &QAction::toggled, island, [island](bool visible) { island->setRequestedVisible(visible); });
         connect(drawingToolBar, &QToolBar::visibilityChanged, this, &AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged, Qt::UniqueConnection);
         connect(drawingToolBar, &QToolBar::visibilityChanged, this, [this, island](bool visible) {
+            if (d->aCompactMode->isChecked()) {
+                return;
+            }
             if (!visible && (island->window()->isFullScreen() || !island->isHidden())) {
                 return;
             }
@@ -2055,6 +2210,9 @@ void AnnotationActionHandler::endTemporaryTool()
 
 void AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged(bool visible)
 {
+    if (d->aCompactMode && d->aCompactMode->isChecked()) {
+        return;
+    }
     if (!visible) {
         auto *island = static_cast<DrawingToolBarIsland *>(d->drawingToolBar);
         if (island->window()->isFullScreen() && island->requestedVisible()) {
