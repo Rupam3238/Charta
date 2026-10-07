@@ -222,10 +222,12 @@ public:
             "QToolButton { color: #aab6c2; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px; padding: 2px; margin: 0; }"
             "QToolButton:hover { color: #f2f5f8; background: #303a46; }"
             "QToolButton:checked { color: #ffffff; background: #16414c; border-color: #27bfd6; }"
+            "QToolButton[compactToggle=true]:checked { color: #ffffff; background: transparent; border-color: transparent; }"
             "QToolButton:focus { border-color: #27bfd6; }"));
 
         m_activeToolButton = new QToolButton(this);
         m_activeToolButton->setAutoRaise(true);
+        m_activeToolButton->setCheckable(true);
         m_activeToolButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
         m_activeToolButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         connect(m_activeToolButton, &QToolButton::clicked, this, [this] {
@@ -239,6 +241,8 @@ public:
         });
 
         m_toggleButton = new QToolButton(this);
+        m_toggleButton->setObjectName(QStringLiteral("drawingToolBarCompactModeToggle"));
+        m_toggleButton->setProperty("compactToggle", true);
         m_toggleButton->setAutoRaise(true);
         m_toggleButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         m_toggleButton->setDefaultAction(modeAction);
@@ -256,11 +260,14 @@ public:
         }
         if (!action) {
             m_activeToolButton->setIcon(QIcon());
+            m_activeToolButton->setText(QString());
             m_activeToolButton->setToolTip(QString());
             m_activeToolButton->setEnabled(false);
+            m_activeToolButton->setChecked(false);
             return;
         }
         m_activeToolButton->setEnabled(action->isEnabled());
+        m_activeToolButton->setChecked(true);
         m_activeToolButton->setIcon(action->icon());
         m_activeToolButton->setText(action->text());
         m_activeToolButton->setToolTip(action->toolTip().isEmpty() ? action->text() : action->toolTip());
@@ -269,6 +276,11 @@ public:
             m_activeToolButton->setIcon(realButton->icon());
             m_activeToolButton->setToolTip(realButton->toolTip().isEmpty() ? action->text() : realButton->toolTip());
         }
+    }
+
+    QWidget *activeToolButton() const
+    {
+        return m_activeToolButton;
     }
 
 private:
@@ -1006,8 +1018,12 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
     popup.ensurePolished();
     popup.adjustSize();
     QPoint popupPosition = QCursor::pos();
-    if (anchorWidget) {
-        popupPosition = anchorWidget->mapToGlobal(QPoint(0, anchorWidget->height() + 4));
+    QWidget *effectiveAnchor = anchorWidget;
+    if (!effectiveAnchor && drawingToolBar && drawingToolBar->isHidden() && compactToolBarView) {
+        effectiveAnchor = compactToolBarView->activeToolButton();
+    }
+    if (effectiveAnchor) {
+        popupPosition = effectiveAnchor->mapToGlobal(QPoint(effectiveAnchor->width() + 6, 0));
     } else if (drawingToolBar) {
         if (QWidget *toolButton = drawingToolBar->widgetForAction(action)) {
             popupPosition = toolButton->mapToGlobal(QPoint(toolButton->width() + 6, 0));
