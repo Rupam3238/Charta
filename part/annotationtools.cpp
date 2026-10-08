@@ -264,12 +264,14 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
         return segmentRect;
     } else if (type == Release && points.count() > 0) {
         if (points.count() < 2) {
-            points.clear();
-            pressures.clear();
-            segmentWidths.clear();
-        } else {
-            m_creationCompleted = true;
+            const qreal representativeWidth = representativeStrokeWidth(m_pressureSum, pressures.size(), m_allDefaultPressure, basePenWidth);
+            const qreal pageWidth = qMax<qreal>(1.0, m_pageWidth);
+            const qreal segmentPixelWidth = qBound<qreal>(0.5, pressures.last() * representativeWidth * xScale / pageWidth, 100.0);
+            segmentWidths.append(segmentPixelWidth * pageWidth / xScale);
+            points.append(lastPoint);
+            pressures.append(pressures.last());
         }
+        m_creationCompleted = true;
         return totalRect.geometry((int)xScale, (int)yScale);
     }
     return QRect();

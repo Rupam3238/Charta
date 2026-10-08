@@ -34,6 +34,7 @@ private Q_SLOTS:
     void testAddAnnotationUndoWithRotate_Bug318091();
     void testRemoveAnnotations();
     void testRemoveAnnotationGroupUndoOnce();
+    void testSingleClickInkAnnotation();
     void testInkCustomAppearanceSaveReload();
 
 private:
@@ -220,6 +221,42 @@ void AddRemoveAnnotationTest::testRemoveAnnotationGroupUndoOnce()
 
     m_document->undo();
     QCOMPARE(m_document->page(0)->annotations().size(), 2);
+}
+
+void AddRemoveAnnotationTest::testSingleClickInkAnnotation()
+{
+    QDomDocument engineDocument;
+    QDomElement toolElement = engineDocument.createElement(QStringLiteral("tool"));
+    QDomElement annotationElement = engineDocument.createElement(QStringLiteral("annotation"));
+    annotationElement.setAttribute(QStringLiteral("type"), QStringLiteral("Ink"));
+    annotationElement.setAttribute(QStringLiteral("width"), QStringLiteral("20"));
+    annotationElement.setAttribute(QStringLiteral("color"), QStringLiteral("#ff00ff"));
+    toolElement.appendChild(annotationElement);
+    engineDocument.appendChild(toolElement);
+
+    SmoothPathEngine engine(toolElement);
+    const auto modifiers = AnnotatorEngine::Modifiers {};
+    const Okular::Page *page = m_document->page(0);
+    const qreal x = 0.5;
+    const qreal y = 0.5;
+    engine.event(AnnotatorEngine::Press, AnnotatorEngine::Left, modifiers, x, y, page->width(), page->height(), page);
+    engine.event(AnnotatorEngine::Release, AnnotatorEngine::Left, modifiers, x, y, page->width(), page->height(), page);
+
+    QVERIFY(engine.creationCompleted());
+    const QList<Okular::Annotation *> annotations = engine.end();
+    QCOMPARE(annotations.size(), 1);
+    auto *ink = dynamic_cast<Okular::InkAnnotation *>(annotations.constFirst());
+    QVERIFY(ink);
+    QCOMPARE(ink->style().width(), qreal(20.0));
+    QCOMPARE(ink->inkPaths().size(), 1);
+    QCOMPARE(ink->inkPaths().constFirst().size(), 2);
+    QVERIFY(!ink->appearanceStream().isEmpty());
+    QVERIFY(ink->boundingRectangle().width() > 0.0);
+    QVERIFY(ink->boundingRectangle().height() > 0.0);
+
+    m_document->addPageAnnotation(0, ink);
+    QCOMPARE(m_document->page(0)->annotations().size(), 1);
+    QCOMPARE(m_document->page(0)->annotations().constFirst(), ink);
 }
 
 void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
