@@ -36,6 +36,7 @@ private Q_SLOTS:
     void testRemoveAnnotationGroupUndoOnce();
     void testSingleClickInkAnnotation();
     void testInkCustomAppearanceSaveReload();
+    void testInkCustomAppearanceRotatedPage();
 
 private:
     Okular::Document *m_document;
@@ -451,6 +452,112 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
     QVERIFY(reopenedOkularDocument->page(0)->annotations().isEmpty());
     reopenedOkularDocument->undo();
     QCOMPARE(reopenedOkularDocument->page(0)->annotations().size(), 1);
+#endif
+}
+
+void AddRemoveAnnotationTest::testInkCustomAppearanceRotatedPage()
+{
+#if !defined(HAVE_POPPLER_QT6) || !defined(POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE)
+    QSKIP("This test requires Poppler's custom Ink appearance API");
+#else
+    QTemporaryFile rotatedPdf(QDir::tempPath() + QStringLiteral("/charta-rotated-ink-XXXXXX.pdf"));
+    QVERIFY(rotatedPdf.open());
+
+    QByteArray pdf("%PDF-1.4\n");
+    QVector<qint64> objectOffsets(5);
+    auto appendObject = [&pdf, &objectOffsets](int objectNumber, const QByteArray &contents) {
+        objectOffsets[objectNumber] = pdf.size();
+        pdf += QByteArray::number(objectNumber) + " 0 obj\n" + contents + "\nendobj\n";
+    };
+    appendObject(1, "<< /Type /Catalog /Pages 2 0 R >>");
+    appendObject(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+    appendObject(3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Rotate 270 /Resources << >> /Contents 4 0 R >>");
+    const QByteArray contentStream("q\n1 1 1 rg\n0 0 841.89 595.28 re\nf\nQ\n");
+    appendObject(4, "<< /Length " + QByteArray::number(contentStream.size()) + " >>\nstream\n" + contentStream + "endstream");
+    const qint64 xrefOffset = pdf.size();
+    pdf += "xref\n0 5\n0000000000 65535 f \n";
+    for (int objectNumber = 1; objectNumber < objectOffsets.size(); ++objectNumber) {
+        pdf += QByteArray::number(objectOffsets[objectNumber]).rightJustified(10, '0') + " 00000 n \n";
+    }
+    pdf += "trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n" + QByteArray::number(xrefOffset) + "\n%%EOF\n";
+    QCOMPARE(rotatedPdf.write(pdf), qint64(pdf.size()));
+    rotatedPdf.flush();
+
+    m_document->closeDocument();
+    QMimeDatabase mimeDatabase;
+    const QMimeType mime = mimeDatabase.mimeTypeForFile(rotatedPdf.fileName());
+    QCOMPARE(m_document->openDocument(rotatedPdf.fileName(), QUrl(), mime), Okular::Document::OpenSuccess);
+    const Okular::Page *page = m_document->page(0);
+    QVERIFY(page);
+    QCOMPARE(page->orientation(), Okular::Rotation270);
+
+    QDomDocument engineDocument;
+    QDomElement toolElement = engineDocument.createElement(QStringLiteral("tool"));
+    toolElement.setAttribute(QStringLiteral("color"), QStringLiteral("#ff00ff"));
+    QDomElement annotationElement = engineDocument.createElement(QStringLiteral("annotation"));
+    annotationElement.setAttribute(QStringLiteral("type"), QStringLiteral("Ink"));
+    annotationElement.setAttribute(QStringLiteral("width"), QStringLiteral("12"));
+    annotationElement.setAttribute(QStringLiteral("color"), QStringLiteral("#ff00ff"));
+    toolElement.appendChild(annotationElement);
+    engineDocument.appendChild(toolElement);
+
+    const QList<QPointF> samples {QPointF(0.2, 0.2), QPointF(0.38, 0.2), QPointF(0.38, 0.52), QPointF(0.62, 0.62)};
+    SmoothPathEngine engine(toolElement);
+    const auto modifiers = AnnotatorEngine::Modifiers {};
+    const qreal pageWidth = page->width();
+    const qreal pageHeight = page->height();
+    engine.event(AnnotatorEngine::Press, AnnotatorEngine::Left, modifiers, samples.first().x(), samples.first().y(), pageWidth, pageHeight, page);
+    for (int index = 1; index < samples.size(); ++index) {
+        engine.event(AnnotatorEngine::Move, AnnotatorEngine::Left, modifiers, samples[index].x(), samples[index].y(), pageWidth, pageHeight, page);
+    }
+    engine.event(AnnotatorEngine::Release, AnnotatorEngine::Left, modifiers, samples.last().x(), samples.last().y(), pageWidth, pageHeight, page);
+    QVERIFY(engine.creationCompleted());
+
+    QImage preview(qRound(pageWidth), qRound(pageHeight), QImage::Format_ARGB32_Premultiplied);
+    preview.fill(Qt::transparent);
+    QPainter previewPainter(&preview);
+    engine.paint(&previewPainter, pageWidth, pageHeight, preview.rect());
+    previewPainter.end();
+
+    const QList<Okular::Annotation *> annotations = engine.end();
+    QCOMPARE(annotations.size(), 1);
+    auto *ink = dynamic_cast<Okular::InkAnnotation *>(annotations.constFirst());
+    QVERIFY(ink);
+    m_document->addPageAnnotation(0, ink);
+
+    QTemporaryFile savedPdf(QDir::tempPath() + QStringLiteral("/charta-rotated-ink-saved-XXXXXX.pdf"));
+    QVERIFY(savedPdf.open());
+    savedPdf.close();
+    QString errorText;
+    QVERIFY2(m_document->saveChanges(savedPdf.fileName(), &errorText), qPrintable(errorText));
+
+    auto savedDocument = Poppler::Document::load(savedPdf.fileName());
+    QVERIFY(savedDocument);
+    auto savedPage = savedDocument->page(0);
+    QVERIFY(savedPage);
+    QCOMPARE(savedPage->orientation(), Poppler::Page::Seascape);
+    const QImage savedImage = savedPage->renderToImage(72, 72);
+
+    auto isMagenta = [](const QColor &color) {
+        return color.red() > 150 && color.blue() > 150 && color.green() < 140 && color.alpha() > 80;
+    };
+    int expectedPixels = 0;
+    int renderedPixels = 0;
+    int matchingPixels = 0;
+    for (int y = 0; y < savedImage.height(); ++y) {
+        for (int x = 0; x < savedImage.width(); ++x) {
+            const int previewX = qBound(0, qRound(static_cast<qreal>(x) * preview.width() / savedImage.width()), preview.width() - 1);
+            const int previewY = qBound(0, qRound(static_cast<qreal>(y) * preview.height() / savedImage.height()), preview.height() - 1);
+            const bool expected = isMagenta(preview.pixelColor(previewX, previewY));
+            const bool rendered = isMagenta(savedImage.pixelColor(x, y));
+            expectedPixels += expected;
+            renderedPixels += rendered;
+            matchingPixels += expected && rendered;
+        }
+    }
+    QVERIFY(expectedPixels > 100);
+    QVERIFY(renderedPixels > 100);
+    QVERIFY(static_cast<double>(matchingPixels) / (expectedPixels + renderedPixels - matchingPixels) > 0.5);
 #endif
 }
 

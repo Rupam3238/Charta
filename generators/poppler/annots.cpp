@@ -16,6 +16,7 @@
 #include <QImageReader>
 #include <QLoggingCategory>
 #include <QTemporaryFile>
+#include <QTransform>
 #include <QVariant>
 
 #include <core/annotations.h>
@@ -426,7 +427,56 @@ static void updatePopplerAnnotationFromOkularAnnotation(const Okular::StampAnnot
     setPopplerStampAnnotationCustomImage(page, pStampAnnotation, oStampAnnotation);
 }
 
-static void updatePopplerAnnotationFromOkularAnnotation(const Okular::InkAnnotation *oInkAnnotation, Poppler::InkAnnotation *pInkAnnotation)
+#ifdef POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE
+static QByteArray pdfNumber(qreal value)
+{
+    QByteArray number = QByteArray::number(value, 'f', 10);
+    while (number.endsWith('0')) {
+        number.chop(1);
+    }
+    if (number.endsWith('.')) {
+        number.chop(1);
+    }
+    return number;
+}
+
+static void setInkAppearanceStream(const Okular::InkAnnotation *okularAnnotation, Poppler::InkAnnotation *popplerAnnotation, const Poppler::Page *page)
+{
+    const QByteArray appearance = okularAnnotation->appearanceStream();
+    const QRectF boundingBox = okularAnnotation->appearanceBoundingBox().normalized();
+    if (!page || boundingBox.isNull()) {
+        popplerAnnotation->setAppearanceStream(appearance, boundingBox);
+        return;
+    }
+
+    QTransform transform;
+    switch (page->orientation()) {
+    case Poppler::Page::Landscape:
+        transform = QTransform(0, 1, -1, 0, boundingBox.bottom(), -boundingBox.left());
+        break;
+    case Poppler::Page::UpsideDown:
+        transform = QTransform(-1, 0, 0, -1, boundingBox.right(), boundingBox.bottom());
+        break;
+    case Poppler::Page::Seascape:
+        transform = QTransform(0, -1, 1, 0, -boundingBox.top(), boundingBox.right());
+        break;
+    case Poppler::Page::Portrait:
+        popplerAnnotation->setAppearanceStream(appearance, boundingBox);
+        return;
+    }
+
+    QByteArray transformedAppearance = "q\n";
+    transformedAppearance += pdfNumber(transform.m11()) + ' ' + pdfNumber(transform.m12()) + ' ' + pdfNumber(transform.m21()) + ' ' + pdfNumber(transform.m22()) + ' '
+        + pdfNumber(transform.dx()) + ' ' + pdfNumber(transform.dy()) + " cm\n";
+    transformedAppearance += appearance;
+    transformedAppearance += "\nQ\n";
+
+    const QRectF transformedBox = transform.mapRect(boundingBox).normalized();
+    popplerAnnotation->setAppearanceStream(transformedAppearance, transformedBox);
+}
+#endif
+
+static void updatePopplerAnnotationFromOkularAnnotation(const Okular::InkAnnotation *oInkAnnotation, Poppler::InkAnnotation *pInkAnnotation, const Poppler::Page *page)
 {
     QList<QList<QPointF>> paths;
     const QList<QList<Okular::NormalizedPoint>> inkPathsList = oInkAnnotation->inkPaths();
@@ -440,7 +490,7 @@ static void updatePopplerAnnotationFromOkularAnnotation(const Okular::InkAnnotat
     pInkAnnotation->setInkPaths(paths);
 #ifdef POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE
     if (!oInkAnnotation->appearanceStream().isEmpty()) {
-        pInkAnnotation->setAppearanceStream(oInkAnnotation->appearanceStream(), oInkAnnotation->appearanceBoundingBox());
+        setInkAppearanceStream(oInkAnnotation, pInkAnnotation, page);
     }
 #endif
 }
@@ -625,12 +675,12 @@ static std::unique_ptr<Poppler::Annotation> createPopplerAnnotationFromOkularAnn
 }
 #endif
 
-static Poppler::Annotation *createPopplerAnnotationFromOkularAnnotation(const Okular::InkAnnotation *oInkAnnotation)
+static Poppler::Annotation *createPopplerAnnotationFromOkularAnnotation(const Okular::InkAnnotation *oInkAnnotation, const Poppler::Page *page)
 {
     Poppler::InkAnnotation *pInkAnnotation = new Poppler::InkAnnotation();
 
     setSharedAnnotationPropertiesToPopplerAnnotation(oInkAnnotation, pInkAnnotation);
-    updatePopplerAnnotationFromOkularAnnotation(oInkAnnotation, pInkAnnotation);
+    updatePopplerAnnotationFromOkularAnnotation(oInkAnnotation, pInkAnnotation, page);
 
     return pInkAnnotation;
 }
@@ -678,7 +728,7 @@ void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int pag
         }
     } break;
     case Okular::Annotation::AInk:
-        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::InkAnnotation *>(okl_ann));
+        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::InkAnnotation *>(okl_ann), ppl_page.get());
         break;
     case Okular::Annotation::ACaret:
         ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::CaretAnnotation *>(okl_ann));
@@ -722,7 +772,6 @@ void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int pag
 
 void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_ann, int page, bool appearanceChanged)
 {
-    Q_UNUSED(page);
     Q_UNUSED(appearanceChanged);
 
     Poppler::Annotation *ppl_ann = qvariant_cast<Poppler::Annotation *>(okl_ann->nativeId());
@@ -795,7 +844,8 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
     case Poppler::Annotation::AInk: {
         const Okular::InkAnnotation *okl_inkann = static_cast<const Okular::InkAnnotation *>(okl_ann);
         Poppler::InkAnnotation *ppl_inkann = static_cast<Poppler::InkAnnotation *>(ppl_ann);
-        updatePopplerAnnotationFromOkularAnnotation(okl_inkann, ppl_inkann);
+        std::unique_ptr<Poppler::Page> ppl_page = ppl_doc->page(page);
+        updatePopplerAnnotationFromOkularAnnotation(okl_inkann, ppl_inkann, ppl_page.get());
         break;
     }
     case Poppler::Annotation::AWidget:
