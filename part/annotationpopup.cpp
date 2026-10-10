@@ -30,6 +30,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QTemporaryFile>
+#include <QUuid>
 #include <QUrl>
 
 Q_DECLARE_METATYPE(AnnotationPopup::AnnotPagePair)
@@ -43,6 +44,7 @@ public:
         : m_imageFile(QDir::tempPath() + QLatin1String("/charta-clipboard-XXXXXX.png"))
     {
         setStampIconName(QString());
+        setUniqueName(QStringLiteral("charta-clipboard-image-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
         if (m_imageFile.open() && image.save(&m_imageFile, "PNG") && m_imageFile.flush()) {
             setStampIconName(m_imageFile.fileName());
         }
@@ -471,6 +473,7 @@ QList<Okular::Annotation *> AnnotationPopup::pasteClipboardImageToPage(int pageN
     }
 
     annotation->setBoundingRectangle(Okular::NormalizedRect(centerX - width / 2.0, centerY - height / 2.0, centerX + width / 2.0, centerY + height / 2.0));
+    annotation->setFlags(annotation->flags() & ~Okular::Annotation::DenyWrite);
     mDocument->addPageAnnotation(pageNumber, annotation);
     return {annotation};
 }

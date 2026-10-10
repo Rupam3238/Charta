@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QImage>
 #include <QTemporaryFile>
+#include <QUuid>
 #include <QTest>
 
 #ifdef HAVE_POPPLER_QT6
@@ -35,6 +36,7 @@ private Q_SLOTS:
     void testRemoveAnnotations();
     void testRemoveAnnotationGroupUndoOnce();
     void testSingleClickInkAnnotation();
+    void testClipboardImageStampSaveReloadRemainsEditable();
     void testInkCustomAppearanceSaveReload();
     void testInkCustomAppearanceRotatedPage();
 
@@ -258,6 +260,124 @@ void AddRemoveAnnotationTest::testSingleClickInkAnnotation()
     m_document->addPageAnnotation(0, ink);
     QCOMPARE(m_document->page(0)->annotations().size(), 1);
     QCOMPARE(m_document->page(0)->annotations().constFirst(), ink);
+}
+
+void AddRemoveAnnotationTest::testClipboardImageStampSaveReloadRemainsEditable()
+{
+#ifndef HAVE_POPPLER_QT6
+    QSKIP("This test requires Poppler Qt6 rendering");
+#else
+    auto cyanPixelBounds = [](const QImage &image) {
+        QRect bounds;
+        for (int y = 0; y < image.height(); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                const QColor color = image.pixelColor(x, y);
+                if (color.red() < 80 && color.green() > 160 && color.blue() > 180 && color.alpha() > 200) {
+                    bounds |= QRect(x, y, 1, 1);
+                }
+            }
+        }
+        return bounds;
+    };
+
+    QTemporaryFile tempImage(QDir::tempPath() + QStringLiteral("/charta-clipboard-XXXXXX.png"));
+    QVERIFY(tempImage.open());
+    QImage image(64, 64, QImage::Format_ARGB32);
+    image.fill(Qt::black);
+    QPainter painter(&image);
+    painter.fillRect(10, 10, 44, 44, QColor(0, 220, 255));
+    painter.end();
+    QVERIFY(image.save(&tempImage, "PNG"));
+    tempImage.close();
+
+    auto *stamp = new Okular::StampAnnotation();
+    stamp->setUniqueName(QStringLiteral("charta-clipboard-image-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
+    stamp->setStampIconName(tempImage.fileName());
+    stamp->setBoundingRectangle(Okular::NormalizedRect(0.20, 0.20, 0.55, 0.55));
+    m_document->addPageAnnotation(0, stamp);
+
+    QTemporaryFile savedPdf(QDir::tempPath() + QStringLiteral("/charta-clipboard-stamp-XXXXXX.pdf"));
+    QVERIFY(savedPdf.open());
+    savedPdf.close();
+
+    QString errorText;
+    QVERIFY2(m_document->saveChanges(savedPdf.fileName(), &errorText), qPrintable(errorText));
+
+    auto renderedSavedDocument = Poppler::Document::load(savedPdf.fileName());
+    QVERIFY(renderedSavedDocument);
+    auto renderedSavedPage = renderedSavedDocument->page(0);
+    QVERIFY(renderedSavedPage);
+    const QImage beforeMoveImage = renderedSavedPage->renderToImage(72, 72);
+    const QRect beforeMoveBounds = cyanPixelBounds(beforeMoveImage);
+    QVERIFY(beforeMoveBounds.width() > 10);
+    QVERIFY(beforeMoveBounds.height() > 10);
+    Poppler::StampAnnotation *savedPopplerStamp = nullptr;
+    const auto savedAnnotations = renderedSavedPage->annotations();
+    for (const auto &annotation : savedAnnotations) {
+        if (annotation->subType() == Poppler::Annotation::AStamp && annotation->uniqueName().startsWith(QStringLiteral("charta-clipboard-image-"))) {
+            savedPopplerStamp = static_cast<Poppler::StampAnnotation *>(annotation.get());
+            break;
+        }
+    }
+    QVERIFY(savedPopplerStamp);
+    QCOMPARE(savedPopplerStamp->stampIconName(), QStringLiteral("Draft"));
+    QVERIFY(savedPopplerStamp->annotationAppearance());
+
+    auto reopenedDocument = std::make_unique<Okular::Document>(nullptr);
+    QMimeDatabase mimeDatabase;
+    QCOMPARE(reopenedDocument->openDocument(savedPdf.fileName(), QUrl(), mimeDatabase.mimeTypeForFile(savedPdf.fileName())), Okular::Document::OpenSuccess);
+
+    Okular::Annotation *reopenedStamp = nullptr;
+    for (Okular::Annotation *annotation : reopenedDocument->page(0)->annotations()) {
+        if (annotation->subType() == Okular::Annotation::AStamp) {
+            reopenedStamp = annotation;
+            break;
+        }
+    }
+
+    QVERIFY(reopenedStamp);
+    auto *reopenedStampImage = dynamic_cast<Okular::StampAnnotation *>(reopenedStamp);
+    QVERIFY(reopenedStampImage);
+    QVERIFY(reopenedStamp->uniqueName().startsWith(QStringLiteral("charta-clipboard-image-")));
+    QCOMPARE(reopenedStampImage->stampIconName(), QStringLiteral("Draft"));
+    QVERIFY(!(reopenedStamp->flags() & Okular::Annotation::DenyWrite));
+    const Okular::NormalizedRect originalRect = reopenedStamp->boundingRectangle();
+    reopenedDocument->translatePageAnnotation(0, reopenedStamp, Okular::NormalizedPoint(0.05, 0.05));
+    const Okular::NormalizedRect movedRect = reopenedStamp->boundingRectangle();
+    QVERIFY(movedRect.left != originalRect.left || movedRect.top != originalRect.top);
+
+    QTemporaryFile movedPdf(QDir::tempPath() + QStringLiteral("/charta-clipboard-stamp-moved-XXXXXX.pdf"));
+    QVERIFY(movedPdf.open());
+    movedPdf.close();
+    errorText.clear();
+    QVERIFY2(reopenedDocument->saveChanges(movedPdf.fileName(), &errorText), qPrintable(errorText));
+
+    auto renderedMovedDocument = Poppler::Document::load(movedPdf.fileName());
+    QVERIFY(renderedMovedDocument);
+    auto renderedMovedPage = renderedMovedDocument->page(0);
+    QVERIFY(renderedMovedPage);
+    const QImage afterMoveImage = renderedMovedPage->renderToImage(72, 72);
+    const QRect afterMoveBounds = cyanPixelBounds(afterMoveImage);
+    QVERIFY(afterMoveBounds.width() > 10);
+    QVERIFY(afterMoveBounds.height() > 10);
+    QVERIFY(afterMoveBounds.left() > beforeMoveBounds.left());
+    QVERIFY(afterMoveBounds.top() > beforeMoveBounds.top());
+    QVERIFY(qAbs(afterMoveBounds.width() - beforeMoveBounds.width()) <= 2);
+    QVERIFY(qAbs(afterMoveBounds.height() - beforeMoveBounds.height()) <= 2);
+
+    auto reopenedMovedDocument = std::make_unique<Okular::Document>(nullptr);
+    QCOMPARE(reopenedMovedDocument->openDocument(movedPdf.fileName(), QUrl(), mimeDatabase.mimeTypeForFile(movedPdf.fileName())), Okular::Document::OpenSuccess);
+    Okular::Annotation *reopenedMovedStamp = nullptr;
+    for (Okular::Annotation *annotation : reopenedMovedDocument->page(0)->annotations()) {
+        if (annotation->subType() == Okular::Annotation::AStamp && annotation->uniqueName().startsWith(QStringLiteral("charta-clipboard-image-"))) {
+            reopenedMovedStamp = annotation;
+            break;
+        }
+    }
+    QVERIFY(reopenedMovedStamp);
+    QVERIFY(!(reopenedMovedStamp->flags() & Okular::Annotation::DenyWrite));
+    QCOMPARE(cyanPixelBounds(renderedMovedPage->renderToImage(72, 72)), afterMoveBounds);
+#endif
 }
 
 void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()

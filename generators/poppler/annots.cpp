@@ -304,10 +304,19 @@ static bool sameStyle(const Okular::Annotation::Style &okularStyle, const Popple
         && qFuzzyCompare(okularStyle.effectIntensity(), popplerStyle.effectIntensity()) && okularStyle.xCorners() == popplerStyle.xCorners() && okularStyle.yCorners() == popplerStyle.yCorners();
 }
 
+static bool isChartaClipboardImageAnnotation(const QString &uniqueName)
+{
+    return !uniqueName.isEmpty() && uniqueName.startsWith(QStringLiteral("charta-clipboard-image-"));
+}
+
 static void setPopplerStampAnnotationCustomImage(const Poppler::Page *page, Poppler::StampAnnotation *pStampAnnotation, const Okular::StampAnnotation *oStampAnnotation)
 {
     const QString iconName = oStampAnnotation->stampIconName();
     if (iconName.isEmpty()) {
+        return;
+    }
+
+    if (isChartaClipboardImageAnnotation(oStampAnnotation->uniqueName()) && !QFile::exists(iconName)) {
         return;
     }
 
@@ -787,7 +796,9 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
     const bool positionOnlyGeomChange = ppl_ann->boundary() != newBoundary && sameStyle(okl_ann->style(), ppl_ann->style()) && okl_ann->subType() == Okular::Annotation::AGeom
         && static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalInnerColor() == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomInnerColor()
         && okularToPoppler(static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalType()) == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomType();
-    if (positionOnlyGeomChange) {
+    const bool positionOnlyClipboardStampChange = ppl_ann->boundary() != newBoundary && sameStyle(okl_ann->style(), ppl_ann->style()) && okl_ann->subType() == Okular::Annotation::AStamp
+        && isChartaClipboardImageAnnotation(okl_ann->uniqueName());
+    if (positionOnlyGeomChange || positionOnlyClipboardStampChange) {
         savedAppearance = ppl_ann->annotationAppearance();
     }
 
@@ -1362,7 +1373,11 @@ Okular::Annotation *createAnnotationFromPopplerAnnotation(Poppler::Annotation *p
                 setPopplerStampAnnotationCustomImage(&popplerPage, pStampAnn, oStampAnn);
             }
 
-            oStampAnn->setFlags(okularAnnotation->flags() | Okular::Annotation::Flag::DenyWrite);
+            if (isChartaClipboardImageAnnotation(popplerAnnotation->uniqueName())) {
+                oStampAnn->setFlags(okularAnnotation->flags() & ~Okular::Annotation::Flag::DenyWrite);
+            } else {
+                oStampAnn->setFlags(okularAnnotation->flags() | Okular::Annotation::Flag::DenyWrite);
+            }
         }
 
         // Convert the poppler annotation style to Okular annotation style
