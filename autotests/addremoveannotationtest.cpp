@@ -18,10 +18,46 @@
 
 #include "../core/annotations.h"
 #include "../core/document.h"
+#include "../core/generator.h"
+#include "../core/observer.h"
 #include "../core/page.h"
 #include "../part/annotationtools.h"
 #include "../settings_core.h"
 #include "testingutils.h"
+
+namespace
+{
+class PixmapRevisionObserver final : public Okular::DocumentObserver
+{
+public:
+    explicit PixmapRevisionObserver(Okular::Document *document)
+        : m_document(document)
+    {
+        m_document->addObserver(this);
+    }
+
+    ~PixmapRevisionObserver() override
+    {
+        m_document->removeObserver(this);
+    }
+
+    void notifyPageAnnotationsChanged(int page, quint64 revision) override
+    {
+        annotationRevisions.append(qMakePair(page, revision));
+    }
+
+    void notifyPagePixmapChanged(int page, quint64 revision) override
+    {
+        pixmapRevisions.append(qMakePair(page, revision));
+    }
+
+    QList<QPair<int, quint64>> annotationRevisions;
+    QList<QPair<int, quint64>> pixmapRevisions;
+
+private:
+    Okular::Document *m_document;
+};
+}
 
 class AddRemoveAnnotationTest : public QObject
 {
@@ -36,6 +72,7 @@ private Q_SLOTS:
     void testRemoveAnnotations();
     void testRemoveAnnotationGroupUndoOnce();
     void testSingleClickInkAnnotation();
+    void testPixmapAnnotationRevisions();
     void testClipboardImageStampSaveReloadRemainsEditable();
     void testInkCustomAppearanceSaveReload();
     void testInkCustomAppearanceRotatedPage();
@@ -262,6 +299,40 @@ void AddRemoveAnnotationTest::testSingleClickInkAnnotation()
     QCOMPARE(m_document->page(0)->annotations().constFirst(), ink);
 }
 
+void AddRemoveAnnotationTest::testPixmapAnnotationRevisions()
+{
+    PixmapRevisionObserver observer(m_document);
+    const Okular::Page *page = m_document->page(0);
+    const int pixmapWidth = qRound(page->width());
+    const int pixmapHeight = qRound(page->height());
+    const auto asynchronous = Okular::PixmapRequest::Asynchronous;
+
+    auto createInk = [](double xOffset) {
+        auto *ink = new Okular::InkAnnotation();
+        ink->style().setWidth(8.0);
+        ink->style().setColor(Qt::magenta);
+        ink->setInkPaths({{Okular::NormalizedPoint(xOffset, 0.2), Okular::NormalizedPoint(xOffset + 0.1, 0.3)}});
+        ink->setBoundingRectangle(Okular::NormalizedRect(xOffset, 0.2, xOffset + 0.1, 0.3));
+        return ink;
+    };
+
+    m_document->addPageAnnotation(0, createInk(0.1));
+    QCOMPARE(observer.annotationRevisions.size(), 1);
+    const quint64 firstRevision = observer.annotationRevisions.constLast().second;
+    m_document->requestPixmaps({new Okular::PixmapRequest(&observer, 0, pixmapWidth, pixmapHeight, 1.0, 0, asynchronous)}, Okular::Document::NoOption);
+
+    m_document->addPageAnnotation(0, createInk(0.5));
+    QCOMPARE(observer.annotationRevisions.size(), 2);
+    const quint64 secondRevision = observer.annotationRevisions.constLast().second;
+    QVERIFY(secondRevision > firstRevision);
+    m_document->requestPixmaps({new Okular::PixmapRequest(&observer, 0, pixmapWidth, pixmapHeight, 1.0, 0, asynchronous)}, Okular::Document::NoOption);
+
+    QTRY_VERIFY_WITH_TIMEOUT(observer.pixmapRevisions.size() >= 2, 15000);
+    QVERIFY(observer.pixmapRevisions.contains(qMakePair(0, firstRevision)));
+    QVERIFY(observer.pixmapRevisions.contains(qMakePair(0, secondRevision)));
+    QCOMPARE(page->annotationGeneration(), secondRevision);
+}
+
 void AddRemoveAnnotationTest::testClipboardImageStampSaveReloadRemainsEditable()
 {
 #ifndef HAVE_POPPLER_QT6
@@ -438,6 +509,7 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
     }
     engine.event(AnnotatorEngine::Release, AnnotatorEngine::Left, modifiers, samples.last().x(), samples.last().y(), pageWidth, pageHeight, page);
     QVERIFY(engine.creationCompleted());
+        const SmoothPath pendingPath = engine.endSmoothPath();
     QImage liveStrokeImage(qRound(pageWidth), qRound(pageHeight), QImage::Format_ARGB32_Premultiplied);
     liveStrokeImage.fill(Qt::transparent);
     QPainter liveStrokePainter(&liveStrokeImage);
@@ -446,6 +518,13 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
     const QRect liveStrokeBounds = magentaPixelBounds(liveStrokeImage);
     QVERIFY(!liveStrokeBounds.isEmpty());
 
+    QImage pendingStrokeImage(qRound(pageWidth), qRound(pageHeight), QImage::Format_ARGB32_Premultiplied);
+    pendingStrokeImage.fill(Qt::transparent);
+    QPainter pendingStrokePainter(&pendingStrokeImage);
+    pendingPath.paint(&pendingStrokePainter, pageWidth, pageHeight);
+    pendingStrokePainter.end();
+    const QRect pendingStrokeBounds = magentaPixelBounds(pendingStrokeImage);
+    QVERIFY(!pendingStrokeBounds.isEmpty());
     const QList<Okular::Annotation *> createdAnnotations = engine.end();
     QCOMPARE(createdAnnotations.size(), 1);
     auto *ink = dynamic_cast<Okular::InkAnnotation *>(createdAnnotations.first());
@@ -456,6 +535,52 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
     QCOMPARE(inkPaths.size(), 1);
     QCOMPARE(inkPaths.constFirst().size(), samples.size());
     const QList<Okular::NormalizedPoint> &processedPoints = inkPaths.constFirst();
+    qreal centerlineLength = 0.0;
+    for (qsizetype index = 1; index < processedPoints.size(); ++index) {
+        centerlineLength += QLineF(QPointF(processedPoints[index - 1].x * pageWidth, processedPoints[index - 1].y * pageHeight),
+                                   QPointF(processedPoints[index].x * pageWidth, processedPoints[index].y * pageHeight))
+                                .length();
+    }
+    const qreal liveWidthProxy = countMagentaPixels(liveStrokeImage) / centerlineLength;
+    const qreal pendingWidthProxy = countMagentaPixels(pendingStrokeImage) / centerlineLength;
+    QVERIFY(qAbs(liveWidthProxy - pendingWidthProxy) <= liveWidthProxy * 0.2 + 1.0);
+
+    constexpr qreal highZoomScale = 4.0;
+    SmoothPathEngine highZoomEngine(toolElement);
+    highZoomEngine.event(AnnotatorEngine::Press, AnnotatorEngine::Left, modifiers, samples.first().x(), samples.first().y(), pageWidth * highZoomScale, pageHeight * highZoomScale, page);
+    for (int index = 1; index < samples.size(); ++index) {
+        highZoomEngine.event(AnnotatorEngine::Move,
+                             AnnotatorEngine::Left,
+                             modifiers,
+                             samples[index].x(),
+                             samples[index].y(),
+                             pageWidth * highZoomScale,
+                             pageHeight * highZoomScale,
+                             page);
+    }
+    highZoomEngine.event(AnnotatorEngine::Release,
+                         AnnotatorEngine::Left,
+                         modifiers,
+                         samples.last().x(),
+                         samples.last().y(),
+                         pageWidth * highZoomScale,
+                         pageHeight * highZoomScale,
+                         page);
+    QImage highZoomLiveImage(qRound(pageWidth * highZoomScale), qRound(pageHeight * highZoomScale), QImage::Format_ARGB32_Premultiplied);
+    highZoomLiveImage.fill(Qt::transparent);
+    QPainter highZoomLivePainter(&highZoomLiveImage);
+    highZoomEngine.paint(&highZoomLivePainter, pageWidth * highZoomScale, pageHeight * highZoomScale, highZoomLiveImage.rect());
+    highZoomLivePainter.end();
+    const SmoothPath highZoomPendingPath = highZoomEngine.endSmoothPath();
+    QImage highZoomPendingImage(highZoomLiveImage.size(), QImage::Format_ARGB32_Premultiplied);
+    highZoomPendingImage.fill(Qt::transparent);
+    QPainter highZoomPendingPainter(&highZoomPendingImage);
+    highZoomPendingPath.paint(&highZoomPendingPainter, pageWidth * highZoomScale, pageHeight * highZoomScale);
+    highZoomPendingPainter.end();
+    const qreal highZoomLiveWidthProxy = countMagentaPixels(highZoomLiveImage) / (centerlineLength * highZoomScale * highZoomScale);
+    const qreal highZoomPendingWidthProxy = countMagentaPixels(highZoomPendingImage) / (centerlineLength * highZoomScale * highZoomScale);
+    QVERIFY(qAbs(highZoomLiveWidthProxy - highZoomPendingWidthProxy) <= highZoomLiveWidthProxy * 0.2 + 1.0);
+    QVERIFY(qAbs(highZoomLiveWidthProxy - liveWidthProxy) <= liveWidthProxy * 0.2 + 1.0);
     qreal sumX = 0.0;
     qreal sumY = 0.0;
     for (qsizetype index = 0; index < samples.size(); ++index) {
@@ -514,6 +639,36 @@ void AddRemoveAnnotationTest::testInkCustomAppearanceSaveReload()
     QVERIFY(qAbs(immediateBounds.top() - expectedPdfBounds.top()) <= 3);
     QVERIFY(qAbs(immediateBounds.right() - expectedPdfBounds.right()) <= 3);
     QVERIFY(qAbs(immediateBounds.bottom() - expectedPdfBounds.bottom()) <= 3);
+    const qreal pdfScale = static_cast<qreal>(immediateImage.width()) / pageWidth;
+    const qreal immediateWidthProxy = countMagentaPixels(immediateImage) / (centerlineLength * pdfScale);
+    QVERIFY(qAbs(immediateWidthProxy - liveWidthProxy) <= liveWidthProxy * 0.2 + 1.0);
+
+    const QImage highZoomImmediateImage = livePage->renderToImage(288, 288);
+    const qreal highZoomPdfScale = static_cast<qreal>(highZoomImmediateImage.width()) / pageWidth;
+    const qreal highZoomImmediateWidthProxy = countMagentaPixels(highZoomImmediateImage) / (centerlineLength * highZoomPdfScale * highZoomPdfScale);
+    QVERIFY(qAbs(highZoomImmediateWidthProxy - highZoomLiveWidthProxy) <= highZoomLiveWidthProxy * 0.2 + 1.0);
+
+    const QRect firstStrokeRegion = magentaPixelBounds(highZoomImmediateImage).adjusted(-8, -8, 8, 8).intersected(highZoomImmediateImage.rect());
+    QVERIFY(!firstStrokeRegion.isEmpty());
+    const int firstStrokeCoverageBeforeSecondAddition = countMagentaPixels(highZoomImmediateImage.copy(firstStrokeRegion));
+    Poppler::InkAnnotation secondInk;
+    const QRectF translatedBoundary(bounds.left + 0.5, bounds.top, bounds.width(), bounds.height());
+    secondInk.setBoundary(translatedBoundary);
+    QList<QList<QPointF>> secondPaths;
+    for (const QList<QPointF> &path : std::as_const(popplerPaths)) {
+        QList<QPointF> translatedPath;
+        translatedPath.reserve(path.size());
+        for (const QPointF &point : path) {
+            translatedPath.append(QPointF(point.x() + 0.5, point.y()));
+        }
+        secondPaths.append(translatedPath);
+    }
+    secondInk.setInkPaths(secondPaths);
+    secondInk.setAppearanceStream(ink->appearanceStream(), ink->appearanceBoundingBox());
+    livePage->addAnnotation(&secondInk);
+    const QImage afterSecondAdditionImage = livePage->renderToImage(288, 288);
+    const int firstStrokeCoverageAfterSecondAddition = countMagentaPixels(afterSecondAdditionImage.copy(firstStrokeRegion));
+    QCOMPARE(firstStrokeCoverageAfterSecondAddition, firstStrokeCoverageBeforeSecondAddition);
 
     m_document->addPageAnnotation(0, ink);
     QCOMPARE(ink->subType(), Okular::Annotation::AInk);

@@ -3346,6 +3346,7 @@ void Document::requestPixmaps(const QList<PixmapRequest *> &requests, PixmapRequ
         }
 
         request->d->mPage = d->m_pagesVector.value(request->pageNumber());
+        request->d->mAnnotationGeneration = request->d->mPage->annotationGeneration();
 
         if (request->isTile()) {
             // Change the current request rect so that only invalid tiles are
@@ -3438,7 +3439,12 @@ void Document::requestTextPage(uint pageNumber)
 
 void DocumentPrivate::notifyAnnotationChanges(int page)
 {
-    foreachObserverD(notifyPageChanged(page, DocumentObserver::Annotations));
+    Page *changedPage = m_pagesVector.value(page, nullptr);
+    if (!changedPage) {
+        return;
+    }
+    const quint64 revision = ++changedPage->d->m_annotationGeneration;
+    foreachObserverD(notifyPageAnnotationsChanged(page, revision));
 }
 
 void DocumentPrivate::notifyFormChanges(int /*page*/)
@@ -5638,7 +5644,7 @@ void DocumentPrivate::requestDone(PixmapRequest *req)
             m_allocatedPixmapsTotalMemory += memoryBytes;
 
             // 2. notify an observer that its pixmap changed
-            observer->notifyPageChanged(req->pageNumber(), DocumentObserver::Pixmap);
+            observer->notifyPagePixmapChanged(req->pageNumber(), req->annotationGeneration());
         }
 #ifndef NDEBUG
         else {

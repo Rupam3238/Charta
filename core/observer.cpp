@@ -30,6 +30,16 @@ void DocumentObserver::notifyPageChanged(int, int)
 {
 }
 
+void DocumentObserver::notifyPageAnnotationsChanged(int page, quint64)
+{
+    notifyPageChanged(page, Annotations);
+}
+
+void DocumentObserver::notifyPagePixmapChanged(int page, quint64)
+{
+    notifyPageChanged(page, Pixmap);
+}
+
 void DocumentObserver::notifyContentsCleared(int)
 {
 }

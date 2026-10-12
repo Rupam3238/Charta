@@ -158,6 +158,7 @@ public:
     DocumentPrivate *m_doc;
     NormalizedRect m_boundingBox;
     Rotation m_rotation;
+    quint64 m_annotationGeneration = 0;
 
     TextPage *m_text;
     PageTransition *m_transition;

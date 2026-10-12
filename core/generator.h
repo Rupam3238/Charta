@@ -700,6 +700,7 @@ public:
      * Returns the page height of the requested pixmap.
      */
     int height() const;
+    quint64 annotationGeneration() const;
 
     /**
      * Returns the priority (less it better, 0 is maximum) of the

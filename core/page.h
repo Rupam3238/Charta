@@ -140,6 +140,7 @@ public:
      * If there is a partially rendered pixmap the answer is false.
      */
     bool hasPixmap(DocumentObserver *observer, int width = -1, int height = -1, const NormalizedRect &rect = NormalizedRect()) const;
+    quint64 annotationGeneration() const;
 
     /**
      * Sets the size of the page (in screen pixels) if there is a TilesManager.

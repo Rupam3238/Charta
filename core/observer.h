@@ -80,6 +80,9 @@ public:
      */
     virtual void notifyPageChanged(int page, int flags);
 
+    virtual void notifyPageAnnotationsChanged(int page, quint64 revision);
+    virtual void notifyPagePixmapChanged(int page, quint64 revision);
+
     /**
      * This method is called whenever the content described by the passed @p flags
      * has been cleared.

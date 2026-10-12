@@ -10,9 +10,11 @@
 #include <QObject>
 #include <QPlainTextEdit>
 #include <QPointer>
+#include <QTimer>
 #include <qdom.h>
 
 #include <memory>
+#include <vector>
 
 #include <KActionCollection>
 
@@ -97,8 +99,8 @@ public:
     bool routeKeyEvent(QKeyEvent *event);
     bool routePaints(const QRect wantedRect) const;
     void routePaint(QPainter *painter, const QRect paintRect);
-    void finishPaintCycle();
     void cancelPendingFreehandHandoff();
+    void pendingFreehandPixmapChanged(int pageNumber, quint64 revision);
     void resetPageViewItems();
 
     void reparseConfig();
@@ -170,6 +172,16 @@ Q_SIGNALS:
     void requestOpenNewlySignedFile(const QString &filePath, int pageNumber);
 
 private:
+    struct PendingFreehandHandoff {
+        std::unique_ptr<SmoothPath> path;
+        PageViewItem *item = nullptr;
+        QRect rect;
+        int pageNumber = -1;
+        quint64 annotationGeneration = 0;
+        quint64 id = 0;
+        QTimer *timeout = nullptr;
+    };
+
     bool eventFilter(QObject *watched, QEvent *event) override;
     void startTypewriterTextEdit(Okular::TextAnnotation *annotation, PageViewItem *pageViewItem);
     void finishTypewriterTextEdit();
@@ -202,10 +214,8 @@ private:
     int m_lastToolId;
     QRect m_lastDrawnRect;
     PageViewItem *m_lockedItem;
-    std::unique_ptr<SmoothPath> m_pendingFreehandPath;
-    PageViewItem *m_pendingFreehandItem = nullptr;
-    QRect m_pendingFreehandRect;
-    bool m_pendingFreehandPainted = false;
+    std::vector<PendingFreehandHandoff> m_pendingFreehandHandoffs;
+    quint64 m_nextPendingFreehandHandoffId = 0;
     std::unique_ptr<AnnotatorEngine> m_temporaryPreviousEngine;
     PageViewItem *m_temporaryPreviousLockedItem = nullptr;
     QRect m_temporaryPreviousDrawnRect;

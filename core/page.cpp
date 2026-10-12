@@ -263,6 +263,11 @@ bool Page::hasPixmap(DocumentObserver *observer, int width, int height, const No
     return (pixmap->width() == width && pixmap->height() == height);
 }
 
+quint64 Page::annotationGeneration() const
+{
+    return d->m_annotationGeneration;
+}
+
 void Page::setPageSize(DocumentObserver *observer, int width, int height)
 {
     TilesManager *tm = d->tilesManager(observer);

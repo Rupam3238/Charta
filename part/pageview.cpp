@@ -1258,9 +1258,6 @@ void PageView::createAnnotationsVideoWidgets(PageViewItem *item, const QList<Oku
         }
     }
 
-    if (d->annotator) {
-        d->annotator->finishPaintCycle();
-    }
 }
 
 // BEGIN DocumentObserver inherited methods
@@ -1595,7 +1592,9 @@ void PageView::notifyPageChanged(int pageNumber, int changedFlags)
     }
 
     if (changedFlags & DocumentObserver::Annotations) {
-        d->annotator->cancelPendingFreehandHandoff();
+        if (changedFlags & DocumentObserver::Pixmap) {
+            d->annotator->cancelPendingFreehandHandoff();
+        }
         const QList<Okular::Annotation *> annots = d->document->page(pageNumber)->annotations();
         const QList<Okular::Annotation *>::ConstIterator annItEnd = annots.end();
         QSet<AnnotWindow *>::Iterator it = d->m_annowindows.begin();
@@ -1651,6 +1650,18 @@ void PageView::notifyPageChanged(int pageNumber, int changedFlags)
     }
 }
 
+void PageView::notifyPageAnnotationsChanged(int pageNumber, quint64 revision)
+{
+    Q_UNUSED(revision);
+    notifyPageChanged(pageNumber, DocumentObserver::Annotations);
+}
+
+void PageView::notifyPagePixmapChanged(int pageNumber, quint64 revision)
+{
+    notifyPageChanged(pageNumber, DocumentObserver::Pixmap);
+    d->annotator->pendingFreehandPixmapChanged(pageNumber, revision);
+}
+
 void PageView::notifyContentsCleared(int changedFlags)
 {
     // if pixmaps were cleared, re-ask them
@@ -1661,6 +1672,7 @@ void PageView::notifyContentsCleared(int changedFlags)
 
 void PageView::notifyZoom(int factor)
 {
+    d->annotator->cancelPendingFreehandHandoff();
     if (factor > 0) {
         updateZoom(ZoomIn);
     } else {

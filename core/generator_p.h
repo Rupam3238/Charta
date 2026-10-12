@@ -88,6 +88,7 @@ public:
     int mHeight;
     int mPriority;
     int mFeatures;
+    quint64 mAnnotationGeneration = 0;
     bool mForce : 1;
     bool mTile : 1;
     bool mPartialUpdatesWanted : 1;

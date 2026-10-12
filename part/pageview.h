@@ -98,6 +98,8 @@ public:
     void notifySetup(const QList<Okular::Page *> &pages, int setupFlags) override;
     void notifyViewportChanged(bool smoothMove) override;
     void notifyPageChanged(int pageNumber, int changedFlags) override;
+    void notifyPageAnnotationsChanged(int pageNumber, quint64 revision) override;
+    void notifyPagePixmapChanged(int pageNumber, quint64 revision) override;
     void notifyContentsCleared(int changedFlags) override;
     void notifyZoom(int factor) override;
     bool canUnloadPixmap(int pageNum) const override;

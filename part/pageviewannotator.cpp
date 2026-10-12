@@ -2101,6 +2101,7 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
     if (m_engine->creationCompleted()) {
         // apply engine data to the Annotation's and reset engine
         const QList<Okular::Annotation *> annotations = m_engine->end();
+        QString pendingFreehandAnnotationName;
         // attach the newly filled annotations to the page
         for (Okular::Annotation *annotation : annotations) {
             if (!annotation) {
@@ -2111,6 +2112,9 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
             annotation->setModificationDate(QDateTime::currentDateTime());
             annotation->setAuthor(Okular::Settings::identityAuthor());
             m_document->addPageAnnotation(m_lockedItem->pageNumber(), annotation);
+            if (dynamic_cast<Okular::InkAnnotation *>(annotation)) {
+                pendingFreehandAnnotationName = annotation->uniqueName();
+            }
 
             if (auto *textAnnotation = dynamic_cast<Okular::TextAnnotation *>(annotation);
                 textAnnotation && textAnnotation->textType() == Okular::TextAnnotation::InPlace && textAnnotation->inplaceIntent() == Okular::TextAnnotation::TypeWriter) {
@@ -2188,10 +2192,29 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
             m_continuousMode = false;
         }
 
-        if (auto *smoothEngine = dynamic_cast<SmoothPathEngine *>(m_engine)) {
-            m_pendingFreehandPath = std::make_unique<SmoothPath>(smoothEngine->endSmoothPath());
-            m_pendingFreehandItem = m_lockedItem;
-            m_pendingFreehandRect = smoothEngine->liveBounds().translated(m_lockedItem->uncroppedGeometry().topLeft());
+        if (auto *smoothEngine = dynamic_cast<SmoothPathEngine *>(m_engine); smoothEngine && !pendingFreehandAnnotationName.isEmpty()) {
+            PendingFreehandHandoff handoff;
+            handoff.path = std::make_unique<SmoothPath>(smoothEngine->endSmoothPath());
+            handoff.item = m_lockedItem;
+            handoff.rect = smoothEngine->liveBounds().translated(m_lockedItem->uncroppedGeometry().topLeft());
+            handoff.pageNumber = m_lockedItem->pageNumber();
+            handoff.annotationGeneration = m_document->page(handoff.pageNumber)->annotationGeneration();
+            handoff.id = ++m_nextPendingFreehandHandoffId;
+            handoff.timeout = new QTimer(this);
+            handoff.timeout->setSingleShot(true);
+            connect(handoff.timeout, &QTimer::timeout, this, [this, id = handoff.id, timeout = handoff.timeout] {
+                auto it = std::find_if(m_pendingFreehandHandoffs.begin(), m_pendingFreehandHandoffs.end(), [id](const PendingFreehandHandoff &entry) { return entry.id == id; });
+                if (it == m_pendingFreehandHandoffs.end()) {
+                    timeout->deleteLater();
+                    return;
+                }
+                const QRect repaintRect = it->rect;
+                m_pendingFreehandHandoffs.erase(it);
+                timeout->deleteLater();
+                m_pageView->viewport()->update(repaintRect.translated(-m_pageView->contentAreaPosition()));
+            });
+            handoff.timeout->start(5000);
+            m_pendingFreehandHandoffs.push_back(std::move(handoff));
         }
 
         if (m_continuousMode) {
@@ -2267,7 +2290,9 @@ bool PageViewAnnotator::routePaints(const QRect wantedRect) const
     if (const auto *smoothEngine = dynamic_cast<const SmoothPathEngine *>(m_engine); smoothEngine && m_lockedItem) {
         paintsLive = paintsLive || wantedRect.intersects(smoothEngine->liveBounds().translated(m_lockedItem->uncroppedGeometry().topLeft()));
     }
-    const bool paintsPending = m_pendingFreehandPath && m_pendingFreehandItem && wantedRect.intersects(m_pendingFreehandRect);
+    const bool paintsPending = std::any_of(m_pendingFreehandHandoffs.cbegin(), m_pendingFreehandHandoffs.cend(), [&wantedRect](const PendingFreehandHandoff &handoff) {
+        return handoff.path && handoff.item && wantedRect.intersects(handoff.rect);
+    });
     const auto *eraser = dynamic_cast<const EraserEngine *>(m_engine);
     return paintsLive || paintsPending || (eraser && eraser->hasLiveStrokes(wantedRect));
 }
@@ -2278,7 +2303,7 @@ void PageViewAnnotator::routePaint(QPainter *painter, const QRect paintRect)
     if (eraser) {
         eraser->paintLiveStrokes(painter, paintRect);
     }
-    if (!m_lockedItem && !m_pendingFreehandPath) {
+    if (!m_lockedItem && m_pendingFreehandHandoffs.empty()) {
         return;
     }
 
@@ -2308,36 +2333,53 @@ void PageViewAnnotator::routePaint(QPainter *painter, const QRect paintRect)
         painter->restore();
     }
 
-    if (m_pendingFreehandPath && m_pendingFreehandItem && paintRect.intersects(m_pendingFreehandRect)) {
-        const QRect &itemRect = m_pendingFreehandItem->uncroppedGeometry();
+    for (const PendingFreehandHandoff &handoff : m_pendingFreehandHandoffs) {
+        if (!handoff.path || !handoff.item || !paintRect.intersects(handoff.rect)) {
+            continue;
+        }
+        const QRect &itemRect = handoff.item->uncroppedGeometry();
         painter->save();
         painter->translate(itemRect.topLeft());
-        m_pendingFreehandPath->paint(painter, m_pendingFreehandItem->uncroppedWidth(), m_pendingFreehandItem->uncroppedHeight());
+        handoff.path->paint(painter, handoff.item->uncroppedWidth(), handoff.item->uncroppedHeight());
         painter->restore();
-        m_pendingFreehandPainted = true;
     }
-}
-
-void PageViewAnnotator::finishPaintCycle()
-{
-    if (!m_pendingFreehandPainted) {
-        return;
-    }
-
-    const QRect repaintRect = m_pendingFreehandRect;
-    m_pendingFreehandPath.reset();
-    m_pendingFreehandItem = nullptr;
-    m_pendingFreehandRect = QRect();
-    m_pendingFreehandPainted = false;
-    m_pageView->viewport()->update(repaintRect.translated(-m_pageView->contentAreaPosition()));
 }
 
 void PageViewAnnotator::cancelPendingFreehandHandoff()
 {
-    m_pendingFreehandPath.reset();
-    m_pendingFreehandItem = nullptr;
-    m_pendingFreehandRect = QRect();
-    m_pendingFreehandPainted = false;
+    QRect repaintRect;
+    for (PendingFreehandHandoff &handoff : m_pendingFreehandHandoffs) {
+        repaintRect |= handoff.rect;
+        if (handoff.timeout) {
+            handoff.timeout->stop();
+            handoff.timeout->deleteLater();
+        }
+    }
+    m_pendingFreehandHandoffs.clear();
+    if (repaintRect.isValid() && m_pageView->viewport()) {
+        m_pageView->viewport()->update(repaintRect.translated(-m_pageView->contentAreaPosition()));
+    }
+}
+
+void PageViewAnnotator::pendingFreehandPixmapChanged(int pageNumber, quint64 revision)
+{
+    QRect repaintRect;
+    auto it = m_pendingFreehandHandoffs.begin();
+    while (it != m_pendingFreehandHandoffs.end()) {
+        if (it->pageNumber == pageNumber && it->annotationGeneration <= revision) {
+            repaintRect |= it->rect;
+            if (it->timeout) {
+                it->timeout->stop();
+                it->timeout->deleteLater();
+            }
+            it = m_pendingFreehandHandoffs.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    if (repaintRect.isValid()) {
+        m_pageView->viewport()->update(repaintRect.translated(-m_pageView->contentAreaPosition()));
+    }
 }
 
 void PageViewAnnotator::resetPageViewItems()

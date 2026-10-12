@@ -486,7 +486,7 @@ void Generator::signalPartialPixmapRequest(PixmapRequest *request, const QImage 
     pagePrivate->setPixmap(request->observer(), new QPixmap(QPixmap::fromImage(image)), request->normalizedRect(), true /* isPartialPixmap */);
 
     const int pageNumber = request->page()->number();
-    request->observer()->notifyPageChanged(pageNumber, Okular::DocumentObserver::Pixmap);
+    request->observer()->notifyPagePixmapChanged(pageNumber, request->annotationGeneration());
 }
 
 const Document *Generator::document() const
@@ -632,6 +632,11 @@ int PixmapRequest::width() const
 int PixmapRequest::height() const
 {
     return d->mHeight;
+}
+
+quint64 PixmapRequest::annotationGeneration() const
+{
+    return d->mAnnotationGeneration;
 }
 
 int PixmapRequest::priority() const
