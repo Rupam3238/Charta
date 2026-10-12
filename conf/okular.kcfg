@@ -13,6 +13,8 @@
  </signal>
  <signal name="primaryAnnotationToolBarChanged" />
  <signal name="recentAnnotationColorsChanged" />
+ <signal name="annotationWidthMenuPresetsChanged" />
+ <signal name="toolSettingsWidthPresetsChanged" />
  <group name="Dlg Performance" >
   <entry key="EnableCompositing" type="Bool" >
    <default>true</default>
@@ -173,6 +175,23 @@
   </entry>
   <entry key="QuickAnnotationDefaultAction" type="UInt">
    <default>0</default>
+  </entry>
+ </group>
+ <group name="Annotation Width Presets">
+  <entry key="AnnotationWidthMenuPresets" type="StringList">
+   <code>
+    QStringList annotationWidthMenuPresets {QStringLiteral("0.5"), QStringLiteral("1"), QStringLiteral("1.5"), QStringLiteral("2"), QStringLiteral("2.5"), QStringLiteral("3"),
+                                              QStringLiteral("3.5"), QStringLiteral("4"), QStringLiteral("4.5"), QStringLiteral("5"), QStringLiteral("20"), QStringLiteral("50")};
+   </code>
+   <default code="true">annotationWidthMenuPresets</default>
+   <emit signal="annotationWidthMenuPresetsChanged" />
+  </entry>
+  <entry key="ToolSettingsWidthPresets" type="StringList">
+   <code>
+    QStringList toolSettingsWidthPresets {QStringLiteral("1"), QStringLiteral("5"), QStringLiteral("20"), QStringLiteral("50")};
+   </code>
+   <default code="true">toolSettingsWidthPresets</default>
+   <emit signal="toolSettingsWidthPresetsChanged" />
   </entry>
  </group>
  <group name="Zoom">

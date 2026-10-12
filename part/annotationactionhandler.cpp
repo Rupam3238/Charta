@@ -29,6 +29,7 @@
 #include <QKeySequence>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QInputDialog>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -40,6 +41,7 @@
 #include <QSlider>
 #include <QSignalBlocker>
 #include <QScreen>
+#include <QStackedLayout>
 #include <QTimer>
 #include <QTextEdit>
 #include <QVBoxLayout>
@@ -54,6 +56,8 @@
 #include <KToolBar>
 
 #include <optional>
+#include <functional>
+#include <memory>
 
 // local includes
 #include "actionbar.h"
@@ -66,6 +70,7 @@
 #include "pageviewannotator.h"
 #include "settings.h"
 #include "toggleactionmenu.h"
+#include "widthpresetutils.h"
 
 namespace
 {
@@ -81,6 +86,65 @@ std::optional<AnnotationActionHandler::TemporaryTool> temporaryToolForKey(int ke
     }
     return std::nullopt;
 }
+
+class WidthPresetLineEdit final : public QLineEdit
+{
+public:
+    explicit WidthPresetLineEdit(QWidget *parent)
+        : QLineEdit(parent)
+    {
+        connect(this, &QLineEdit::editingFinished, this, [this] {
+            if (m_cancelled || m_committing || !m_commit) {
+                return;
+            }
+            m_committing = true;
+            const bool saved = m_commit(text());
+            m_committing = false;
+            if (!saved) {
+                QTimer::singleShot(0, this, [this] {
+                    if (isVisible()) {
+                        setFocus();
+                        selectAll();
+                    }
+                });
+            }
+        });
+    }
+
+    void setCallbacks(std::function<bool(const QString &)> commit, std::function<void()> cancel)
+    {
+        m_commit = std::move(commit);
+        m_cancel = std::move(cancel);
+    }
+
+    void beginEditing(const QString &value)
+    {
+        m_cancelled = false;
+        setText(value);
+        selectAll();
+        setFocus();
+    }
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override
+    {
+        if (event->key() == Qt::Key_Escape) {
+            m_cancelled = true;
+            if (m_cancel) {
+                m_cancel();
+            }
+            event->accept();
+            return;
+        }
+        QLineEdit::keyPressEvent(event);
+    }
+
+private:
+    std::function<bool(const QString &)> m_commit;
+    std::function<void()> m_cancel;
+    bool m_cancelled = false;
+    bool m_committing = false;
+};
 
 class DrawingToolBarIsland final : public KToolBar
 {
@@ -461,7 +525,8 @@ public:
         bool partialEraser = false;
         bool initialized = false;
     };
-    static const QList<double> widthStandardValues;
+    QList<double> widthStandardValues() const;
+    void populateWidthActions();
     static const QList<double> opacityStandardValues;
 
     explicit AnnotationActionHandlerPrivate(AnnotationActionHandler *qq)
@@ -591,6 +656,7 @@ public:
     QAction *aCustomStamp;
     QAction *aCustomWidth;
     QAction *aCustomOpacity;
+    AnnotationWidthPresets::SelectionTracker widthPresetActivation;
 
     QColor currentColor;
     QColor currentInnerColor;
@@ -601,7 +667,55 @@ public:
     bool textToolsEnabled;
 };
 
-const QList<double> AnnotationActionHandlerPrivate::widthStandardValues = {0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 20, 50};
+QList<double> AnnotationActionHandlerPrivate::widthStandardValues() const
+{
+    return AnnotationWidthPresets::presetValuesOrDefaults(Okular::Settings::annotationWidthMenuPresets(), AnnotationWidthPresets::defaultMenuPresetStrings());
+}
+
+void AnnotationActionHandlerPrivate::populateWidthActions()
+{
+    for (QAction *action : aWidth->actions()) {
+        aWidth->removeAction(action);
+        delete action;
+    }
+    aCustomWidth = nullptr;
+    widthPresetActivation.setSelectedIndex(-1);
+
+    const QList<double> presetWidths = widthStandardValues();
+    for (qsizetype index = 0; index < presetWidths.size(); ++index) {
+        const double width = presetWidths.at(index);
+        auto *action = new KToggleAction(widthIcon(width), i18nc("@item:inlistbox", "Width %1", width), q);
+        aWidth->addAction(action);
+        QObject::connect(action, &QAction::triggered, q, [this, index, width] {
+            if (widthPresetActivation.activate(index)) {
+                bool accepted = false;
+                QWidget *dialogParent = QApplication::activeWindow();
+                const double editedWidth = QInputDialog::getDouble(dialogParent,
+                                                                   i18nc("@title:window", "Edit Width Preset"),
+                                                                   i18nc("@label:spinbox", "Width (px):"),
+                                                                   width,
+                                                                   AnnotationWidthPresets::minimumWidth,
+                                                                   AnnotationWidthPresets::maximumWidth,
+                                                                   3,
+                                                                   &accepted);
+                if (accepted) {
+                    const QStringList currentPresets = Okular::Settings::annotationWidthMenuPresets();
+                    QStringList updatedPresets;
+                    if (!AnnotationWidthPresets::replacePresetString(currentPresets, index, QLocale::c().toString(editedWidth, 'g', 12), &updatedPresets)) {
+                        KMessageBox::error(dialogParent, i18nc("@info", "That width is already in the preset list or is outside the allowed range."));
+                    } else {
+                        Okular::Settings::setAnnotationWidthMenuPresets(updatedPresets);
+                        Okular::Settings::self()->save();
+                        parseTool(selectedBuiltinTool);
+                    }
+                }
+                return;
+            }
+            annotator->setAnnotationWidth(width);
+            updateConfigActions();
+        });
+    }
+}
 
 const QList<double> AnnotationActionHandlerPrivate::opacityStandardValues = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
 
@@ -766,18 +880,18 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         controlLayout->addLayout(row);
 
         auto *slider = new ResponsiveSlider(Qt::Horizontal, controlParent);
-        const int scale = decimals == 0 ? 1 : 10;
-        const int minSliderValue = qRound(std::max(minimum, 0.25) * scale);
+        const int scale = qRound(1.0 / AnnotationWidthPresets::adjustmentStep);
+        const int minSliderValue = qRound(std::max(minimum, AnnotationWidthPresets::minimumWidth) * scale);
         const int maxSliderValue = qRound(maximum * scale);
         slider->setRange(minSliderValue, maxSliderValue);
         slider->setSingleStep(1);
-        slider->setPageStep(qMax(5, (maxSliderValue - minSliderValue) / 10));
+        slider->setPageStep(qMax(1, (maxSliderValue - minSliderValue) / 10));
         slider->setTracking(true);
 
         auto *spinBox = new QDoubleSpinBox(controlParent);
-        spinBox->setRange(std::max(minimum, 0.25), maximum);
+        spinBox->setRange(std::max(minimum, AnnotationWidthPresets::minimumWidth), maximum);
         spinBox->setDecimals(decimals);
-        spinBox->setSingleStep(0.25);
+        spinBox->setSingleStep(AnnotationWidthPresets::adjustmentStep);
         spinBox->setSuffix(i18n(" px"));
         spinBox->setFixedWidth(110);
         auto *controlRow = new QHBoxLayout;
@@ -786,37 +900,108 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         controlRow->addWidget(spinBox);
         controlLayout->addLayout(controlRow);
 
-        const QList<double> presetWidths = {1.0, 5.0, 20.0, 50.0};
+        const QList<double> presetWidths = AnnotationWidthPresets::presetValuesOrDefaults(Okular::Settings::toolSettingsWidthPresets(), AnnotationWidthPresets::defaultToolPresetStrings());
+        auto currentPresetWidths = std::make_shared<QList<double>>(presetWidths);
+        auto selectedPreset = std::make_shared<AnnotationWidthPresets::SelectionTracker>();
         auto *presetRow = new QHBoxLayout;
         presetRow->setSpacing(6);
-        QList<QToolButton *> presetButtons;
-        for (double presetWidth : presetWidths) {
-            auto *presetButton = new QToolButton(controlParent);
+        struct PresetButtonEntry {
+            QWidget *container;
+            QToolButton *button;
+            WidthPresetLineEdit *editor;
+        };
+        auto presetEntries = std::make_shared<QList<PresetButtonEntry>>();
+        for (qsizetype index = 0; index < presetWidths.size(); ++index) {
+            const double presetWidth = presetWidths.at(index);
+            auto *container = new QWidget(controlParent);
+            container->setFixedSize(76, 30);
+            auto *stack = new QStackedLayout(container);
+            stack->setContentsMargins(0, 0, 0, 0);
+            auto *presetButton = new QToolButton(container);
             presetButton->setText(i18n("%1 px", presetWidth));
-            presetButton->setToolTip(i18n("Set width to %1 px", presetWidth));
+            presetButton->setToolTip(i18n("Select %1 px. Click again to edit this preset", presetWidth));
             presetButton->setCheckable(true);
             presetButton->setAutoRaise(true);
-            presetButton->setFixedWidth(58);
-            presetRow->addWidget(presetButton);
-            presetButtons.append(presetButton);
+            presetButton->setFixedSize(container->size());
+            auto *editor = new WidthPresetLineEdit(container);
+            auto *validator = new QDoubleValidator(AnnotationWidthPresets::minimumWidth, AnnotationWidthPresets::maximumWidth, 3, editor);
+            validator->setLocale(QLocale::c());
+            validator->setNotation(QDoubleValidator::StandardNotation);
+            editor->setValidator(validator);
+            editor->setFixedSize(container->size());
+            stack->addWidget(presetButton);
+            stack->addWidget(editor);
+            presetRow->addWidget(container);
+            presetEntries->append({container, presetButton, editor});
         }
         controlLayout->addLayout(presetRow);
 
-        const auto updatePresetSelection = [presetButtons, spinBox](double width) {
-            for (QToolButton *presetButton : std::as_const(presetButtons)) {
-                const bool isSelected = qFuzzyCompare(presetButton->text().remove(QLatin1String(" px")).toDouble(), width);
-                presetButton->setChecked(isSelected);
+        const auto updatePresetSelection = [presetEntries, currentPresetWidths, spinBox](double width) {
+            for (qsizetype index = 0; index < presetEntries->size(); ++index) {
+                presetEntries->at(index).button->setChecked(qFuzzyCompare(currentPresetWidths->at(index), width));
             }
             spinBox->setValue(width);
         };
 
-        const double initialWidth = qMax(0.25, drawingToolSettings.value(key).width);
+        for (qsizetype index = 0; index < presetEntries->size(); ++index) {
+            const PresetButtonEntry entry = presetEntries->at(index);
+            auto *stack = qobject_cast<QStackedLayout *>(entry.container->layout());
+            QObject::connect(entry.button, &QToolButton::clicked, q, [this, key, kind = *kindIt, selectedAnnotation, &selectedAnnotationChanged, &selectedWidthChanged,
+                                                              entry, stack, index, presetEntries, currentPresetWidths, selectedPreset, spinBox, updatePresetSelection] {
+                if (selectedPreset->activate(index)) {
+                    const QSignalBlocker blocker(entry.button);
+                    entry.button->setChecked(true);
+                    entry.editor->beginEditing(QLocale::c().toString(currentPresetWidths->at(index), 'g', 12));
+                    stack->setCurrentWidget(entry.editor);
+                    entry.editor->setCallbacks(
+                        [entry, stack, index, currentPresetWidths, presetEntries, selectedPreset, spinBox](const QString &text) {
+                            QStringList updated;
+                            if (!AnnotationWidthPresets::replacePresetString(Okular::Settings::toolSettingsWidthPresets(), index, text, &updated)) {
+                                entry.editor->setToolTip(i18nc("@info:tooltip", "Enter a unique width from %1 to %2 px", AnnotationWidthPresets::minimumWidth, AnnotationWidthPresets::maximumWidth));
+                                return false;
+                            }
+                            Okular::Settings::setToolSettingsWidthPresets(updated);
+                            Okular::Settings::self()->save();
+                            *currentPresetWidths = AnnotationWidthPresets::presetValuesOrDefaults(updated, AnnotationWidthPresets::defaultToolPresetStrings());
+                            selectedPreset->setSelectedIndex(updated.indexOf(QLocale::c().toString(currentPresetWidths->at(index), 'g', 12)));
+                            for (qsizetype presetIndex = 0; presetIndex < presetEntries->size(); ++presetIndex) {
+                                const double width = currentPresetWidths->at(presetIndex);
+                                QToolButton *button = presetEntries->at(presetIndex).button;
+                                button->setText(i18n("%1 px", width));
+                                button->setToolTip(i18n("Select %1 px. Click again to edit this preset", width));
+                                button->setChecked(qFuzzyCompare(width, spinBox->value()));
+                            }
+                            stack->setCurrentWidget(entry.button);
+                            return true;
+                        },
+                        [entry, stack] { stack->setCurrentWidget(entry.button); });
+                    return;
+                }
+
+                selectedPreset->setSelectedIndex(index);
+                const double presetWidth = currentPresetWidths->at(index);
+                updatePresetSelection(presetWidth);
+                drawingToolSettings[key].width = presetWidth;
+                if (selectedAnnotation) {
+                    selectedAnnotationChanged = true;
+                    selectedWidthChanged = true;
+                    return;
+                }
+                if (kind == DrawingToolKind::Eraser) {
+                    annotator->setEraserWidth(presetWidth);
+                } else {
+                    annotator->setDrawingToolWidthPixels(presetWidth);
+                }
+            });
+        }
+
+        const double initialWidth = qBound(minimum, drawingToolSettings.value(key).width, maximum);
         spinBox->setValue(initialWidth);
         slider->setValue(qRound(initialWidth * scale));
         currentValue->setText(i18n("%1 px", spinBox->value()));
 
         const auto updateSpinStep = [spinBox]() {
-            spinBox->setSingleStep(0.25);
+            spinBox->setSingleStep(AnnotationWidthPresets::adjustmentStep);
         };
         updateSpinStep();
 
@@ -837,23 +1022,6 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
                 annotator->setDrawingToolWidthPixels(value);
             }
         });
-        for (QToolButton *presetButton : std::as_const(presetButtons)) {
-            const double presetWidth = presetButton->text().remove(QLatin1String(" px")).toDouble();
-            QObject::connect(presetButton, &QToolButton::clicked, q, [this, key, kind = *kindIt, selectedAnnotation, &selectedAnnotationChanged, &selectedWidthChanged, presetWidth, updatePresetSelection]() {
-                updatePresetSelection(presetWidth);
-                drawingToolSettings[key].width = presetWidth;
-                if (selectedAnnotation) {
-                    selectedAnnotationChanged = true;
-                    selectedWidthChanged = true;
-                    return;
-                }
-                if (kind == DrawingToolKind::Eraser) {
-                    annotator->setEraserWidth(presetWidth);
-                } else {
-                    annotator->setDrawingToolWidthPixels(presetWidth);
-                }
-            });
-        }
         updatePresetSelection(initialWidth);
     };
 
@@ -1015,7 +1183,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             }
         });
     } else {
-        addWidthControl(0.1, *kindIt == DrawingToolKind::Eraser ? 100.0 : 200.0, *kindIt == DrawingToolKind::Eraser ? 0 : 1);
+        addWidthControl(*kindIt == DrawingToolKind::Eraser ? 1.0 : AnnotationWidthPresets::minimumWidth, *kindIt == DrawingToolKind::Eraser ? 100.0 : 200.0, 1);
     }
 
     if (*kindIt != DrawingToolKind::Eraser) {
@@ -1242,7 +1410,7 @@ void AnnotationActionHandlerPrivate::parseTool(int toolId)
     // if the width value is not a default one, insert a new action in the width list
     if (annElement.hasAttribute(QStringLiteral("width"))) {
         double width = annElement.attribute(QStringLiteral("width")).toDouble();
-        aCustomWidth = selectActionItem(aWidth, aCustomWidth, width, widthStandardValues, widthIcon(width), i18nc("@item:inlistbox", "Width %1", width));
+        aCustomWidth = selectActionItem(aWidth, aCustomWidth, width, widthStandardValues(), widthIcon(width), i18nc("@item:inlistbox", "Width %1", width));
     }
 
     // if the opacity value is not a default one, insert a new action in the opacity list
@@ -1293,7 +1461,7 @@ void AnnotationActionHandlerPrivate::updateConfigActions(const QString &annotTyp
 
     if (isEraser) {
         const double width = annotator->eraserWidth();
-        aCustomWidth = selectActionItem(aWidth, aCustomWidth, width, widthStandardValues, widthIcon(width), i18nc("@item:inlistbox", "Eraser diameter %1 px", width));
+        aCustomWidth = selectActionItem(aWidth, aCustomWidth, width, widthStandardValues(), widthIcon(width), i18nc("@item:inlistbox", "Eraser diameter %1 px", width));
         aWidth->setToolTip(i18nc("@info:tooltip", "Eraser diameter"));
         return;
     }
@@ -1871,14 +2039,11 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     // Width list
     d->aWidth = new KSelectAction(QIcon::fromTheme(QStringLiteral("edit-line-width")), i18nc("@action:intoolbar Current annotation config option", "Line width"), this);
     d->aWidth->setToolBarMode(KSelectAction::MenuMode);
-    for (auto width : d->widthStandardValues) {
-        KToggleAction *ann = new KToggleAction(d->widthIcon(width), i18nc("@item:inlistbox", "Width %1", width), this);
-        d->aWidth->addAction(ann);
-        connect(ann, &QAction::triggered, this, [this, width]() {
-            d->annotator->setAnnotationWidth(width);
-            d->updateConfigActions();
-        });
-    }
+    d->populateWidthActions();
+    connect(Okular::Settings::self(), &Okular::Settings::annotationWidthMenuPresetsChanged, this, [this] {
+        d->populateWidthActions();
+        d->parseTool(d->selectedBuiltinTool);
+    });
 
     // Opacity list
     d->aOpacity = new KSelectAction(QIcon::fromTheme(QStringLiteral("edit-opacity")), i18nc("@action:intoolbar Current annotation config option", "Opacity"), this);

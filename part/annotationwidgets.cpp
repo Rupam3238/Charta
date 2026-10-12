@@ -5,6 +5,7 @@
 */
 
 #include "annotationwidgets.h"
+#include "widthpresetutils.h"
 #include "annotationcolorhistory.h"
 
 // qt/kde includes
@@ -406,9 +407,9 @@ void TextAnnotationWidget::addWidthSpinBox(QWidget *widget, QFormLayout *formlay
 {
     m_spinWidth = new QDoubleSpinBox(widget);
     formlayout->addRow(i18n("Border &width:"), m_spinWidth);
-    m_spinWidth->setRange(0.1, 200.0);
+    m_spinWidth->setRange(AnnotationWidthPresets::minimumWidth, 200.0);
     m_spinWidth->setValue(m_textAnn->style().width());
-    m_spinWidth->setSingleStep(0.1);
+    m_spinWidth->setSingleStep(AnnotationWidthPresets::adjustmentStep);
     connect(m_spinWidth, &QDoubleSpinBox::valueChanged, this, &AnnotationWidget::dataChanged);
 }
 
@@ -491,8 +492,8 @@ void LineAnnotationWidget::createStyleWidget(QFormLayout *formlayout)
     addOpacitySpinBox(widget, formlayout);
 
     m_spinSize = new QDoubleSpinBox(widget);
-    m_spinSize->setRange(0.1, 200.0);
-    m_spinSize->setSingleStep(0.1);
+    m_spinSize->setRange(AnnotationWidthPresets::minimumWidth, 200.0);
+    m_spinSize->setSingleStep(AnnotationWidthPresets::adjustmentStep);
     m_spinSize->setValue(m_lineAnn->style().width());
 
     connect(m_spinSize, &QDoubleSpinBox::valueChanged, this, &LineAnnotationWidget::dataChanged);
@@ -628,8 +629,8 @@ void InkAnnotationWidget::createStyleWidget(QFormLayout *formlayout)
     m_spinSize = new QDoubleSpinBox(widget);
     formlayout->addRow(i18n("&Width:"), m_spinSize);
 
-    m_spinSize->setRange(0.1, 200.0);
-    m_spinSize->setSingleStep(0.1);
+    m_spinSize->setRange(AnnotationWidthPresets::minimumWidth, 200.0);
+    m_spinSize->setSingleStep(AnnotationWidthPresets::adjustmentStep);
     m_spinSize->setValue(m_inkAnn->style().width());
 
     connect(m_spinSize, &QDoubleSpinBox::valueChanged, this, &AnnotationWidget::dataChanged);
@@ -712,8 +713,8 @@ void GeomAnnotationWidget::createStyleWidget(QFormLayout *formlayout)
     } else {
         m_innerColor->setEnabled(false);
     }
-    m_spinSize->setRange(0.1, 200.0);
-    m_spinSize->setSingleStep(0.1);
+    m_spinSize->setRange(AnnotationWidthPresets::minimumWidth, 200.0);
+    m_spinSize->setSingleStep(AnnotationWidthPresets::adjustmentStep);
     m_spinSize->setValue(m_geomAnn->style().width());
 
     connect(m_typeCombo, &KComboBox::currentIndexChanged, this, &AnnotationWidget::dataChanged);

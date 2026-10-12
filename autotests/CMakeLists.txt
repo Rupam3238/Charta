@@ -142,6 +142,11 @@ if(BUILD_DESKTOP)
 endif()
 
 if(BUILD_DESKTOP)
+    ecm_add_test(widthpresetstest.cpp
+        TEST_NAME "widthpresetstest"
+        LINK_LIBRARIES Qt6::Test okularpart
+    )
+
     ecm_add_test(annotationtoolbartest.cpp ../part/annotationtools.cpp ../shell/okular_main.cpp ../shell/shellutils.cpp ../shell/shell.cpp ../shell/welcomescreen.cpp ../gui/recentitemsmodel.cpp closedialoghelper.cpp ../shell/welcomescreen.ui
         TEST_NAME "annotationtoolbartest"
         LINK_LIBRARIES Qt6::Test okularpart

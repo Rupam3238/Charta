@@ -31,6 +31,7 @@
 #include "core/page.h"
 #include "gui/guiutils.h"
 #include "pageview.h"
+#include "widthpresetutils.h"
 #include "videowidget.h"
 
 static const int handleSize = 10;
@@ -38,8 +39,6 @@ static const int handleLongSize = 20;
 static const int handleShortSize = 6;
 static const int handlePadding = handleLongSize / 2;
 static const int handleHitExpansion = 4;
-static const double minimumNormalizedResizeDimension = 0.005;
-
 static QPointF annotationPagePoint(const Okular::NormalizedPoint &point, double width, double height)
 {
     return QPointF(point.x * width, point.y * height);
@@ -1210,8 +1209,12 @@ Okular::NormalizedRect MouseAnnotation::resizedRect(const Okular::NormalizedRect
 {
     const double width = startRect.right - startRect.left;
     const double height = startRect.bottom - startRect.top;
-    const double minWidth = width > 0.0 ? qMin(minimumNormalizedResizeDimension, width) : minimumNormalizedResizeDimension;
-    const double minHeight = height > 0.0 ? qMin(minimumNormalizedResizeDimension, height) : minimumNormalizedResizeDimension;
+    const double pageWidth = m_focusedAnnotation.pageViewItem ? m_focusedAnnotation.pageViewItem->uncroppedWidth() : 1.0;
+    const double pageHeight = m_focusedAnnotation.pageViewItem ? m_focusedAnnotation.pageViewItem->uncroppedHeight() : 1.0;
+    const double minimumWidth = AnnotationWidthPresets::minimumNormalizedResizeDimension(pageWidth);
+    const double minimumHeight = AnnotationWidthPresets::minimumNormalizedResizeDimension(pageHeight);
+    const double minWidth = width > 0.0 ? qMin(minimumWidth, width) : minimumWidth;
+    const double minHeight = height > 0.0 ? qMin(minimumHeight, height) : minimumHeight;
     double left = qBound(0.0, startRect.left + delta1.x(), startRect.right - minWidth);
     double right = qBound(left + minWidth, startRect.right + delta2.x(), 1.0);
     double top = qBound(0.0, startRect.top + delta1.y(), startRect.bottom - minHeight);
