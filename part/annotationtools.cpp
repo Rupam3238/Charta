@@ -230,15 +230,14 @@ QRect SmoothPathEngine::event(EventType type, Button button, Modifiers modifiers
         pressures.append(processedPressure);
         m_pressureSum += processedPressure;
         m_allDefaultPressure = m_allDefaultPressure && qFuzzyCompare(processedPressure, 1.0);
-        QPen pen(m_engineColor, representativeStrokeWidth(m_pressureSum, pressures.size(), m_allDefaultPressure, basePenWidth) * xScale / m_pageWidth);
-        pen.setJoinStyle(Qt::RoundJoin);
-        pen.setCapStyle(Qt::RoundCap);
-        return m_liveStroke.addSegment(QPointF(lastPoint.x * xScale, lastPoint.y * yScale), QPointF(lastPoint.x * xScale, lastPoint.y * yScale), pen,
-                                       m_annotElement.attribute(QStringLiteral("opacity"), QStringLiteral("1.0")).toDouble());
+        return {};
     } else if (type == Move && points.count() > 0) {
         const qreal pressure = qBound(0.0, modifiers.pressure, 1.0);
         const Okular::NormalizedPoint previousPoint = lastPoint;
         const Okular::NormalizedPoint nextPoint = processPoint(Okular::NormalizedPoint(nX, nY), pressure);
+        if (qFuzzyIsNull(nextPoint.x - previousPoint.x) && qFuzzyIsNull(nextPoint.y - previousPoint.y)) {
+            return {};
+        }
         points.append(nextPoint);
         const qreal processedPressure = pressureWindow.last();
         pressures.append(processedPressure);

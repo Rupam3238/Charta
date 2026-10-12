@@ -962,6 +962,26 @@ void PageView::setupActions(KActionCollection *ac)
     ac->setDefaultShortcut(spd, QKeySequence(Qt::Key_Space));
     addAction(spd);
 
+    auto *clearCurrentPageAnnotations = new QAction(i18n("Clear Current Page"), this);
+    ac->addAction(QStringLiteral("clear_current_page_annotations"), clearCurrentPageAnnotations);
+    ac->setDefaultShortcut(clearCurrentPageAnnotations, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Delete));
+    connect(clearCurrentPageAnnotations, &QAction::triggered, this, [this] {
+        const int pageNumber = d->document->currentPage();
+        const Okular::Page *page = d->document->page(pageNumber);
+        if (!page) {
+            return;
+        }
+        QList<Okular::Annotation *> annotations;
+        for (Okular::Annotation *annotation : page->annotations()) {
+            if (d->document->canRemovePageAnnotation(annotation)) {
+                annotations.append(annotation);
+            }
+        }
+        if (!annotations.isEmpty()) {
+            d->document->removePageAnnotations(pageNumber, annotations);
+        }
+    });
+
     d->aToggleForms = new KToggleAction(i18n("Show Forms"), this);
     ac->addAction(QStringLiteral("view_toggle_forms"), d->aToggleForms);
     connect(d->aToggleForms, &QAction::toggled, this, &PageView::slotToggleForms);
@@ -2188,6 +2208,28 @@ void PageView::keyPressEvent(QKeyEvent *e)
     // move/scroll page by using keys
     // When the shift key is held down, scroll ten times faster
     int stepsize = (e->modifiers() & Qt::ShiftModifier) ? 10 : 1;
+    const auto setArrowNavigationViewport = [this](int targetPage) {
+        if (targetPage < 0 || targetPage >= static_cast<int>(d->document->pages())) {
+            return;
+        }
+
+        double normalizedX = 0.5;
+        double normalizedY = 0.5;
+        const int currentPage = d->document->currentPage();
+        const auto currentItem = std::find_if(d->items.cbegin(), d->items.cend(), [currentPage](const PageViewItem *item) { return item->pageNumber() == currentPage; });
+        if (currentItem != d->items.cend() && (*currentItem)->uncroppedWidth() > 0 && (*currentItem)->uncroppedHeight() > 0) {
+            const QPoint viewportCenter = contentAreaPoint(viewport()->rect().center());
+            normalizedX = qBound(0.0, (*currentItem)->absToPageX(viewportCenter.x()), 1.0);
+            normalizedY = qBound(0.0, (*currentItem)->absToPageY(viewportCenter.y()), 1.0);
+        }
+
+        Okular::DocumentViewport viewport(targetPage);
+        viewport.rePos.enabled = true;
+        viewport.rePos.normalizedX = normalizedX;
+        viewport.rePos.normalizedY = normalizedY;
+        viewport.rePos.pos = Okular::DocumentViewport::Center;
+        d->document->setViewport(viewport);
+    };
     switch (e->key()) {
     case Qt::Key_J:
     case Qt::Key_Down:
@@ -2213,7 +2255,11 @@ void PageView::keyPressEvent(QKeyEvent *e)
         if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Single || horizontalScrollBar()->maximum() == 0) {
             // in single-page view, left/right keys should navigate between pages instead of panning across the page
             int next_page = d->document->currentPage() - 1;
-            d->document->setViewportPage(next_page);
+            if (e->key() == Qt::Key_Left) {
+                setArrowNavigationViewport(next_page);
+            } else {
+                d->document->setViewportPage(next_page);
+            }
         } else {
             d->scroller->scrollTo(d->scroller->finalPosition() + QPoint(-stepsize * horizontalScrollBar()->singleStep(), 0), d->currentShortScrollDuration);
         }
@@ -2223,7 +2269,11 @@ void PageView::keyPressEvent(QKeyEvent *e)
         if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Single || horizontalScrollBar()->maximum() == 0) {
             // in single-page view, left/right keys should navigate between pages instead of panning across the page
             int next_page = d->document->currentPage() + 1;
-            d->document->setViewportPage(next_page);
+            if (e->key() == Qt::Key_Right) {
+                setArrowNavigationViewport(next_page);
+            } else {
+                d->document->setViewportPage(next_page);
+            }
         } else {
             d->scroller->scrollTo(d->scroller->finalPosition() + QPoint(stepsize * horizontalScrollBar()->singleStep(), 0), d->currentShortScrollDuration);
         }
