@@ -350,6 +350,9 @@
    </choices>
    <emit signal="primaryAnnotationToolBarChanged" />
   </entry>
+  <entry key="DrawingToolBarCompact" type="Bool" >
+   <default>false</default>
+  </entry>
   <entry key="ViewMode" type="Enum" >
    <default>Single</default>
    <choices>

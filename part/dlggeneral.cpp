@@ -192,7 +192,7 @@ DlgGeneral::DlgGeneral(QWidget *parent, Okular::EmbedMode embedMode)
     // Under Wayland the cursor wrap feature is unavailable
     if (QGuiApplication::platformName() != QLatin1String("wayland")) {
         QCheckBox *dragBeyondScreenEdges = new QCheckBox(this);
-        dragBeyondScreenEdges->setText(i18nc("@option:check Config dialog, general page", "When using Browse Tool, wrap cursor at screen edges"));
+        dragBeyondScreenEdges->setText(i18nc("@option:check Config dialog, general page", "When using Pan Tool, wrap cursor at screen edges"));
         dragBeyondScreenEdges->setObjectName(QStringLiteral("kcfg_DragBeyondScreenEdges"));
         layout->addRow(programFeaturesLabel(), dragBeyondScreenEdges);
     }

@@ -8,6 +8,7 @@
 
 #include <QTest>
 
+#include <QKeyEvent>
 #include <QMenu>
 #include <QTabBar>
 #include <QTabWidget>
@@ -62,6 +63,7 @@ private Q_SLOTS:
 
     void testAnnotationToolBar();
     void testAnnotationToolBar_data();
+    void testMomentaryToolSwitching();
     void testAnnotationToolBarActionsEnabledState();
     void testAnnotationToolBarActionsEnabledState_data();
     void testAnnotationToolBarConfigActionsEnabledState();
@@ -316,6 +318,99 @@ void AnnotationToolBarTest::testAnnotationToolBar_data()
     QTest::addColumn<int>("tabIndex");
     QTest::addRow("first tab") << 0;
     QTest::addRow("second tab") << 1;
+}
+
+void AnnotationToolBarTest::testMomentaryToolSwitching()
+{
+    const QStringList paths = {QStringLiteral(KDESRCDIR "data/file1.pdf")};
+    const QString serializedOptions = ShellUtils::serializeOptions(false, false, false, false, false, QString(), QString(), QString());
+    QCOMPARE(Okular::main(paths, serializedOptions), Okular::Success);
+
+    Shell *shell = findShell();
+    QVERIFY(shell);
+    if (qgetenv("KDECI_CANNOT_CREATE_WINDOWS") == "1") {
+        QSKIP("KDE CI can't create a window on this platform, skipping some gui tests");
+    }
+    QVERIFY(QTest::qWaitForWindowExposed(shell));
+
+    auto *part = dynamic_cast<Okular::Part *>(shell->m_tabs.constFirst().part);
+    QVERIFY(part);
+    PageView *view = pageView(part);
+    QVERIFY(view);
+    view->setFocus();
+    QTRY_VERIFY(view->hasFocus());
+
+    KActionCollection *actions = part->actionCollection();
+    QAction *pen = actions->action(QStringLiteral("annotation_freehand_line"));
+    QAction *highlighter = actions->action(QStringLiteral("annotation_highlighter"));
+    QAction *eraser = actions->action(QStringLiteral("drawing_eraser"));
+    QAction *pan = actions->action(QStringLiteral("drawing_browse"));
+    QToolBar *drawingToolBar = view->findChild<QToolBar *>(QStringLiteral("drawingToolBar"));
+    QVERIFY(pen);
+    QVERIFY(highlighter);
+    QVERIFY(eraser);
+    QVERIFY(pan);
+    QVERIFY(drawingToolBar);
+    QAction *compactMode = drawingToolBar->actions().constLast();
+
+    pen->trigger();
+    QTest::keyClick(view->viewport(), Qt::Key_Space);
+    QVERIFY(pan->isChecked());
+    QVERIFY(!pen->isChecked());
+
+    pen->trigger();
+    QTest::keyPress(view->viewport(), Qt::Key_Space);
+    QTest::qWait(250);
+    QVERIFY(pan->isChecked());
+    QTest::keyPress(view->viewport(), Qt::Key_Space);
+    QTest::keyRelease(view->viewport(), Qt::Key_Space);
+    QVERIFY(pen->isChecked());
+
+    QTest::keyPress(view->viewport(), Qt::Key_Space);
+    QTest::qWait(250);
+    QVERIFY(pan->isChecked());
+    highlighter->trigger();
+    QTest::keyRelease(view->viewport(), Qt::Key_Space);
+    QVERIFY(highlighter->isChecked());
+
+    compactMode->trigger();
+    QVERIFY(compactMode->isChecked());
+    highlighter->trigger();
+    QTest::keyClick(view->viewport(), Qt::Key_Space);
+    QVERIFY(pan->isChecked());
+    QVERIFY(!highlighter->isChecked());
+
+    highlighter->trigger();
+    QTest::keyPress(view->viewport(), Qt::Key_Space);
+    QTest::qWait(250);
+    QVERIFY(pan->isChecked());
+    QTest::keyRelease(view->viewport(), Qt::Key_Space);
+    QVERIFY(highlighter->isChecked());
+
+    QTest::keyClick(view->viewport(), Qt::Key_E);
+    QVERIFY(eraser->isChecked());
+    QVERIFY(!highlighter->isChecked());
+
+    highlighter->trigger();
+    QTest::keyPress(view->viewport(), Qt::Key_E);
+    QTest::qWait(250);
+    QVERIFY(eraser->isChecked());
+    QTest::keyRelease(view->viewport(), Qt::Key_E);
+    QVERIFY(highlighter->isChecked());
+
+    compactMode->trigger();
+    QVERIFY(!compactMode->isChecked());
+    pen->trigger();
+    QTest::keyPress(view->viewport(), Qt::Key_Space);
+    QTest::keyPress(view->viewport(), Qt::Key_E);
+    QVERIFY(eraser->isChecked());
+    QKeyEvent repeatPress(QEvent::KeyPress, Qt::Key_E, Qt::NoModifier, QString(), true, 1);
+    QApplication::sendEvent(view->viewport(), &repeatPress);
+    QVERIFY(eraser->isChecked());
+    QTest::keyRelease(view->viewport(), Qt::Key_E);
+    QVERIFY(pan->isChecked());
+    QTest::keyRelease(view->viewport(), Qt::Key_Space);
+    QVERIFY(pen->isChecked());
 }
 
 void AnnotationToolBarTest::testAnnotationToolBarActionsEnabledState()

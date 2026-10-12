@@ -32,7 +32,7 @@ class AnnotationActionHandler : public QObject
     Q_OBJECT
 
 public:
-    enum class TemporaryTool { Select, Eraser };
+    enum class TemporaryTool { Select, Eraser, Pan };
 
     AnnotationActionHandler(PageViewAnnotator *parent, KActionCollection *ac);
     ~AnnotationActionHandler() override;
@@ -52,6 +52,7 @@ public:
     void setTextToolsEnabled(bool on);
     void deselectAllAnnotationActions();
     bool beginTemporaryTool(TemporaryTool tool);
+    bool switchTemporaryTool(TemporaryTool tool);
     void endTemporaryTool();
     bool showAnnotationSettings(Okular::Document *document, const QList<Okular::Annotation *> &annotations, int pageNumber, QWidget *anchorWidget);
 
@@ -59,6 +60,8 @@ private Q_SLOTS:
     void slotAnnotationToolBarVisibilityChanged(bool visible);
 
 private:
+    void cancelTemporaryToolSwitch();
+    void abandonTemporaryToolSwitch();
     bool eventFilter(QObject *watched, QEvent *event) override;
     class AnnotationActionHandlerPrivate *d;
 };

@@ -840,7 +840,7 @@ void PageView::setupViewerActions(KActionCollection *ac)
     // Mouse mode actions for viewer mode
     d->mouseModeActionGroup = new QActionGroup(this);
     d->mouseModeActionGroup->setExclusive(true);
-    d->aMouseNormal = new QAction(QIcon::fromTheme(QStringLiteral("transform-browse")), i18n("&Browse"), this);
+    d->aMouseNormal = new QAction(QIcon::fromTheme(QStringLiteral("transform-browse")), i18n("&Pan"), this);
     ac->addAction(QStringLiteral("mouse_drag"), d->aMouseNormal);
     connect(d->aMouseNormal, &QAction::triggered, this, &PageView::slotSetMouseNormal);
     d->aMouseNormal->setCheckable(true);

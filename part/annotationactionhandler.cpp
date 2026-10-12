@@ -10,6 +10,7 @@
 // qt includes
 #include <QActionGroup>
 #include <QActionEvent>
+#include <QAbstractSpinBox>
 #include <QApplication>
 #include <QBitmap>
 #include <QColorDialog>
@@ -26,17 +27,21 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QKeySequence>
+#include <QKeyEvent>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
 #include <QPointer>
+#include <QPlainTextEdit>
 #include <QSizePolicy>
 #include <QRadioButton>
 #include <QSlider>
 #include <QSignalBlocker>
 #include <QScreen>
 #include <QTimer>
+#include <QTextEdit>
 #include <QVBoxLayout>
 
 // kde includes
@@ -47,6 +52,8 @@
 #include <KParts/MainWindow>
 #include <KSelectAction>
 #include <KToolBar>
+
+#include <optional>
 
 // local includes
 #include "actionbar.h"
@@ -62,6 +69,19 @@
 
 namespace
 {
+constexpr int temporaryToolHoldThresholdMs = 180;
+
+std::optional<AnnotationActionHandler::TemporaryTool> temporaryToolForKey(int key)
+{
+    if (key == Qt::Key_Space) {
+        return AnnotationActionHandler::TemporaryTool::Pan;
+    }
+    if (key == Qt::Key_E) {
+        return AnnotationActionHandler::TemporaryTool::Eraser;
+    }
+    return std::nullopt;
+}
+
 class DrawingToolBarIsland final : public KToolBar
 {
 public:
@@ -532,6 +552,9 @@ public:
     QAction *temporaryToolPreviousAction = nullptr;
     QAction *temporaryToolAction = nullptr;
     bool restoringTemporaryTool = false;
+    bool changingTemporaryTool = false;
+    QList<int> heldTemporaryToolKeys;
+    QTimer *temporaryToolHoldTimer = nullptr;
     bool selectionToolWasActiveOnPress = false;
     bool freeformHighlightActive = false;
     QActionGroup *agTools;
@@ -1376,8 +1399,17 @@ void AnnotationActionHandlerPrivate::populateQuickAnnotations()
             }
         }
         QObject::connect(annFav, &KToggleAction::toggled, q, [this, favToolId](bool checked) {
-            if (checked && !restoringTemporaryTool) {
-                slotQuickToolSelected(favToolId);
+            if (checked) {
+                if (restoringTemporaryTool) {
+                    aBrowseTool->setChecked(false);
+                    annotator->setAnnotationSelectionMode(false);
+                    annotator->setEraserMode(false);
+                    annotator->selectQuickTool(favToolId);
+                    selectedBuiltinTool = -1;
+                    updateConfigActions();
+                } else {
+                    slotQuickToolSelected(favToolId);
+                }
             }
         });
         QDomElement engineElement = favToolElement.firstChildElement(QStringLiteral("engine"));
@@ -1575,13 +1607,35 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     , d(new AnnotationActionHandlerPrivate(this))
 {
     d->annotator = parent;
+    d->temporaryToolHoldTimer = new QTimer(this);
+    d->temporaryToolHoldTimer->setSingleShot(true);
+    d->temporaryToolHoldTimer->setInterval(temporaryToolHoldThresholdMs);
+    connect(d->temporaryToolHoldTimer, &QTimer::timeout, this, [this] {
+        if (d->heldTemporaryToolKeys.isEmpty()) {
+            return;
+        }
+        if (const auto tool = temporaryToolForKey(d->heldTemporaryToolKeys.constLast())) {
+            switchTemporaryTool(*tool);
+        }
+    });
+    qApp->installEventFilter(this);
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget *oldWidget, QWidget *newWidget) {
+        if (d->heldTemporaryToolKeys.isEmpty() || oldWidget == newWidget) {
+            return;
+        }
+        QTimer::singleShot(0, this, [this, oldWidget] {
+            if (!d->heldTemporaryToolKeys.isEmpty() && QApplication::focusWidget() != oldWidget) {
+                cancelTemporaryToolSwitch();
+            }
+        });
+    });
 
     // toolbar visibility actions
     d->aToolBarVisibility = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18n("&Annotations"), this);
     d->aHideToolBar = new QAction(QIcon::fromTheme(QStringLiteral("dialog-close")), i18nc("@action:intoolbar Hide the drawing toolbar", "Hide drawing tools"), this);
     d->aShowToolBar = new QAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18nc("@action:intoolbar Show the drawing toolbar", "Show drawing tools"), this);
     d->aCompactMode = new KToggleAction(QIcon::fromTheme(QStringLiteral("charta"), QIcon(QStringLiteral(":/branding/charta.svg"))), i18nc("@action:intoolbar Switch drawing toolbar between expanded and compact presentation", "Compact"), this);
-    d->aCompactMode->setChecked(false);
+    d->aCompactMode->setChecked(Okular::Settings::drawingToolBarCompact());
 
     // Text markup actions
     KToggleAction *aHighlighter = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-highlight")), i18nc("@action:intoolbar Annotation tool", "Highlighter"), this);
@@ -1605,7 +1659,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     Q_ASSERT(d->aBrowseTool);
     d->aMouseSelectTools = ac->action(QStringLiteral("mouse_selecttools"));
     Q_ASSERT(d->aMouseSelectTools);
-    d->aDrawingBrowse = new KToggleAction(QIcon::fromTheme(QStringLiteral("transform-browse")), i18nc("@action:intoolbar Drawing tool", "Browse"), this);
+    d->aDrawingBrowse = new KToggleAction(QIcon::fromTheme(QStringLiteral("transform-browse")), i18nc("@action:intoolbar Drawing tool", "Pan"), this);
     d->aDrawingBrowse->setChecked(d->aBrowseTool->isChecked());
     KToggleAction *aFreehandLine = new KToggleAction(QIcon::fromTheme(QStringLiteral("draw-freehand")), i18nc("@action:intoolbar Drawing tool", "Pen / Freehand"), this);
     // Geometrical shapes actions
@@ -1670,7 +1724,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     for (const auto &ann : tools) {
         // action group workaround: connecting to toggled instead of triggered
         connect(ann, &QAction::toggled, this, [this, toolId](bool checked) {
-            if (checked && !d->restoringTemporaryTool) {
+            if (checked) {
                 d->aBrowseTool->setChecked(false);
                 d->annotator->setAnnotationSelectionMode(false);
                 d->selectTool(toolId);
@@ -1683,7 +1737,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->agTools->addAction(d->aLassoSelectTool);
     d->agTools->addAction(d->aEraserTool);
     const auto selectionToolToggled = [this](bool checked, bool lassoMode, QAction *action) {
-        if (!checked || d->restoringTemporaryTool) {
+        if (!checked) {
             return;
         }
         d->aSelectTools->setDefaultAction(action);
@@ -1691,6 +1745,10 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         d->annotator->setEraserMode(false);
         d->annotator->selectBuiltinTool(-1);
         d->annotator->setAnnotationSelectionMode(true, lassoMode);
+        if (d->restoringTemporaryTool) {
+            d->updateConfigActions();
+            return;
+        }
         d->selectModeSwitchingToBrowse = true;
         d->aBrowseTool->trigger();
         d->selectModeSwitchingToBrowse = false;
@@ -1701,9 +1759,6 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     connect(d->aSelectTool, &QAction::toggled, this, [this, selectionToolToggled](bool checked) { selectionToolToggled(checked, false, d->aSelectTool); });
     connect(d->aLassoSelectTool, &QAction::toggled, this, [this, selectionToolToggled](bool checked) { selectionToolToggled(checked, true, d->aLassoSelectTool); });
     connect(d->aEraserTool, &QAction::toggled, this, [this](bool checked) {
-        if (d->restoringTemporaryTool) {
-            return;
-        }
         if (checked) {
             d->aBrowseTool->setChecked(false);
             d->annotator->setAnnotationSelectionMode(false);
@@ -1716,6 +1771,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         d->aDrawingBrowse->setChecked(checked);
     });
     connect(d->aBrowseTool, &QAction::triggered, this, [this] {
+        if (!d->changingTemporaryTool && !d->restoringTemporaryTool && (d->temporaryToolAction || !d->heldTemporaryToolKeys.isEmpty())) {
+            abandonTemporaryToolSwitch();
+        }
         if (d->selectModeSwitchingToBrowse) {
             return;
         }
@@ -1725,6 +1783,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     connect(d->aDrawingBrowse, &QAction::toggled, this, [this](bool checked) {
         if (!checked) {
             return;
+        }
+        if (!d->changingTemporaryTool && !d->restoringTemporaryTool && (d->temporaryToolAction || !d->heldTemporaryToolKeys.isEmpty())) {
+            abandonTemporaryToolSwitch();
         }
         d->annotator->setAnnotationSelectionMode(false);
         d->selectModeSwitchingToBrowse = true;
@@ -1743,7 +1804,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
         // action group workaround: connecting to toggled instead of triggered
         // (because deselectAllAnnotationActions has to call triggered)
         connect(ann, &QAction::toggled, this, [this, stamp](bool checked) {
-            if (checked && !d->restoringTemporaryTool) {
+            if (checked) {
                 d->slotStampToolSelected(stamp.second);
             }
         });
@@ -1841,6 +1902,9 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
             d->pendingMousePopupAction = nullptr;
             d->agLastAction = action;
             return;
+        }
+        if (!d->changingTemporaryTool && !d->restoringTemporaryTool && (d->temporaryToolAction || !d->heldTemporaryToolKeys.isEmpty())) {
+            abandonTemporaryToolSwitch();
         }
         if (action == d->agLastAction) {
             const bool mouseRepeat = d->pendingMousePopupAction == action;
@@ -1989,6 +2053,84 @@ bool AnnotationActionHandler::showAnnotationSettings(Okular::Document *document,
 
 bool AnnotationActionHandler::eventFilter(QObject *watched, QEvent *event)
 {
+    auto *pageView = qobject_cast<PageView *>(d->annotator->parent());
+    auto *eventWidget = qobject_cast<QWidget *>(watched);
+    const auto isInPageView = [pageView](QWidget *widget) { return pageView && widget && (widget == pageView || pageView->isAncestorOf(widget)); };
+    if (!d->heldTemporaryToolKeys.isEmpty()
+        && (event->type() == QEvent::ApplicationDeactivate || (pageView && event->type() == QEvent::WindowDeactivate && eventWidget == pageView->window()))) {
+        cancelTemporaryToolSwitch();
+    }
+
+    const bool heldKeyRelease = event->type() == QEvent::KeyRelease && d->heldTemporaryToolKeys.contains(static_cast<QKeyEvent *>(event)->key());
+    if ((event->type() == QEvent::KeyRelease || event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride) && (isInPageView(eventWidget) || heldKeyRelease)) {
+        auto *keyEvent = static_cast<QKeyEvent *>(event);
+        const int key = keyEvent->key();
+        const auto activeAction = [this] {
+            QAction *action = d->agTools->checkedAction();
+            return action ? action : (d->aDrawingBrowse->isChecked() ? static_cast<QAction *>(d->aDrawingBrowse) : nullptr);
+        };
+        const auto actionForTool = [this](TemporaryTool tool) -> QAction * {
+            return tool == TemporaryTool::Eraser ? static_cast<QAction *>(d->aEraserTool) : d->aDrawingBrowse;
+        };
+
+        if (const auto tool = temporaryToolForKey(key)) {
+            const bool held = d->heldTemporaryToolKeys.contains(key);
+            if (event->type() == QEvent::KeyRelease && held) {
+                keyEvent->accept();
+                if (keyEvent->isAutoRepeat()) {
+                    return true;
+                }
+                d->heldTemporaryToolKeys.removeAll(key);
+                if (d->heldTemporaryToolKeys.isEmpty() && d->temporaryToolAction) {
+                    endTemporaryTool();
+                } else if (d->heldTemporaryToolKeys.isEmpty()) {
+                    d->temporaryToolHoldTimer->stop();
+                    if (const auto persistentTool = temporaryToolForKey(key)) {
+                        actionForTool(*persistentTool)->trigger();
+                    }
+                } else if (const auto activeTool = temporaryToolForKey(d->heldTemporaryToolKeys.constLast())) {
+                    switchTemporaryTool(*activeTool);
+                }
+                return true;
+            }
+
+            if ((event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride) && keyEvent->modifiers() == Qt::NoModifier) {
+                QWidget *focusWidget = QApplication::focusWidget();
+                const bool textInputFocused = qobject_cast<QLineEdit *>(focusWidget) || qobject_cast<QTextEdit *>(focusWidget) || qobject_cast<QPlainTextEdit *>(focusWidget)
+                    || qobject_cast<QAbstractSpinBox *>(focusWidget) || (qobject_cast<QComboBox *>(focusWidget) && qobject_cast<QComboBox *>(focusWidget)->isEditable());
+                const bool canSwitch = !textInputFocused && (d->temporaryToolAction || (activeAction() && activeAction() != actionForTool(*tool)));
+
+                if (canSwitch && event->type() == QEvent::ShortcutOverride && (!keyEvent->isAutoRepeat() || held)) {
+                    keyEvent->accept();
+                    return false;
+                }
+                if (canSwitch && event->type() == QEvent::KeyPress) {
+                    if (held) {
+                        keyEvent->accept();
+                        return true;
+                    }
+                    if (keyEvent->isAutoRepeat()) {
+                        return false;
+                    }
+                    const bool overlapping = !d->heldTemporaryToolKeys.isEmpty();
+                    d->heldTemporaryToolKeys.append(key);
+                    if (overlapping) {
+                        d->temporaryToolHoldTimer->stop();
+                        if (switchTemporaryTool(*tool)) {
+                            keyEvent->accept();
+                            return true;
+                        }
+                    } else {
+                        d->temporaryToolHoldTimer->start();
+                        keyEvent->accept();
+                        return true;
+                    }
+                    d->heldTemporaryToolKeys.removeAll(key);
+                }
+            }
+        }
+    }
+
     if (event->type() == QEvent::MouseButtonPress) {
         const auto action = d->settingsButtonActions.constFind(watched);
         if (action != d->settingsButtonActions.cend() && d->agTools->checkedAction() == *action) {
@@ -1996,6 +2138,21 @@ bool AnnotationActionHandler::eventFilter(QObject *watched, QEvent *event)
         }
     }
     return QObject::eventFilter(watched, event);
+}
+
+void AnnotationActionHandler::cancelTemporaryToolSwitch()
+{
+    d->temporaryToolHoldTimer->stop();
+    d->heldTemporaryToolKeys.clear();
+    endTemporaryTool();
+}
+
+void AnnotationActionHandler::abandonTemporaryToolSwitch()
+{
+    d->temporaryToolHoldTimer->stop();
+    d->heldTemporaryToolKeys.clear();
+    d->temporaryToolAction = nullptr;
+    d->temporaryToolPreviousAction = nullptr;
 }
 
 void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
@@ -2077,13 +2234,21 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
                 d->compactToolBarView->setActiveAction(action);
             }
         });
+        connect(d->aDrawingBrowse, &QAction::toggled, this, [this](bool checked) {
+            if (checked && d->compactToolBarView) {
+                d->compactToolBarView->setActiveAction(d->aDrawingBrowse);
+            }
+        });
         connect(d->aCompactMode, &QAction::toggled, this, [this, island](bool compact) {
+            Okular::Settings::setDrawingToolBarCompact(compact);
+            Okular::Settings::self()->save();
             island->setCompactPresentation(compact);
             if (d->compactToolBarView) {
                 d->compactToolBarView->setVisible(compact);
             }
         });
     }
+    island->setCompactPresentation(d->aCompactMode->isChecked());
     if (auto *selectionButton = qobject_cast<QToolButton *>(drawingToolBar->widgetForAction(d->aSelectTools));
         selectionButton && !selectionButton->property("selectionRepeatPopupConnected").toBool()) {
         selectionButton->setProperty("selectionRepeatPopupConnected", true);
@@ -2241,17 +2406,47 @@ bool AnnotationActionHandler::beginTemporaryTool(TemporaryTool tool)
         return false;
     }
 
-    QAction *temporaryAction = tool == TemporaryTool::Select ? d->aSelectTools->defaultAction() : static_cast<QAction *>(d->aEraserTool);
+    QAction *temporaryAction = tool == TemporaryTool::Select ? d->aSelectTools->defaultAction()
+        : (tool == TemporaryTool::Eraser ? static_cast<QAction *>(d->aEraserTool) : d->aDrawingBrowse);
     if (previousAction == temporaryAction) {
         return false;
     }
 
     d->temporaryToolPreviousAction = previousAction;
     d->temporaryToolAction = temporaryAction;
+    d->changingTemporaryTool = true;
     temporaryAction->trigger();
+    d->changingTemporaryTool = false;
     if (!temporaryAction->isChecked()) {
         d->temporaryToolPreviousAction = nullptr;
         d->temporaryToolAction = nullptr;
+        return false;
+    }
+    return true;
+}
+
+bool AnnotationActionHandler::switchTemporaryTool(TemporaryTool tool)
+{
+    if (!d->temporaryToolAction) {
+        return beginTemporaryTool(tool);
+    }
+
+    QAction *temporaryAction = tool == TemporaryTool::Select ? d->aSelectTools->defaultAction()
+        : (tool == TemporaryTool::Eraser ? static_cast<QAction *>(d->aEraserTool) : d->aDrawingBrowse);
+    if (temporaryAction == d->temporaryToolAction) {
+        return true;
+    }
+    if (!temporaryAction || !temporaryAction->isEnabled()) {
+        return false;
+    }
+
+    QAction *previousTemporaryAction = d->temporaryToolAction;
+    d->temporaryToolAction = temporaryAction;
+    d->changingTemporaryTool = true;
+    temporaryAction->trigger();
+    d->changingTemporaryTool = false;
+    if (!temporaryAction->isChecked()) {
+        d->temporaryToolAction = previousTemporaryAction;
         return false;
     }
     return true;
@@ -2267,7 +2462,9 @@ void AnnotationActionHandler::endTemporaryTool()
     d->temporaryToolAction = nullptr;
     if (previousAction) {
         d->restoringTemporaryTool = true;
+        d->changingTemporaryTool = true;
         previousAction->trigger();
+        d->changingTemporaryTool = false;
         d->restoringTemporaryTool = false;
     }
     d->temporaryToolPreviousAction = nullptr;
