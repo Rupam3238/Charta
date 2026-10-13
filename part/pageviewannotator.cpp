@@ -156,7 +156,7 @@ public:
             QSet<Okular::Annotation *> &pendingOnPage = m_pendingAnnotations[pageNumber];
             const QRectF sweptBounds = sweptCircle.boundingRect();
             for (Okular::Annotation *annotation : annotations) {
-                if (pendingOnPage.contains(annotation) || !m_document->canRemovePageAnnotation(annotation)) {
+                if (pendingOnPage.contains(annotation) || isEraseProtected(annotation) || !m_document->canRemovePageAnnotation(annotation)) {
                     continue;
                 }
                 const qreal pageScale = ((xScale / page->width()) + (yScale / page->height())) / 2.0;
@@ -281,6 +281,19 @@ private:
             swept.addEllipse(start, m_width / 2.0, m_width / 2.0);
         }
         return swept;
+    }
+
+    // Shape annotations that the eraser must never remove:
+    // rectangle/ellipse are AGeom; line, arrow and polygon are ALine.
+    static bool isEraseProtected(const Okular::Annotation *annotation)
+    {
+        switch (annotation->subType()) {
+        case Okular::Annotation::AGeom:
+        case Okular::Annotation::ALine:
+            return true;
+        default:
+            return false;
+        }
     }
 
     static QPointF toPagePixels(const Okular::NormalizedPoint &point, double xScale, double yScale)
