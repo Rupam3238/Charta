@@ -130,9 +130,10 @@ public:
     void adoptGeneratedContents(PagePrivate *oldPage);
 
     /**
-     * Adds a new @p annotation to the page. If @p isLastAnnotationChild is true, add a AnnotationObjectRect
+     * Adds a new @p annotation to the page. If @p isLastAnnotationChild is true, add a AnnotationObjectRect.
+     * If @p index is given, the annotation is inserted at the specified absolute position in the page order.
      */
-    void addAnnotation(Annotation *annotation, bool isLastAnnotationChild);
+    void addAnnotation(Annotation *annotation, bool isLastAnnotationChild, int index = -1);
 
     /*
      * Tries to find an equivalent form field to oldField by looking into the rect, type and name

@@ -94,6 +94,45 @@ bool PopplerAnnotationProxy::supports(Capability cap) const
     }
 }
 
+int PopplerAnnotationProxy::annotationIndex(int page, const Okular::Annotation *annotation) const
+{
+    if (!annotation) {
+        return -1;
+    }
+
+    Poppler::Annotation *nativeAnnotation = qvariant_cast<Poppler::Annotation *>(annotation->nativeId());
+    if (!nativeAnnotation) {
+        return -1;
+    }
+
+    QMutexLocker ml(mutex);
+    std::unique_ptr<Poppler::Page> popplerPage = ppl_doc->page(page);
+    return popplerPage ? popplerPage->annotationIndex(nativeAnnotation) : -1;
+}
+
+int PopplerAnnotationProxy::annotationCount(int page) const
+{
+    QMutexLocker ml(mutex);
+    std::unique_ptr<Poppler::Page> popplerPage = ppl_doc->page(page);
+    return popplerPage ? popplerPage->annotationCount() : 0;
+}
+
+bool PopplerAnnotationProxy::moveAnnotationToIndex(int page, Okular::Annotation *annotation, int index)
+{
+    if (!annotation) {
+        return false;
+    }
+
+    Poppler::Annotation *nativeAnnotation = qvariant_cast<Poppler::Annotation *>(annotation->nativeId());
+    if (!nativeAnnotation) {
+        return false;
+    }
+
+    QMutexLocker ml(mutex);
+    std::unique_ptr<Poppler::Page> popplerPage = ppl_doc->page(page);
+    return popplerPage && popplerPage->moveAnnotation(nativeAnnotation, index);
+}
+
 static Poppler::TextAnnotation::TextType okularToPoppler(Okular::TextAnnotation::TextType ott)
 {
     switch (ott) {

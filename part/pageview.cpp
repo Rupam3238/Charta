@@ -203,6 +203,11 @@ public:
     QToolButton *annotationStrokesButton = nullptr;
     QToolButton *annotationCopyButton = nullptr;
     QToolButton *annotationDeleteButton = nullptr;
+    QToolButton *annotationStackingButton = nullptr;
+    QAction *annotationStackMoveUpAction = nullptr;
+    QAction *annotationStackMoveDownAction = nullptr;
+    QAction *annotationStackMoveToTopAction = nullptr;
+    QAction *annotationStackMoveToBottomAction = nullptr;
     Okular::Annotation *annotationPanelAnnotation = nullptr;
 
     int lastSourceLocationViewportPageNumber = -1;
@@ -384,13 +389,66 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     d->annotationDeleteButton->setText(i18n("Delete"));
     d->annotationDeleteButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-delete")));
     d->annotationDeleteButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    d->annotationStackingButton = new QToolButton(d->annotationSelectionPanel);
+    d->annotationStackingButton->setText(i18n("Stacking"));
+    d->annotationStackingButton->setIcon(QIcon::fromTheme(QStringLiteral("list-sort")));
+    d->annotationStackingButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    d->annotationStackingButton->setPopupMode(QToolButton::InstantPopup);
+    QMenu *annotationStackingMenu = new QMenu(d->annotationStackingButton);
+    d->annotationStackMoveUpAction = annotationStackingMenu->addAction(QIcon::fromTheme(QStringLiteral("arrow-up")), i18n("Move Up"));
+    d->annotationStackMoveDownAction = annotationStackingMenu->addAction(QIcon::fromTheme(QStringLiteral("arrow-down")), i18n("Move Down"));
+    annotationStackingMenu->addSeparator();
+    d->annotationStackMoveToTopAction = annotationStackingMenu->addAction(QIcon::fromTheme(QStringLiteral("go-top")), i18n("Move to Topmost"));
+    d->annotationStackMoveToBottomAction = annotationStackingMenu->addAction(QIcon::fromTheme(QStringLiteral("go-bottom")), i18n("Move to Bottommost"));
+    d->annotationStackingButton->setMenu(annotationStackingMenu);
     annotationPanelLayout->addWidget(d->annotationStrokesButton);
     annotationPanelLayout->addWidget(d->annotationCopyButton);
     annotationPanelLayout->addWidget(d->annotationDeleteButton);
+    annotationPanelLayout->addWidget(d->annotationStackingButton);
     d->annotationSelectionPanel->hide();
 
     connect(d->annotationCopyButton, &QToolButton::clicked, this, &PageView::copySelectedAnnotations);
     connect(d->annotationDeleteButton, &QToolButton::clicked, this, &PageView::deleteSelectedAnnotations);
+    connect(d->annotationStackMoveUpAction, &QAction::triggered, this, [this]() {
+        const QList<AnnotationDescription> selected = d->mouseAnnotation->selectedAnnotations();
+        if (selected.size() != 1) {
+            return;
+        }
+        const AnnotationDescription &description = selected.constFirst();
+        if (description.pageNumber >= 0 && description.annotation) {
+            d->document->movePageAnnotationUp(description.pageNumber, description.annotation);
+        }
+    });
+    connect(d->annotationStackMoveDownAction, &QAction::triggered, this, [this]() {
+        const QList<AnnotationDescription> selected = d->mouseAnnotation->selectedAnnotations();
+        if (selected.size() != 1) {
+            return;
+        }
+        const AnnotationDescription &description = selected.constFirst();
+        if (description.pageNumber >= 0 && description.annotation) {
+            d->document->movePageAnnotationDown(description.pageNumber, description.annotation);
+        }
+    });
+    connect(d->annotationStackMoveToTopAction, &QAction::triggered, this, [this]() {
+        const QList<AnnotationDescription> selected = d->mouseAnnotation->selectedAnnotations();
+        if (selected.size() != 1) {
+            return;
+        }
+        const AnnotationDescription &description = selected.constFirst();
+        if (description.pageNumber >= 0 && description.annotation) {
+            d->document->movePageAnnotationToTop(description.pageNumber, description.annotation);
+        }
+    });
+    connect(d->annotationStackMoveToBottomAction, &QAction::triggered, this, [this]() {
+        const QList<AnnotationDescription> selected = d->mouseAnnotation->selectedAnnotations();
+        if (selected.size() != 1) {
+            return;
+        }
+        const AnnotationDescription &description = selected.constFirst();
+        if (description.pageNumber >= 0 && description.annotation) {
+            d->document->movePageAnnotationToBottom(description.pageNumber, description.annotation);
+        }
+    });
     connect(d->annotationStrokesButton, &QToolButton::clicked, this, [this] {
         const QList<AnnotationDescription> descriptions = d->mouseAnnotation->selectedAnnotations();
         const int pageNumber = descriptions.isEmpty() ? -1 : descriptions.constFirst().pageNumber;
@@ -676,6 +734,15 @@ void PageView::updateAnnotationSelectionPanel()
     d->annotationDeleteButton->setEnabled(std::any_of(selected.cbegin(), selected.cend(), [this](const AnnotationDescription &description) {
         return d->document->canRemovePageAnnotation(description.annotation);
     }));
+    const bool canStackSelectedAnnotation = annotation != nullptr && selected.size() == 1 && d->document->page(selected.constFirst().pageNumber)
+        && d->document->annotationIndex(selected.constFirst().pageNumber, annotation) >= 0 && d->document->canModifyPageAnnotation(annotation);
+    d->annotationStackingButton->setEnabled(canStackSelectedAnnotation);
+    const int currentStackIndex = canStackSelectedAnnotation ? d->document->annotationIndex(selected.constFirst().pageNumber, annotation) : -1;
+    const int lastStackIndex = canStackSelectedAnnotation ? d->document->page(selected.constFirst().pageNumber)->annotations().size() - 1 : -1;
+    d->annotationStackMoveUpAction->setEnabled(canStackSelectedAnnotation && currentStackIndex >= 0 && currentStackIndex < lastStackIndex);
+    d->annotationStackMoveDownAction->setEnabled(canStackSelectedAnnotation && currentStackIndex > 0);
+    d->annotationStackMoveToTopAction->setEnabled(canStackSelectedAnnotation && currentStackIndex >= 0 && currentStackIndex < lastStackIndex);
+    d->annotationStackMoveToBottomAction->setEnabled(canStackSelectedAnnotation && currentStackIndex > 0);
     d->annotationSelectionPanel->adjustSize();
     QRect selectionRect;
     for (const AnnotationDescription &description : selected) {

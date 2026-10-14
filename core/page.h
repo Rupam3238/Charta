@@ -344,7 +344,17 @@ public:
     /**
      * Adds a new @p annotation to the page with potential comments.
      */
-    void addAnnotation(Annotation *annotation);
+    void addAnnotation(Annotation *annotation, int index = -1);
+
+    /**
+     * Returns the index of the given @p annotation in the page order, or -1 if it is not on the page.
+     */
+    int annotationIndex(const Annotation *annotation) const;
+
+    /**
+     * Moves the given @p annotation to the specified absolute @p index in the page order.
+     */
+    void moveAnnotation(Annotation *annotation, int index);
 
     /**
      * Removes the @p annotation from the page.

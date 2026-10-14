@@ -57,10 +57,11 @@ Okular::NormalizedRect buildBoundingRectangleForButtons(const QList<Okular::Form
     return boundingRect;
 }
 
-AddAnnotationCommand::AddAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber)
+AddAnnotationCommand::AddAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber, int index)
     : m_docPriv(docPriv)
     , m_annotation(annotation)
     , m_pageNumber(pageNumber)
+    , m_index(index)
     , m_done(false)
 {
     setText(i18nc("Add an annotation to the page", "add annotation"));
@@ -83,7 +84,7 @@ void AddAnnotationCommand::undo()
 void AddAnnotationCommand::redo()
 {
     moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
-    m_docPriv->performAddPageAnnotation(m_pageNumber, m_annotation);
+    m_docPriv->performAddPageAnnotation(m_pageNumber, m_annotation, m_index);
     m_done = true;
 }
 
@@ -107,8 +108,12 @@ RemoveAnnotationCommand::RemoveAnnotationCommand(Okular::DocumentPrivate *doc, O
     : m_docPriv(doc)
     , m_annotation(annotation)
     , m_pageNumber(pageNumber)
+    , m_oldIndex(-1)
     , m_done(false)
 {
+    if (annotation && doc && doc->m_pagesVector.value(pageNumber)) {
+        m_oldIndex = doc->m_pagesVector[pageNumber]->annotationIndex(annotation);
+    }
     setText(i18nc("Remove an annotation from the page", "remove annotation"));
 }
 
@@ -122,7 +127,7 @@ RemoveAnnotationCommand::~RemoveAnnotationCommand()
 void RemoveAnnotationCommand::undo()
 {
     moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
-    m_docPriv->performAddPageAnnotation(m_pageNumber, m_annotation);
+    m_docPriv->performAddPageAnnotation(m_pageNumber, m_annotation, m_oldIndex);
     m_done = false;
 }
 
@@ -146,6 +151,39 @@ bool RemoveAnnotationCommand::refreshInternalPageReferences(const QList<Okular::
         }
     }
 
+    return true;
+}
+
+    ReorderAnnotationCommand::ReorderAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber, int oldIndex, int newIndex, int oldNativeIndex, int newNativeIndex)
+    : m_docPriv(docPriv)
+    , m_annotation(annotation)
+    , m_pageNumber(pageNumber)
+    , m_oldIndex(oldIndex)
+    , m_newIndex(newIndex)
+    , m_oldNativeIndex(oldNativeIndex)
+    , m_newNativeIndex(newNativeIndex)
+{
+    setText(i18nc("Reorder an annotation on the page", "reorder annotation"));
+}
+
+void ReorderAnnotationCommand::undo()
+{
+    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    m_docPriv->performReorderPageAnnotation(m_pageNumber, m_annotation, m_oldIndex, m_oldNativeIndex);
+}
+
+void ReorderAnnotationCommand::redo()
+{
+    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    m_docPriv->performReorderPageAnnotation(m_pageNumber, m_annotation, m_newIndex, m_newNativeIndex);
+}
+
+bool ReorderAnnotationCommand::refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector)
+{
+    auto a = newPagesVector[m_pageNumber]->annotation(m_annotation->uniqueName());
+    if (a) {
+        m_annotation = a;
+    }
     return true;
 }
 

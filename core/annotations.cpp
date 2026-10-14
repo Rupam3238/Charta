@@ -233,6 +233,10 @@ AnnotationProxy::~AnnotationProxy()
 {
 }
 
+AnnotationOrderProxy::~AnnotationOrderProxy()
+{
+}
+
 // BEGIN Annotation implementation
 
 class Annotation::Style::Private

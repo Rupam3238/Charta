@@ -1017,13 +1017,14 @@ DocumentViewport DocumentPrivate::nextDocumentViewport() const
     return ret;
 }
 
-void DocumentPrivate::performAddPageAnnotation(int page, Annotation *annotation)
+void DocumentPrivate::performAddPageAnnotation(int page, Annotation *annotation, int index)
 {
     Okular::SaveInterface *iface = qobject_cast<Okular::SaveInterface *>(m_generator);
     AnnotationProxy *proxy = iface ? iface->annotationProxy() : nullptr;
+    auto *orderProxy = dynamic_cast<AnnotationOrderProxy *>(proxy);
 
     // find out the page to attach annotation
-    Page *kp = m_pagesVector[page];
+    Page *kp = m_pagesVector.value(page, nullptr);
     if (!m_generator || !kp) {
         return;
     }
@@ -1034,11 +1035,30 @@ void DocumentPrivate::performAddPageAnnotation(int page, Annotation *annotation)
     }
 
     // add annotation to the page
-    kp->addAnnotation(annotation);
+    kp->addAnnotation(annotation, index);
 
     // tell the annotation proxy
     if (proxy && proxy->supports(AnnotationProxy::Addition)) {
         proxy->notifyAddition(annotation, page);
+    }
+
+    if (orderProxy && (annotation->flags() & Annotation::ExternallyDrawn) && index >= 0) {
+        const int modelIndex = kp->annotationIndex(annotation);
+        const QList<Annotation *> annotations = kp->annotations();
+        int nativeTargetIndex = -1;
+        for (int i = modelIndex + 1; i < annotations.size(); ++i) {
+            nativeTargetIndex = orderProxy->annotationIndex(page, annotations.at(i));
+            if (nativeTargetIndex >= 0) {
+                break;
+            }
+        }
+        if (nativeTargetIndex < 0) {
+            nativeTargetIndex = orderProxy->annotationCount(page) - 1;
+        }
+        const int nativeCurrentIndex = orderProxy->annotationIndex(page, annotation);
+        if (nativeCurrentIndex >= 0 && nativeTargetIndex >= 0 && nativeCurrentIndex != nativeTargetIndex) {
+            orderProxy->moveAnnotationToIndex(page, annotation, nativeTargetIndex);
+        }
     }
 
     // notify observers about the change
@@ -1084,6 +1104,43 @@ void DocumentPrivate::performRemovePageAnnotation(int page, Annotation *annotati
             // Redraw everything, including ExternallyDrawn annotations
             refreshAnnotationPixmaps(page);
         }
+    }
+}
+
+void DocumentPrivate::performReorderPageAnnotation(int page, Annotation *annotation, int index, int nativeIndex)
+{
+    Page *kp = m_pagesVector.value(page, nullptr);
+    if (!m_generator || !kp || !annotation) {
+        return;
+    }
+
+    if (!annotation->d_ptr->m_page || annotation->d_ptr->m_page->m_page != kp) {
+        return;
+    }
+
+    const int currentIndex = kp->annotationIndex(annotation);
+    if (currentIndex < 0) {
+        return;
+    }
+
+    const int clampedIndex = qBound(0, index, kp->annotations().size() - 1);
+    if (currentIndex == clampedIndex) {
+        return;
+    }
+
+    const bool externallyDrawn = annotation->flags() & Annotation::ExternallyDrawn;
+    if (externallyDrawn) {
+        Okular::SaveInterface *iface = qobject_cast<Okular::SaveInterface *>(m_generator);
+        auto *orderProxy = iface ? dynamic_cast<AnnotationOrderProxy *>(iface->annotationProxy()) : nullptr;
+        if (!orderProxy || nativeIndex < 0 || !orderProxy->moveAnnotationToIndex(page, annotation, nativeIndex)) {
+            return;
+        }
+    }
+
+    kp->moveAnnotation(annotation, clampedIndex);
+    notifyAnnotationChanges(page);
+    if (externallyDrawn) {
+        refreshAnnotationPixmaps(page);
     }
 }
 
@@ -3460,11 +3517,111 @@ void Document::recalculateForms()
 void Document::addPageAnnotation(int page, Annotation *annotation)
 {
     // Transform annotation's base boundary rectangle into unrotated coordinates
-    Page *p = d->m_pagesVector[page];
+    Page *p = d->m_pagesVector.value(page, nullptr);
+    if (!p || !annotation) {
+        delete annotation;
+        return;
+    }
     QTransform t = p->d->rotationMatrix();
     annotation->d_ptr->baseTransform(t.inverted());
-    QUndoCommand *uc = new AddAnnotationCommand(this->d, annotation, page);
+    QUndoCommand *uc = new AddAnnotationCommand(this->d, annotation, page, p->annotations().size());
     d->m_undoStack->push(uc);
+}
+
+int Document::annotationIndex(int page, const Annotation *annotation) const
+{
+    Page *p = d->m_pagesVector.value(page, nullptr);
+    if (!p || !annotation) {
+        return -1;
+    }
+    return p->annotationIndex(annotation);
+}
+
+void Document::movePageAnnotation(int page, Annotation *annotation, int index)
+{
+    Page *p = d->m_pagesVector.value(page, nullptr);
+    if (!p || !annotation || !canModifyPageAnnotation(annotation)) {
+        return;
+    }
+    const int currentIndex = p->annotationIndex(annotation);
+    if (currentIndex < 0) {
+        return;
+    }
+    const int newIndex = qBound(0, index, p->annotations().size() - 1);
+    if (currentIndex == newIndex) {
+        return;
+    }
+
+    int oldNativeIndex = -1;
+    int newNativeIndex = -1;
+    if (annotation->flags() & Annotation::ExternallyDrawn) {
+        Okular::SaveInterface *iface = qobject_cast<Okular::SaveInterface *>(d->m_generator);
+        auto *orderProxy = iface ? dynamic_cast<AnnotationOrderProxy *>(iface->annotationProxy()) : nullptr;
+        if (!orderProxy) {
+            return;
+        }
+        oldNativeIndex = orderProxy->annotationIndex(page, annotation);
+        const QList<Annotation *> annotations = p->annotations();
+        newNativeIndex = orderProxy->annotationIndex(page, annotations.at(newIndex));
+        if (oldNativeIndex < 0 || newNativeIndex < 0 || oldNativeIndex == newNativeIndex) {
+            return;
+        }
+    }
+
+    QUndoCommand *uc = new ReorderAnnotationCommand(d, annotation, page, currentIndex, newIndex, oldNativeIndex, newNativeIndex);
+    d->m_undoStack->push(uc);
+}
+
+void Document::movePageAnnotationUp(int page, Annotation *annotation)
+{
+    Page *p = d->m_pagesVector.value(page, nullptr);
+    if (!p || !annotation) {
+        return;
+    }
+    const int currentIndex = p->annotationIndex(annotation);
+    if (currentIndex < 0 || currentIndex >= p->annotations().size() - 1) {
+        return;
+    }
+    movePageAnnotation(page, annotation, currentIndex + 1);
+}
+
+void Document::movePageAnnotationDown(int page, Annotation *annotation)
+{
+    Page *p = d->m_pagesVector.value(page, nullptr);
+    if (!p || !annotation) {
+        return;
+    }
+    const int currentIndex = p->annotationIndex(annotation);
+    if (currentIndex <= 0) {
+        return;
+    }
+    movePageAnnotation(page, annotation, currentIndex - 1);
+}
+
+void Document::movePageAnnotationToTop(int page, Annotation *annotation)
+{
+    Page *p = d->m_pagesVector.value(page, nullptr);
+    if (!p || !annotation) {
+        return;
+    }
+    const int currentIndex = p->annotationIndex(annotation);
+    if (currentIndex < 0 || currentIndex >= p->annotations().size() - 1) {
+        return;
+    }
+    movePageAnnotation(page, annotation, p->annotations().size() - 1);
+}
+
+void Document::movePageAnnotationToBottom(int page, Annotation *annotation)
+{
+    Page *p = d->m_pagesVector.value(page, nullptr);
+    if (!p || !annotation) {
+        return;
+    }
+    const int currentIndex = p->annotationIndex(annotation);
+    if (currentIndex <= 0) {
+        return;
+    }
+    movePageAnnotation(page, annotation, 0);
 }
 
 bool Document::canModifyPageAnnotation(const Annotation *annotation) const

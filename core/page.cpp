@@ -132,10 +132,36 @@ void PagePrivate::imageRotationDone(RotationJob *job)
     }
 }
 
-void PagePrivate::addAnnotation(Annotation *annotation, bool isLastAnnotationChild)
+namespace
+{
+void synchronizeAnnotationObjectRects(QList<ObjectRect *> &rects, const QList<Annotation *> &annotations)
+{
+    QHash<Annotation *, ObjectRect *> annotationRects;
+    QList<ObjectRect *> otherRects;
+
+    for (ObjectRect *rect : std::as_const(rects)) {
+        if (rect->objectType() == ObjectRect::OAnnotation) {
+            annotationRects.insert(static_cast<AnnotationObjectRect *>(rect)->annotation(), rect);
+        } else {
+            otherRects.append(rect);
+        }
+    }
+
+    rects.clear();
+    for (Annotation *annotation : annotations) {
+        if (annotationRects.contains(annotation)) {
+            rects.append(annotationRects.take(annotation));
+        }
+    }
+    rects.append(otherRects);
+}
+}
+
+void PagePrivate::addAnnotation(Annotation *annotation, bool isLastAnnotationChild, int index)
 {
     annotation->d_ptr->m_page = this;
-    m_page->m_annotations.append(annotation);
+    const int insertIndex = index < 0 ? m_page->m_annotations.size() : qBound(0, index, m_page->m_annotations.size());
+    m_page->m_annotations.insert(insertIndex, annotation);
 
     // Add an AnnotationObjectRect only if this is the last annotation child (or comment) to avoid to add this object at the same location many times
     if (isLastAnnotationChild) {
@@ -147,6 +173,7 @@ void PagePrivate::addAnnotation(Annotation *annotation, bool isLastAnnotationChi
 
         m_page->m_rects.append(rect);
     }
+    synchronizeAnnotationObjectRects(m_page->m_rects, m_page->m_annotations);
 }
 
 QTransform PagePrivate::rotationMatrix() const
@@ -547,6 +574,20 @@ QList<Annotation *> Page::annotations() const
     return m_annotations;
 }
 
+int Page::annotationIndex(const Annotation *annotation) const
+{
+    if (!annotation) {
+        return -1;
+    }
+
+    for (int i = 0; i < m_annotations.size(); ++i) {
+        if (m_annotations.at(i) == annotation) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 Annotation *Page::annotation(const QString &uniqueName) const
 {
     for (Annotation *a : m_annotations) {
@@ -698,26 +739,53 @@ QColor Page::textSelectionColor() const
     return d->m_textSelections ? d->m_textSelections->color : QColor();
 }
 
-void Page::addAnnotation(Annotation *annotation)
+void Page::addAnnotation(Annotation *annotation, int index)
 {
+    if (!annotation) {
+        return;
+    }
+
     if (annotation->uniqueName().isEmpty()) {
         // Generate uniqueName: okular-{UUID}
         QString uniqueName = QStringLiteral("okular-") + QUuid::createUuid().toString();
         annotation->setUniqueName(uniqueName);
     }
-    int numberAnnotationChild = annotation->revisions().size();
-    d->addAnnotation(annotation, numberAnnotationChild == 0);
 
+    const int insertionIndex = index < 0 ? m_annotations.size() : qBound(0, index, m_annotations.size());
+    int numberAnnotationChild = annotation->revisions().size();
+    d->addAnnotation(annotation, numberAnnotationChild == 0, insertionIndex);
+
+    int childIndex = insertionIndex + 1;
     Annotation *parent = annotation;
     for (auto &revision : annotation->revisions()) {
         numberAnnotationChild--;
         Annotation *child = revision.annotation();
         if (child) {
             child->setPreviousAnnotation(parent);
-            d->addAnnotation(child, numberAnnotationChild == 0);
+            d->addAnnotation(child, numberAnnotationChild == 0, childIndex++);
             parent = child;
         }
     }
+}
+
+void Page::moveAnnotation(Annotation *annotation, int index)
+{
+    if (!annotation) {
+        return;
+    }
+
+    const int currentIndex = annotationIndex(annotation);
+    if (currentIndex < 0) {
+        return;
+    }
+
+    const int targetIndex = qBound(0, index, m_annotations.size() - 1);
+    if (currentIndex == targetIndex) {
+        return;
+    }
+
+    m_annotations.move(currentIndex, targetIndex);
+    synchronizeAnnotationObjectRects(m_rects, m_annotations);
 }
 
 bool Page::removeAnnotation(Annotation *annotation)
@@ -752,6 +820,7 @@ bool Page::removeAnnotation(Annotation *annotation)
         }
     }
 
+    synchronizeAnnotationObjectRects(m_rects, m_annotations);
     return true;
 }
 

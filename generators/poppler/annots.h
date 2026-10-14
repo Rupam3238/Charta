@@ -22,7 +22,7 @@
 
 extern Okular::Annotation *createAnnotationFromPopplerAnnotation(Poppler::Annotation *popplerAnnotation, const Poppler::Page &popplerPage, bool *doDelete);
 
-class PopplerAnnotationProxy : public Okular::AnnotationProxy
+class PopplerAnnotationProxy : public Okular::AnnotationProxy, public Okular::AnnotationOrderProxy
 {
 public:
     PopplerAnnotationProxy(Poppler::Document *doc, QMutex *userMutex, QHash<Okular::Annotation *, Poppler::Annotation *> *annotsOnOpenHash);
@@ -32,6 +32,9 @@ public:
     void notifyAddition(Okular::Annotation *okl_ann, int page) override;
     void notifyModification(const Okular::Annotation *okl_ann, int page, bool appearanceChanged) override;
     void notifyRemoval(Okular::Annotation *okl_ann, int page) override;
+    int annotationIndex(int page, const Okular::Annotation *annotation) const override;
+    int annotationCount(int page) const override;
+    bool moveAnnotationToIndex(int page, Okular::Annotation *annotation, int index) override;
 
 private:
     Poppler::Document *ppl_doc;

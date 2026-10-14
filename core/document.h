@@ -506,6 +506,36 @@ public:
     void addPageAnnotation(int page, Annotation *annotation);
 
     /**
+     * Returns the index of @p annotation on the given @p page, or -1 if it is not present.
+     */
+    int annotationIndex(int page, const Annotation *annotation) const;
+
+    /**
+     * Moves the given @p annotation to the absolute @p index on the given @p page.
+     */
+    void movePageAnnotation(int page, Annotation *annotation, int index);
+
+    /**
+     * Moves the given @p annotation one slot up on the given @p page.
+     */
+    void movePageAnnotationUp(int page, Annotation *annotation);
+
+    /**
+     * Moves the given @p annotation one slot down on the given @p page.
+     */
+    void movePageAnnotationDown(int page, Annotation *annotation);
+
+    /**
+     * Moves the given @p annotation to the top of the page stack.
+     */
+    void movePageAnnotationToTop(int page, Annotation *annotation);
+
+    /**
+     * Moves the given @p annotation to the bottom of the page stack.
+     */
+    void movePageAnnotationToBottom(int page, Annotation *annotation);
+
+    /**
      * Tests if the @p annotation can be modified
      *
      * @since 0.15 (KDE 4.9)

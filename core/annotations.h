@@ -789,6 +789,18 @@ public:
     virtual void notifyRemoval(Annotation *annotation, int page) = 0;
 };
 
+/**
+ * Optional native annotation ordering support supplied by a generator.
+ */
+class OKULARCORE_EXPORT AnnotationOrderProxy
+{
+public:
+    virtual ~AnnotationOrderProxy();
+    virtual int annotationIndex(int page, const Annotation *annotation) const = 0;
+    virtual int annotationCount(int page) const = 0;
+    virtual bool moveAnnotationToIndex(int page, Annotation *annotation, int index) = 0;
+};
+
 class OKULARCORE_EXPORT TextAnnotation : public Annotation
 {
 public:

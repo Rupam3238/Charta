@@ -246,6 +246,27 @@ void AnnotationPopup::addActionsToMenu(QMenu *menu)
             }
         }
 
+        const Okular::Page *annotationPage = pair.pageNumber >= 0 ? mDocument->page(pair.pageNumber) : nullptr;
+        const int annotationStackIndex = annotationPage ? mDocument->annotationIndex(pair.pageNumber, pair.annotation) : -1;
+        const int annotationStackLastIndex = annotationPage ? annotationPage->annotations().size() - 1 : -1;
+        const bool canStackAnnotation = onlyOne && annotationStackIndex >= 0 && mDocument->canModifyPageAnnotation(pair.annotation);
+        QMenu *stackingMenu = menu->addMenu(i18n("Stacking"));
+        action = stackingMenu->addAction(QIcon::fromTheme(QStringLiteral("arrow-up")), i18n("Move Up"));
+        action->setEnabled(canStackAnnotation && annotationStackIndex < annotationStackLastIndex);
+        connect(action, &QAction::triggered, menu, [this, pair] { mDocument->movePageAnnotationUp(pair.pageNumber, pair.annotation); });
+
+        action = stackingMenu->addAction(QIcon::fromTheme(QStringLiteral("arrow-down")), i18n("Move Down"));
+        action->setEnabled(canStackAnnotation && annotationStackIndex > 0);
+        connect(action, &QAction::triggered, menu, [this, pair] { mDocument->movePageAnnotationDown(pair.pageNumber, pair.annotation); });
+
+        action = stackingMenu->addAction(QIcon::fromTheme(QStringLiteral("go-top")), i18n("Move to Topmost"));
+        action->setEnabled(canStackAnnotation && annotationStackIndex < annotationStackLastIndex);
+        connect(action, &QAction::triggered, menu, [this, pair] { mDocument->movePageAnnotationToTop(pair.pageNumber, pair.annotation); });
+
+        action = stackingMenu->addAction(QIcon::fromTheme(QStringLiteral("go-bottom")), i18n("Move to Bottommost"));
+        action->setEnabled(canStackAnnotation && annotationStackIndex > 0);
+        connect(action, &QAction::triggered, menu, [this, pair] { mDocument->movePageAnnotationToBottom(pair.pageNumber, pair.annotation); });
+
         action = menu->addAction(QIcon::fromTheme(QStringLiteral("configure")), i18n("&Properties"));
         action->setEnabled(onlyOne);
         connect(action, &QAction::triggered, menu, [this, pair] { doOpenPropertiesDialog(pair); });

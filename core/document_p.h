@@ -157,8 +157,9 @@ public:
     bool cancelRenderingBecauseOf(PixmapRequest *executingRequest, PixmapRequest *newRequest);
 
     // Methods that implement functionality needed by undo commands
-    void performAddPageAnnotation(int page, Annotation *annotation);
+    void performAddPageAnnotation(int page, Annotation *annotation, int index = -1);
     void performRemovePageAnnotation(int page, Annotation *annotation);
+    void performReorderPageAnnotation(int page, Annotation *annotation, int index, int nativeIndex = -1);
     void performModifyPageAnnotation(int page, Annotation *annotation, bool appearanceChanged);
     void performSetAnnotationContents(const QString &newContents, Annotation *annot, int pageNumber);
 

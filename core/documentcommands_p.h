@@ -34,7 +34,7 @@ public:
 class AddAnnotationCommand : public OkularUndoCommand
 {
 public:
-    AddAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber);
+    AddAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber, int index);
 
     ~AddAnnotationCommand() override;
 
@@ -48,6 +48,7 @@ private:
     Okular::DocumentPrivate *m_docPriv;
     Okular::Annotation *m_annotation;
     int m_pageNumber;
+    int m_index;
     bool m_done;
 };
 
@@ -65,7 +66,26 @@ private:
     Okular::DocumentPrivate *m_docPriv;
     Okular::Annotation *m_annotation;
     int m_pageNumber;
+    int m_oldIndex;
     bool m_done;
+};
+
+class ReorderAnnotationCommand : public OkularUndoCommand
+{
+public:
+    ReorderAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber, int oldIndex, int newIndex, int oldNativeIndex, int newNativeIndex);
+    void undo() override;
+    void redo() override;
+    bool refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector) override;
+
+private:
+    Okular::DocumentPrivate *m_docPriv;
+    Okular::Annotation *m_annotation;
+    int m_pageNumber;
+    int m_oldIndex;
+    int m_newIndex;
+    int m_oldNativeIndex;
+    int m_newNativeIndex;
 };
 
 class ModifyAnnotationPropertiesCommand : public OkularUndoCommand

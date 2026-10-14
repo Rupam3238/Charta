@@ -9,14 +9,17 @@
 // qt/kde includes
 #include <KLineEdit>
 #include <KLocalizedString>
+#include <QAction>
 #include <QFormLayout>
 #include <QFrame>
 #include <QHeaderView>
 #include <QIcon>
 #include <QLabel>
 #include <QLayout>
+#include <QMenu>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QToolButton>
 
 // local includes
 #include "annotationwidgets.h"
@@ -74,6 +77,42 @@ AnnotsPropertiesDialog::AnnotsPropertiesDialog(QWidget *parent, Okular::Document
     gridlayout->addRow(i18n("Modified:"), m_modifyDateLabel);
 
     // END tab 2
+
+    QToolButton *stackingButton = new QToolButton(page);
+    stackingButton->setText(i18n("Stacking"));
+    stackingButton->setPopupMode(QToolButton::InstantPopup);
+    QMenu *stackingMenu = new QMenu(stackingButton);
+    QAction *moveUpAction = stackingMenu->addAction(QIcon::fromTheme(QStringLiteral("arrow-up")), i18n("Move Up"));
+    QAction *moveDownAction = stackingMenu->addAction(QIcon::fromTheme(QStringLiteral("arrow-down")), i18n("Move Down"));
+    stackingMenu->addSeparator();
+    QAction *moveToTopAction = stackingMenu->addAction(QIcon::fromTheme(QStringLiteral("go-top")), i18n("Move to Topmost"));
+    QAction *moveToBottomAction = stackingMenu->addAction(QIcon::fromTheme(QStringLiteral("go-bottom")), i18n("Move to Bottommost"));
+    stackingButton->setMenu(stackingMenu);
+
+    const auto updateStackingActions = [this, stackingButton, moveUpAction, moveDownAction, moveToTopAction, moveToBottomAction]() {
+        if (!m_document || !m_annot || !m_document->page(m_page) || m_document->annotationIndex(m_page, m_annot) < 0 || !m_document->canModifyPageAnnotation(m_annot)) {
+            stackingButton->setEnabled(false);
+            moveUpAction->setEnabled(false);
+            moveDownAction->setEnabled(false);
+            moveToTopAction->setEnabled(false);
+            moveToBottomAction->setEnabled(false);
+            return;
+        }
+        stackingButton->setEnabled(true);
+        const int currentIndex = m_document->annotationIndex(m_page, m_annot);
+        const int lastIndex = m_document->page(m_page)->annotations().size() - 1;
+        moveUpAction->setEnabled(currentIndex >= 0 && currentIndex < lastIndex);
+        moveDownAction->setEnabled(currentIndex > 0);
+        moveToTopAction->setEnabled(currentIndex >= 0 && currentIndex < lastIndex);
+        moveToBottomAction->setEnabled(currentIndex > 0);
+    };
+
+    QObject::connect(moveUpAction, &QAction::triggered, this, [this]() { m_document->movePageAnnotationUp(m_page, m_annot); });
+    QObject::connect(moveDownAction, &QAction::triggered, this, [this]() { m_document->movePageAnnotationDown(m_page, m_annot); });
+    QObject::connect(moveToTopAction, &QAction::triggered, this, [this]() { m_document->movePageAnnotationToTop(m_page, m_annot); });
+    QObject::connect(moveToBottomAction, &QAction::triggered, this, [this]() { m_document->movePageAnnotationToBottom(m_page, m_annot); });
+    updateStackingActions();
+    gridlayout->addRow(i18n("Stacking:"), stackingButton);
 
     QWidget *extraWidget = m_annotWidget->extraWidget();
     if (extraWidget) {

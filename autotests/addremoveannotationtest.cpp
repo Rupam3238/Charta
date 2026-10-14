@@ -69,6 +69,8 @@ private Q_SLOTS:
     void cleanup();
     void testAddAnnotations();
     void testAddAnnotationUndoWithRotate_Bug318091();
+    void testReorderAnnotations();
+    void testReorderPdfBackedAnnotations();
     void testRemoveAnnotations();
     void testRemoveAnnotationGroupUndoOnce();
     void testSingleClickInkAnnotation();
@@ -187,6 +189,145 @@ void AddRemoveAnnotationTest::testAddAnnotationUndoWithRotate_Bug318091()
     // In Bug318091 the bounding rectangle was being rotated upon each redo
     QString newAnnotXml = TestingUtils::getAnnotationXml(annot);
     QCOMPARE(origAnnotXml, newAnnotXml);
+}
+
+void AddRemoveAnnotationTest::testReorderAnnotations()
+{
+    Okular::Annotation *annotA = new Okular::TextAnnotation();
+    annotA->setBoundingRectangle(Okular::NormalizedRect(0.10, 0.10, 0.15, 0.15));
+    annotA->setContents(QStringLiteral("A"));
+
+    Okular::Annotation *annotB = new Okular::TextAnnotation();
+    annotB->setBoundingRectangle(Okular::NormalizedRect(0.20, 0.10, 0.25, 0.15));
+    annotB->setContents(QStringLiteral("B"));
+
+    Okular::Annotation *annotC = new Okular::TextAnnotation();
+    annotC->setBoundingRectangle(Okular::NormalizedRect(0.30, 0.10, 0.35, 0.15));
+    annotC->setContents(QStringLiteral("C"));
+
+    m_document->addPageAnnotation(0, annotA);
+    m_document->addPageAnnotation(0, annotB);
+    m_document->addPageAnnotation(0, annotC);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotA, annotB, annotC}));
+
+    m_document->movePageAnnotationUp(0, annotA);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotB, annotA, annotC}));
+    m_document->movePageAnnotationUp(0, annotC);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotB, annotA, annotC}));
+
+    m_document->movePageAnnotationDown(0, annotA);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotA, annotB, annotC}));
+    m_document->movePageAnnotationDown(0, annotA);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotA, annotB, annotC}));
+
+    m_document->movePageAnnotationToTop(0, annotA);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotB, annotC, annotA}));
+    m_document->movePageAnnotationToBottom(0, annotA);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotA, annotB, annotC}));
+
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotB, annotC, annotA}));
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotA, annotB, annotC}));
+    m_document->redo();
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotB, annotC, annotA}));
+
+    m_document->movePageAnnotationToBottom(0, annotC);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotC, annotB, annotA}));
+    m_document->removePageAnnotation(0, annotB);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotC, annotA}));
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotC, annotB, annotA}));
+    m_document->redo();
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({annotC, annotA}));
+}
+
+void AddRemoveAnnotationTest::testReorderPdfBackedAnnotations()
+{
+#ifndef HAVE_POPPLER_QT6
+    QSKIP("This test requires Poppler Qt6 rendering");
+#else
+    auto *red = new Okular::GeomAnnotation();
+    red->setUniqueName(QStringLiteral("stack-red"));
+    red->setBoundingRectangle(Okular::NormalizedRect(0.25, 0.25, 0.75, 0.75));
+    red->setGeometricalType(Okular::GeomAnnotation::InscribedSquare);
+    red->setGeometricalInnerColor(Qt::red);
+    red->style().setColor(Qt::red);
+    red->style().setWidth(1.0);
+
+    auto *blue = new Okular::GeomAnnotation();
+    blue->setUniqueName(QStringLiteral("stack-blue"));
+    blue->setBoundingRectangle(Okular::NormalizedRect(0.25, 0.25, 0.75, 0.75));
+    blue->setGeometricalType(Okular::GeomAnnotation::InscribedSquare);
+    blue->setGeometricalInnerColor(Qt::blue);
+    blue->style().setColor(Qt::blue);
+    blue->style().setWidth(1.0);
+
+    m_document->addPageAnnotation(0, red);
+    m_document->addPageAnnotation(0, blue);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({red, blue}));
+
+    PixmapRevisionObserver observer(m_document);
+    const Okular::Page *page = m_document->page(0);
+    const int pixmapWidth = qRound(page->width());
+    const int pixmapHeight = qRound(page->height());
+    m_document->requestPixmaps({new Okular::PixmapRequest(&observer, 0, pixmapWidth, pixmapHeight, 1.0, 0, Okular::PixmapRequest::Asynchronous)}, Okular::Document::NoOption);
+    QTRY_VERIFY_WITH_TIMEOUT(!observer.pixmapRevisions.isEmpty(), 15000);
+    observer.pixmapRevisions.clear();
+
+    auto renderSavedPage = [this](QColor expectedTopColor) {
+        QTemporaryFile outputFile(QDir::tempPath() + QStringLiteral("/charta-stack-order-XXXXXX.pdf"));
+        if (!outputFile.open()) {
+            return false;
+        }
+        const QString outputPath = outputFile.fileName();
+        outputFile.close();
+
+        QString errorText;
+        if (!m_document->saveChanges(outputPath, &errorText)) {
+            qWarning() << errorText;
+            return false;
+        }
+
+        const auto renderedDocument = Poppler::Document::load(outputPath);
+        if (!renderedDocument) {
+            return false;
+        }
+        const auto renderedPage = renderedDocument->page(0);
+        if (!renderedPage) {
+            return false;
+        }
+        const auto annotations = renderedPage->annotations();
+        if (annotations.size() != 2 || annotations.at(0)->uniqueName() != (expectedTopColor == Qt::red ? QStringLiteral("stack-blue") : QStringLiteral("stack-red"))
+            || annotations.at(1)->uniqueName() != (expectedTopColor == Qt::red ? QStringLiteral("stack-red") : QStringLiteral("stack-blue"))) {
+            return false;
+        }
+        const QImage image = renderedPage->renderToImage(72, 72);
+        return !image.isNull() && image.pixelColor(image.width() / 2, image.height() / 2) == expectedTopColor;
+    };
+
+    QVERIFY(renderSavedPage(Qt::blue));
+    const quint64 oldGeneration = page->annotationGeneration();
+    m_document->movePageAnnotationUp(0, red);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({blue, red}));
+    QVERIFY(page->annotationGeneration() > oldGeneration);
+    QTRY_VERIFY_WITH_TIMEOUT(!observer.pixmapRevisions.isEmpty(), 15000);
+    QVERIFY(observer.pixmapRevisions.constLast().second >= page->annotationGeneration());
+    QVERIFY(renderSavedPage(Qt::red));
+
+    m_document->removePageAnnotation(0, blue);
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({red}));
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({blue, red}));
+    QVERIFY(renderSavedPage(Qt::red));
+
+    m_document->undo();
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({red, blue}));
+    QVERIFY(renderSavedPage(Qt::blue));
+    m_document->redo();
+    QCOMPARE(m_document->page(0)->annotations(), QList<Okular::Annotation *>({blue, red}));
+    QVERIFY(renderSavedPage(Qt::red));
+#endif
 }
 
 void AddRemoveAnnotationTest::testRemoveAnnotations()
