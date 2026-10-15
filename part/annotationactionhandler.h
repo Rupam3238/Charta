@@ -60,6 +60,12 @@ private Q_SLOTS:
     void slotColorCycle();
     void slotAnnotationToolBarVisibilityChanged(bool visible);
 
+public:
+    /** Returns the currently checked annotation tool action, or nullptr if none (Pan/Select/Browse). */
+    QAction *checkedAnnotationTool() const;
+    /** Returns true if the given annotation tool action supports color cycling. */
+    bool annotationToolSupportsColor(QAction *toolAction) const;
+
 private:
     void cancelTemporaryToolSwitch();
     void abandonTemporaryToolSwitch();

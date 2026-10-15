@@ -2695,6 +2695,23 @@ void AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged(bool visibl
     }
 }
 
+QAction *AnnotationActionHandler::checkedAnnotationTool() const
+{
+    return d->agTools->checkedAction();
+}
+
+bool AnnotationActionHandler::annotationToolSupportsColor(QAction *toolAction) const
+{
+    if (!toolAction) {
+        return false;
+    }
+    auto kindIt = d->drawingToolKinds.constFind(toolAction);
+    if (kindIt == d->drawingToolKinds.cend()) {
+        return false;
+    }
+    return *kindIt != AnnotationActionHandlerPrivate::DrawingToolKind::Eraser;
+}
+
 void AnnotationActionHandler::slotColorCycle()
 {
     if (!d->aColor || !d->aColor->isEnabled()) {
@@ -2703,6 +2720,14 @@ void AnnotationActionHandler::slotColorCycle()
 
     QWidget *focusWidget = QApplication::focusWidget();
     if (focusWidget && (qobject_cast<QLineEdit *>(focusWidget) || qobject_cast<QTextEdit *>(focusWidget) || qobject_cast<QPlainTextEdit *>(focusWidget))) {
+        return;
+    }
+
+    // Only cycle color for tools that actually support color.
+    // Pan/Select/Eraser/Stamp must not change anything or scroll.
+    // Check the currently checked annotation tool action, not just the
+    // annotation element type (which may be stale from a previous tool).
+    if (!annotationToolSupportsColor(d->agTools->checkedAction())) {
         return;
     }
 

@@ -320,7 +320,7 @@ void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPo
                 setState(StateFocused, firstSelected);
                 return;
             }
-            if (selectedBoundingRect().contains(pagePosition)) {
+            if (!selectedBoundingRect().isNull() && selectedBoundingRect().contains(pagePosition)) {
                 m_mousePosition = pagePosition;
                 const bool canMoveSelection = std::all_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [](const AnnotationDescription &selected) { return selected.annotation->canBeMoved(); });
                 if (canMoveSelection) {
@@ -1227,7 +1227,7 @@ MouseAnnotation::ResizeHandle MouseAnnotation::getHandleAt(const QPoint eventPos
     if (ad.annotation->canBeResized()) {
         for (const ResizeHandle &handle : m_resizeHandleList) {
             const QRect rect = getHandleHitRect(handle, ad);
-            if (rect.contains(eventPos)) {
+            if (!rect.isNull() && rect.contains(eventPos)) {
                 selected |= handle;
             }
         }
@@ -1254,7 +1254,7 @@ MouseAnnotation::ResizeHandle MouseAnnotation::getHandleAt(const QPoint eventPos
 
     if (selected == RH_None && ad.annotation->canBeMoved()) {
         const QRect boundingRect = Okular::AnnotationUtils::annotationGeometry(ad.annotation, ad.pageViewItem->uncroppedWidth(), ad.pageViewItem->uncroppedHeight());
-        if (boundingRect.contains(eventPos)) {
+        if (!boundingRect.isNull() && boundingRect.contains(eventPos)) {
             return RH_Content;
         }
     }
@@ -1272,7 +1272,8 @@ MouseAnnotation::ResizeHandle MouseAnnotation::getSelectionHandleAt(const QPoint
     ResizeHandle selected = RH_None;
     if (selectionCanBeResized()) {
         for (const ResizeHandle &handle : std::as_const(m_resizeHandleList)) {
-            if (getHandleHitRect(handle, boundingRect).contains(eventPos)) {
+            const QRect hitRect = getHandleHitRect(handle, boundingRect);
+            if (!hitRect.isNull() && hitRect.contains(eventPos)) {
                 selected |= handle;
             }
         }
@@ -1289,7 +1290,7 @@ MouseAnnotation::ResizeHandle MouseAnnotation::getSelectionHandleAt(const QPoint
             return RH_BottomLeft;
         }
     }
-    if (selected == RH_None && boundingRect.contains(eventPos)
+    if (selected == RH_None && !boundingRect.isNull() && boundingRect.contains(eventPos)
         && std::all_of(m_areaSelectedAnnotations.cbegin(), m_areaSelectedAnnotations.cend(), [](const AnnotationDescription &description) { return description.annotation->canBeMoved(); })) {
         return RH_Content;
     }

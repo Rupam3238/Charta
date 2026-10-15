@@ -511,7 +511,7 @@ protected:
                 const QRect panelGlobalRect(m_panel->mapToGlobal(QPoint(0, 0)), m_panel->size());
                 const QPoint optionsBarPos = m_optionsBar->mapFromGlobal(globalPos);
                 const bool onOptionsBarButton = qobject_cast<QToolButton *>(m_optionsBar->childAt(optionsBarPos)) != nullptr;
-                if (!panelGlobalRect.contains(globalPos) && !onOptionsBarButton) {
+                if ((panelGlobalRect.isNull() || !panelGlobalRect.contains(globalPos)) && !onOptionsBarButton) {
                     closePanel();
                 }
             }

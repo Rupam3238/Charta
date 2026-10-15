@@ -2280,6 +2280,13 @@ void PageView::keyPressEvent(QKeyEvent *e)
         return;
     }
 
+    // Consume color-cycle shortcut when a non-color tool is active (Pan/Select/Eraser/Stamp)
+    // so it doesn't fall through to the viewport scroll handler.
+    if (e->key() == Qt::Key_C && d->annotator && !d->annotator->annotationToolSupportsColor()) {
+        e->accept();
+        return;
+    }
+
     // move/scroll page by using keys
     // When the shift key is held down, scroll ten times faster
     int stepsize = (e->modifiers() & Qt::ShiftModifier) ? 10 : 1;

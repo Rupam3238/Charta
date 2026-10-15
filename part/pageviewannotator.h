@@ -11,6 +11,8 @@
 #include <QPlainTextEdit>
 #include <QPointer>
 #include <QTimer>
+#include <QWidget>
+#include <QColor>
 #include <qdom.h>
 
 #include <memory>
@@ -139,6 +141,10 @@ public:
     QDomElement builtinTool(int toolId);
     // returns the quick annotation tool with the given Id
     QDomElement quickTool(int toolId);
+    // returns the annotation element of the currently active tool
+    QDomElement currentAnnotationElement();
+    // Returns true if the currently active annotation tool supports color cycling
+    bool annotationToolSupportsColor() const;
 
     // methods that write the properties
     void setAnnotationWidth(double width);
@@ -164,6 +170,10 @@ Q_SIGNALS:
      * This signal is emitted whenever an annotation tool is activated or all the tools get deactivated
      */
     void toolActive(bool active);
+    /**
+     * Emitted when the current annotation color changes (e.g. via color-cycle shortcut)
+     */
+    void annotationColorChanged(const QColor &color);
     /**
      * Requests opening of a newly signed file
      * \param filePath path to signed file
@@ -194,8 +204,6 @@ private:
     void selectTool(AnnotationTools *toolsDefinition, int toolId);
     // returns the engine QDomElement of the the currently active tool
     QDomElement currentEngineElement();
-    // returns the annotation QDomElement of the the currently active tool
-    QDomElement currentAnnotationElement();
 
     // global class pointers
     Okular::Document *m_document;
@@ -225,6 +233,12 @@ private:
     int m_typewriterPageNumber = -1;
     // selected annotation name
     // QString m_selectedAnnotationName;
+
+    // Color-cycle indicator overlay (small circle, top-right of viewport)
+    QWidget *m_colorIndicator = nullptr;
+    QTimer *m_colorIndicatorTimer = nullptr;
+
+    void showColorIndicator(const QColor &color);
 };
 
 #endif

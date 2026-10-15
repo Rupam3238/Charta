@@ -1703,6 +1703,17 @@ PageViewAnnotator::PageViewAnnotator(PageView *parent, Okular::Document *storage
     reparseQuickToolsConfig();
     connect(Okular::Settings::self(), &Okular::Settings::builtinAnnotationToolsChanged, this, &PageViewAnnotator::reparseBuiltinToolsConfig);
     connect(Okular::Settings::self(), &Okular::Settings::quickAnnotationToolsChanged, this, &PageViewAnnotator::reparseQuickToolsConfig, Qt::QueuedConnection);
+
+    // Color indicator overlay (small circle, top-right of viewport)
+    m_colorIndicator = new QWidget(m_pageView->viewport());
+    m_colorIndicator->setFixedSize(24, 24);
+    m_colorIndicator->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_colorIndicator->hide();
+
+    m_colorIndicatorTimer = new QTimer(this);
+    m_colorIndicatorTimer->setSingleShot(true);
+    m_colorIndicatorTimer->setInterval(1500);
+    connect(m_colorIndicatorTimer, &QTimer::timeout, m_colorIndicator, &QWidget::hide);
 }
 
 void PageViewAnnotator::reparseConfig()
@@ -2349,6 +2360,14 @@ QRect PageViewAnnotator::routeTabletEvent(QTabletEvent *e, PageViewItem *item, c
     return performRouteMouseOrTabletEvent(eventType, button, modifiers, localPosF, item);
 }
 
+bool PageViewAnnotator::annotationToolSupportsColor() const
+{
+    if (!m_actionHandler) {
+        return false;
+    }
+    return m_actionHandler->annotationToolSupportsColor(m_actionHandler->checkedAnnotationTool());
+}
+
 bool PageViewAnnotator::routeKeyEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) {
@@ -2359,6 +2378,18 @@ bool PageViewAnnotator::routeKeyEvent(QKeyEvent *event)
         detachAnnotation();
         return true;
     }
+
+    // Consume color-cycle shortcut when a non-color tool is active,
+    // so it doesn't fall through to the page-view scroll handler.
+    if (event->key() == Qt::Key_C) {
+        if (!m_actionHandler) {
+            return true;
+        }
+        if (!m_actionHandler->annotationToolSupportsColor(m_actionHandler->checkedAnnotationTool())) {
+            return true;  // Pan / Select / Eraser / Stamp: do nothing
+        }
+    }
+
     return false;
 }
 
@@ -2934,6 +2965,23 @@ void PageViewAnnotator::setAnnotationColor(const QColor &color)
     }
     saveBuiltinAnnotationTools();
     selectLastTool();
+
+    showColorIndicator(color);
+}
+
+void PageViewAnnotator::showColorIndicator(const QColor &color)
+{
+    if (!m_colorIndicator) {
+        return;
+    }
+    m_colorIndicator->setStyleSheet(QStringLiteral(
+        "background-color: %1; "
+        "border: 1px solid #000000; "
+        "border-radius: 12px;").arg(color.name(QColor::HexRgb)));
+    m_colorIndicator->move(m_pageView->viewport()->width() - m_colorIndicator->width() - 6, 6);
+    m_colorIndicator->show();
+    m_colorIndicator->raise();
+    m_colorIndicatorTimer->start();
 }
 
 void PageViewAnnotator::setAnnotationInnerColor(const QColor &color)
