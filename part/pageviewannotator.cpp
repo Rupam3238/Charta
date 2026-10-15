@@ -17,6 +17,7 @@
 #include <QFocusEvent>
 #include <QHash>
 #include <QInputDialog>
+#include "annotationcolorhistory.h"
 #include <QKeyEvent>
 #include <QList>
 #include <QLoggingCategory>
@@ -1870,9 +1871,15 @@ void PageViewAnnotator::finishTypewriterTextEdit()
         if (isEmpty && annotationWasEmpty) {
             // Newly created empty typewriter annotation: canceling the edit should remove it.
             m_document->removePageAnnotation(pageNumber, annotation);
-        } else if (text != annotation->contents()) {
-            // Preserve the annotation when the temporary editor closes: only the editor is transient.
-            m_document->editPageAnnotationContents(pageNumber, annotation, text, editor->textCursor().position(), 0, 0);
+        } else {
+            if (text != annotation->contents()) {
+                // Preserve the annotation when the temporary editor closes: only the editor is transient.
+                m_document->editPageAnnotationContents(pageNumber, annotation, text, editor->textCursor().position(), 0, 0);
+            }
+            const QColor color = annotation->textColor().isValid() ? annotation->textColor() : annotation->style().color();
+            if (color.isValid()) {
+                Okular::AnnotationColorHistory::addRecentColor(color);
+            }
         }
     }
 
@@ -2132,8 +2139,8 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
 
     // 4. if engine has finished, apply Annotation to the page
     if (m_engine->creationCompleted()) {
-        // apply engine data to the Annotation's and reset engine
         const QList<Okular::Annotation *> annotations = m_engine->end();
+
         QString pendingFreehandAnnotationName;
         // attach the newly filled annotations to the page
         for (Okular::Annotation *annotation : annotations) {
@@ -2152,6 +2159,11 @@ QRect PageViewAnnotator::performRouteMouseOrTabletEvent(const AnnotatorEngine::E
             if (auto *textAnnotation = dynamic_cast<Okular::TextAnnotation *>(annotation);
                 textAnnotation && textAnnotation->textType() == Okular::TextAnnotation::InPlace && textAnnotation->inplaceIntent() == Okular::TextAnnotation::TypeWriter) {
                 startTypewriterTextEdit(textAnnotation, m_lockedItem);
+            } else if (annotation->subType() != Okular::Annotation::AStamp) {
+                const QColor color = annotation->style().color();
+                if (color.isValid()) {
+                    Okular::AnnotationColorHistory::addRecentColor(color);
+                }
             }
 
 #if HAVE_NEW_SIGNATURE_API

@@ -127,8 +127,6 @@ void WidgetDrawingTools::slotAdd()
 
     const QDomDocument rootDoc = dlg.toolXml();
     QDomElement toolElement = rootDoc.documentElement();
-    const QDomElement annotationElement = toolElement.firstChildElement(QStringLiteral("engine")).firstChildElement(QStringLiteral("annotation"));
-    Okular::AnnotationColorHistory::addRecentColor(QColor(annotationElement.attribute(QStringLiteral("color"))));
 
     QString itemText = dlg.name().trimmed();
 
@@ -177,8 +175,6 @@ void WidgetDrawingTools::slotEdit()
 
     doc = dlg.toolXml();
     toolElement = doc.documentElement();
-    const QDomElement annotationElement = toolElement.firstChildElement(QStringLiteral("engine")).firstChildElement(QStringLiteral("annotation"));
-    Okular::AnnotationColorHistory::addRecentColor(QColor(annotationElement.attribute(QStringLiteral("color"))));
 
     QString itemText = dlg.name();
 

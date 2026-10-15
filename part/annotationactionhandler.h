@@ -57,6 +57,7 @@ public:
     bool showAnnotationSettings(Okular::Document *document, const QList<Okular::Annotation *> &annotations, int pageNumber, QWidget *anchorWidget);
 
 private Q_SLOTS:
+    void slotColorCycle();
     void slotAnnotationToolBarVisibilityChanged(bool visible);
 
 private:

@@ -22,6 +22,7 @@
 #include <QFileInfo>
 #include <QFontDialog>
 #include <QGraphicsDropShadowEffect>
+#include <QGraphicsItem>
 #include <QGuiApplication>
 #include <QHash>
 #include <QHBoxLayout>
@@ -558,6 +559,7 @@ public:
         , aCustomStamp(nullptr)
         , aCustomWidth(nullptr)
         , aCustomOpacity(nullptr)
+        , aColorCycle(nullptr)
         , currentColor(QColor())
         , currentInnerColor(QColor())
         , currentFont(QFont())
@@ -656,6 +658,7 @@ public:
     QAction *aCustomStamp;
     QAction *aCustomWidth;
     QAction *aCustomOpacity;
+    QAction *aColorCycle = nullptr;
     AnnotationWidthPresets::SelectionTracker widthPresetActivation;
 
     QColor currentColor;
@@ -1083,7 +1086,6 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
                 QToolButton *button = colorPresets.at(index);
                 const QColor preset = presetColors.at(index);
                 QObject::connect(button, &QToolButton::clicked, q, [this, button, colorPresets, preset, swatch, setSwatch, key, selectedAnnotation, &selectedAnnotationChanged, &selectedColorChanged] {
-                    Okular::AnnotationColorHistory::addRecentColor(preset);
                     for (QToolButton *presetButton : colorPresets) {
                         presetButton->setChecked(presetButton == button);
                     }
@@ -1112,7 +1114,6 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             if (!selected.isValid()) {
                 return;
             }
-            Okular::AnnotationColorHistory::addRecentColor(selected);
             for (QToolButton *presetButton : colorPresets) {
                 presetButton->setChecked(false);
             }
@@ -1453,6 +1454,9 @@ void AnnotationActionHandlerPrivate::updateConfigActions(const QString &annotTyp
     aAddToQuickTools->setEnabled(isAnnotationSelected);
     aWidth->setEnabled(isLine || isShape || isEraser);
     aColor->setEnabled(isAnnotationSelected && !isStamp);
+    if (aColorCycle) {
+        aColorCycle->setEnabled(isAnnotationSelected && !isStamp);
+    }
     aInnerColor->setEnabled(isShape);
     aOpacity->setEnabled(isAnnotationSelected);
     aFont->setEnabled(isText);
@@ -1725,9 +1729,6 @@ void AnnotationActionHandlerPrivate::slotSetColor(AnnotationColor colorType, con
         if (!selectedColor.isValid()) {
             return;
         }
-    }
-    if (colorType != AnnotationColor::InnerColor || selectedColor != Qt::transparent) {
-        Okular::AnnotationColorHistory::addRecentColor(selectedColor);
     }
     if (colorType == AnnotationColor::Color) {
         currentColor = selectedColor;
@@ -2036,6 +2037,11 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     d->aFont = new QAction(QIcon::fromTheme(QStringLiteral("font-face")), i18nc("@action:intoolbar Current annotation config option", "Font"), this);
     d->aAdvancedSettings = new QAction(QIcon::fromTheme(QStringLiteral("settings-configure")), i18nc("@action:intoolbar Current annotation advanced settings", "Annotation Settings"), this);
 
+    // Color cycle action
+    d->aColorCycle = new QAction(QIcon::fromTheme(QStringLiteral("format-stroke-color")), i18nc("@action:intoolbar Cycle annotation color", "Cycle Annotation Color"), this);
+    d->aColorCycle->setEnabled(false);
+    connect(d->aColorCycle, &QAction::triggered, this, &AnnotationActionHandler::slotColorCycle);
+
     // Width list
     d->aWidth = new KSelectAction(QIcon::fromTheme(QStringLiteral("edit-line-width")), i18nc("@action:intoolbar Current annotation config option", "Line width"), this);
     d->aWidth->setToolBarMode(KSelectAction::MenuMode);
@@ -2140,6 +2146,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     ac->addAction(QStringLiteral("annotation_settings_opacity"), d->aOpacity);
     ac->addAction(QStringLiteral("annotation_settings_font"), d->aFont);
     ac->addAction(QStringLiteral("annotation_settings_advanced"), d->aAdvancedSettings);
+    ac->addAction(QStringLiteral("annotation_cycle_color"), d->aColorCycle);
 
     ac->setDefaultShortcut(d->aToolBarVisibility, Qt::Key_F6);
     ac->setDefaultShortcut(aHighlighter, Qt::ALT | Qt::Key_1);
@@ -2161,6 +2168,7 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     ac->setDefaultShortcut(aEllipse, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_O));
     ac->setDefaultShortcut(aPolygon, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_P));
     ac->setDefaultShortcut(d->aAddToQuickTools, QKeySequence((Qt::CTRL | Qt::SHIFT) | Qt::Key_B));
+    ac->setDefaultShortcut(d->aColorCycle, QKeySequence(Qt::Key_C));
     d->updateConfigActions();
 
     connect(Okular::Settings::self(), &Okular::Settings::primaryAnnotationToolBarChanged, this, &AnnotationActionHandler::setupAnnotationToolBarVisibilityAction);
@@ -2650,6 +2658,28 @@ void AnnotationActionHandler::slotAnnotationToolBarVisibilityChanged(bool visibl
     d->aShowToolBar->setEnabled(!visible);
     if (!visible && !d->isQuickToolAction(d->agTools->checkedAction())) {
         deselectAllAnnotationActions();
+    }
+}
+
+void AnnotationActionHandler::slotColorCycle()
+{
+    if (!d->aColor || !d->aColor->isEnabled()) {
+        return;
+    }
+
+    QWidget *focusWidget = QApplication::focusWidget();
+    if (focusWidget && (qobject_cast<QLineEdit *>(focusWidget) || qobject_cast<QTextEdit *>(focusWidget) || qobject_cast<QPlainTextEdit *>(focusWidget))) {
+        return;
+    }
+
+    const QList<QColor> colorHistory = Okular::AnnotationColorHistory::recentColors();
+    if (colorHistory.size() <= 1) {
+        return;
+    }
+
+    const QColor nextColor = Okular::AnnotationColorHistory::nextCycledColor(colorHistory, d->currentColor);
+    if (nextColor.isValid() && !Okular::AnnotationColorHistory::colorsEqual(nextColor, d->currentColor)) {
+        d->annotator->setAnnotationColor(nextColor);
     }
 }
 

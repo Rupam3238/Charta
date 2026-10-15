@@ -8,10 +8,14 @@
 #include <QColor>
 #include <QList>
 
+#include "okularpart_export.h"
+
 namespace Okular::AnnotationColorHistory
 {
-QList<QColor> recentColors();
-void addRecentColor(const QColor &color);
+OKULARPART_EXPORT QList<QColor> recentColors();
+OKULARPART_EXPORT void addRecentColor(const QColor &color);
+OKULARPART_EXPORT bool colorsEqual(const QColor &c1, const QColor &c2);
+OKULARPART_EXPORT QColor nextCycledColor(const QList<QColor> &history, const QColor &currentColor);
 }
 
 #endif

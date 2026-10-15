@@ -266,7 +266,6 @@ void AnnotationWidget::addColorButton(QWidget *widget, QFormLayout *formlayout)
     m_colorBn->setColor(m_ann->style().color());
     formlayout->addRow(i18n("&Color:"), m_colorBn);
     connect(m_colorBn, &KColorButton::changed, this, &AnnotationWidget::dataChanged);
-    connect(m_colorBn, &KColorButton::changed, this, [](const QColor &color) { Okular::AnnotationColorHistory::addRecentColor(color); });
 }
 
 void AnnotationWidget::addOpacitySpinBox(QWidget *widget, QFormLayout *formlayout)
@@ -389,7 +388,6 @@ void TextAnnotationWidget::addTextColorButton(QWidget *widget, QFormLayout *form
     m_textColorBn->setColor(m_textAnn->textColor());
     formlayout->addRow(i18n("Text &color:"), m_textColorBn);
     connect(m_textColorBn, &KColorButton::changed, this, &AnnotationWidget::dataChanged);
-    connect(m_textColorBn, &KColorButton::changed, this, [](const QColor &color) { Okular::AnnotationColorHistory::addRecentColor(color); });
 }
 
 void TextAnnotationWidget::addTextAlignComboBox(QWidget *widget, QFormLayout *formlayout)
@@ -566,7 +564,6 @@ void LineAnnotationWidget::createStyleWidget(QFormLayout *formlayout)
         formlayout->addRow(i18n("&Width:"), m_spinSize);
 
         connect(m_innerColor, &KColorButton::changed, this, &AnnotationWidget::dataChanged);
-        connect(m_innerColor, &KColorButton::changed, this, [](const QColor &color) { Okular::AnnotationColorHistory::addRecentColor(color); });
         connect(m_useColor, &QAbstractButton::toggled, this, &AnnotationWidget::dataChanged);
         connect(m_useColor, &QCheckBox::toggled, m_innerColor, &KColorButton::setEnabled);
     }
@@ -719,7 +716,6 @@ void GeomAnnotationWidget::createStyleWidget(QFormLayout *formlayout)
 
     connect(m_typeCombo, &KComboBox::currentIndexChanged, this, &AnnotationWidget::dataChanged);
     connect(m_innerColor, &KColorButton::changed, this, &AnnotationWidget::dataChanged);
-    connect(m_innerColor, &KColorButton::changed, this, [](const QColor &color) { Okular::AnnotationColorHistory::addRecentColor(color); });
     connect(m_useColor, &QAbstractButton::toggled, this, &AnnotationWidget::dataChanged);
     connect(m_useColor, &QCheckBox::toggled, m_innerColor, &KColorButton::setEnabled);
     connect(m_spinSize, &QDoubleSpinBox::valueChanged, this, &AnnotationWidget::dataChanged);
