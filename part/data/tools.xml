@@ -122,7 +122,7 @@ Annotation
     </tool>
     <tool id="13" type="polygon">
         <engine type="PolyLine" color="#007eee" points="-1">
-            <annotation type="Line" width="2" color="#ff007eee" />
+            <annotation type="GeomPolygon" width="2" color="#ff007eee" innerColor="#00000000" />
         </engine>
     </tool>
     <tool id="14" type="stamp">

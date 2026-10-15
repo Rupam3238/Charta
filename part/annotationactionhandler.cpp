@@ -1017,7 +1017,9 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, slider, [slider, scale](double value) { slider->setValue(qRound(value * scale)); });
         QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, spinBox, updateSpinStep);
         QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, currentValue, [currentValue](double value) { currentValue->setText(i18n("%1 px", value)); });
-        QObject::connect(spinBox, &QDoubleSpinBox::valueChanged, q, [this, key, kind = *kindIt, selectedAnnotation, &selectedAnnotationChanged, &selectedWidthChanged](double value) {
+        // Update annotator only when editing is finished or slider released
+        QObject::connect(spinBox, &QDoubleSpinBox::editingFinished, q, [this, key, kind = *kindIt, selectedAnnotation, &selectedAnnotationChanged, &selectedWidthChanged, spinBox]() {
+            double value = spinBox->value();
             drawingToolSettings[key].width = value;
             if (selectedAnnotation) {
                 selectedAnnotationChanged = true;
@@ -1028,6 +1030,21 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
                 annotator->setEraserWidth(value);
             } else {
                 annotator->setDrawingToolWidthPixels(value);
+            }
+        });
+        QObject::connect(slider, &QSlider::sliderReleased, q, [this, key, kind = *kindIt, selectedAnnotation, &selectedAnnotationChanged, &selectedWidthChanged, scale, slider]() {
+            int value = slider->value();
+            double widthValue = static_cast<double>(value) / scale;
+            drawingToolSettings[key].width = widthValue;
+            if (selectedAnnotation) {
+                selectedAnnotationChanged = true;
+                selectedWidthChanged = true;
+                return;
+            }
+            if (kind == DrawingToolKind::Eraser) {
+                annotator->setEraserWidth(widthValue);
+            } else {
+                annotator->setDrawingToolWidthPixels(widthValue);
             }
         });
         updatePresetSelection(initialWidth);
@@ -1248,7 +1265,8 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         layout->addWidget(opacitySlider);
         opacityValue->setText(i18n("%1%", opacitySlider->value()));
         QObject::connect(opacitySlider, &QSlider::valueChanged, opacityValue, [opacityValue](int value) { opacityValue->setText(i18n("%1%", value)); });
-        QObject::connect(opacitySlider, &QSlider::valueChanged, q, [this, key, selectedAnnotation, &selectedAnnotationChanged, &selectedFillOpacityChanged](int value) {
+        QObject::connect(opacitySlider, &QSlider::sliderReleased, q, [this, key, selectedAnnotation, &selectedAnnotationChanged, &selectedFillOpacityChanged, opacitySlider]() {
+            int value = opacitySlider->value();
             drawingToolSettings[key].fillOpacity = value;
             if (selectedAnnotation) {
                 selectedAnnotationChanged = true;
