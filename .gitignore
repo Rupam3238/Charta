@@ -17,4 +17,4 @@ CMakeLists.txt.user*
 .flatpak-builder
 build-dir
 .DS_Store
-charta_logo_packages-dir
+/CLAUDE.md
