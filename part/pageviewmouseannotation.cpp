@@ -295,6 +295,11 @@ MouseAnnotation::MouseAnnotation(PageView *parent, Okular::Document *document)
     , m_state(StateInactive)
     , m_handle(RH_None)
 {
+    m_moveTimer.setSingleShot(true);
+    m_moveTimer.setTimerType(Qt::PreciseTimer);
+    m_moveTimer.setInterval(8);
+    connect(&m_moveTimer, &QTimer::timeout, this, &MouseAnnotation::flushPendingMove);
+
     m_resizeHandleList << RH_Left << RH_Right << RH_Top << RH_Bottom << RH_TopLeft << RH_TopRight << RH_BottomLeft << RH_BottomRight;
 }
 
@@ -453,6 +458,7 @@ void MouseAnnotation::updateHover(PageViewItem *pageViewItem, const QPoint event
 void MouseAnnotation::routeMouseReleaseEvent(PageViewItem *pageViewItem, const QPoint eventPos)
 {
     if (isModified()) {
+        flushPendingMove();
         /* qDebug() << "routeMouseReleaseEvent: finish command"; */
         const bool blockViewportMovement = !m_pageView->allowsAnnotationViewportMovement();
         if (blockViewportMovement) {
@@ -493,18 +499,12 @@ void MouseAnnotation::routeMouseMoveEvent(PageViewItem *pageViewItem, const QPoi
         }
 
         if (isModified()) {
-            /* qDebug() << "routeMouseMoveEvent: perform command, delta " << eventPos - m_mousePosition; */
-            updateViewport(m_focusedAnnotation);
-            const bool blockViewportMovement = !m_pageView->allowsAnnotationViewportMovement();
-            if (blockViewportMovement) {
-                m_document->beginAnnotationViewportMovementBlock();
+            m_pendingMovePos = eventPos;
+            m_pendingMoveModifiers = modifiers;
+            m_hasPendingMove = true;
+            if (!m_moveTimer.isActive()) {
+                m_moveTimer.start();
             }
-            performCommand(eventPos, modifiers);
-            if (blockViewportMovement) {
-                m_document->endAnnotationViewportMovementBlock();
-            }
-            m_mousePosition = eventPos - m_focusedAnnotation.pageViewItem->uncroppedGeometry().topLeft();
-            updateViewport(m_focusedAnnotation);
         }
     } else {
         updateHover(pageViewItem, eventPos);
@@ -866,6 +866,8 @@ void MouseAnnotation::updateAnnotationPointers()
 
 void MouseAnnotation::cancel()
 {
+    m_moveTimer.stop();
+    m_hasPendingMove = false;
     if (isActive()) {
         finishCommand();
         setState(StateInactive, m_focusedAnnotation);
@@ -1044,9 +1046,47 @@ void MouseAnnotation::performCommand(const QPoint newPos, Qt::KeyboardModifiers 
     }
 }
 
+/* Apply the most recent queued mouse position. */
+void MouseAnnotation::flushPendingMove()
+{
+    m_moveTimer.stop();
+    if (!m_hasPendingMove) {
+        return;
+    }
+    m_hasPendingMove = false;
+    if (isModified() && m_focusedAnnotation.isValid()) {
+        applyMoveStep(m_pendingMovePos, m_pendingMoveModifiers);
+    }
+}
+
+void MouseAnnotation::applyMoveStep(const QPoint eventPos, Qt::KeyboardModifiers modifiers)
+{
+    updateViewport(m_focusedAnnotation);
+    const bool blockViewportMovement = !m_pageView->allowsAnnotationViewportMovement();
+    if (blockViewportMovement) {
+        m_document->beginAnnotationViewportMovementBlock();
+    }
+    performCommand(eventPos, modifiers);
+    if (blockViewportMovement) {
+        m_document->endAnnotationViewportMovementBlock();
+    }
+    m_mousePosition = eventPos - m_focusedAnnotation.pageViewItem->uncroppedGeometry().topLeft();
+    updateViewport(m_focusedAnnotation);
+}
+
+bool MouseAnnotation::isDragInProgress() const
+{
+    return isModified() && !m_finishing;
+}
+
 /* Finalize a command in progress for the currently focused annotation. */
 void MouseAnnotation::finishCommand()
 {
+    m_finishing = true;
+    struct FinishGuard {
+        bool &flag;
+        ~FinishGuard() { flag = false; }
+    } finishGuard{m_finishing};
     /*
      * Note:
      * Translate-/resizePageAnnotation causes PopplerAnnotationProxy::notifyModification,

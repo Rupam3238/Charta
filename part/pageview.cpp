@@ -1678,6 +1678,11 @@ void PageView::notifyPageChanged(int pageNumber, int changedFlags)
         return;
     }
 
+    if (changedFlags == DocumentObserver::Annotations && d->mouseAnnotation->isDragInProgress()) {
+        updateAnnotationSelectionPanel();
+        return;
+    }
+
     if (changedFlags & DocumentObserver::Annotations) {
         if (changedFlags & DocumentObserver::Pixmap) {
             d->annotator->cancelPendingFreehandHandoff();

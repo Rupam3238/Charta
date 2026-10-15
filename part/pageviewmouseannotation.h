@@ -22,6 +22,7 @@
 
 #include <QObject>
 #include <QPolygonF>
+#include <QTimer>
 
 #include "core/annotations.h"
 #include "pageviewutils.h"
@@ -122,6 +123,7 @@ public:
     bool isResized() const;
 
     bool isModified() const;
+    bool isDragInProgress() const;
 
     Qt::CursorShape cursor() const;
 
@@ -154,6 +156,8 @@ private:
     void updateHover(PageViewItem *pageViewItem, const QPoint eventPos);
     QRect getFullBoundingRect(const AnnotationDescription &ad) const;
     void performCommand(const QPoint newPos, Qt::KeyboardModifiers modifiers);
+    void applyMoveStep(const QPoint eventPos, Qt::KeyboardModifiers modifiers);
+    void flushPendingMove();
     void finishCommand();
     void updateViewport(const AnnotationDescription &ad) const;
     ResizeHandle getHandleAt(const QPoint eventPos, const AnnotationDescription &ad) const;
@@ -188,6 +192,11 @@ private:
     bool m_selectionMoveUndoMacroOpen = false;
     bool m_selectionMoveChanged = false;
     bool m_selectionResizeUndoMacroOpen = false;
+    QTimer m_moveTimer;
+    QPoint m_pendingMovePos;
+    Qt::KeyboardModifiers m_pendingMoveModifiers = Qt::NoModifier;
+    bool m_hasPendingMove = false;
+    bool m_finishing = false;
 
     QList<ResizeHandle> m_resizeHandleList;
 };
