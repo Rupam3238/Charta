@@ -511,6 +511,11 @@ protected:
 
         QSlider::mousePressEvent(event);
     }
+
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        QSlider::mouseMoveEvent(event);
+    }
 };
 
 class AnnotationActionHandlerPrivate
@@ -1085,20 +1090,31 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             for (int index = 0; index < colorPresets.size(); ++index) {
                 QToolButton *button = colorPresets.at(index);
                 const QColor preset = presetColors.at(index);
-                QObject::connect(button, &QToolButton::clicked, q, [this, button, colorPresets, preset, swatch, setSwatch, key, selectedAnnotation, &selectedAnnotationChanged, &selectedColorChanged] {
+                QObject::connect(button, &QToolButton::clicked, q, [this, button, colorPresets, preset, swatch, setSwatch, key, selectedAnnotation, &selectedAnnotationChanged, &selectedColorChanged, &selectedFillColorChanged, fillColor] {
                     for (QToolButton *presetButton : colorPresets) {
                         presetButton->setChecked(presetButton == button);
                     }
-                    drawingToolSettings[key].color = preset;
-                    if (selectedAnnotation) {
-                        selectedAnnotationChanged = true;
-                        selectedColorChanged = true;
+                    if (fillColor) {
+                        drawingToolSettings[key].fillColor = preset;
+                        if (selectedAnnotation) {
+                            selectedAnnotationChanged = true;
+                            selectedFillColorChanged = true;
+                        } else {
+                            currentInnerColor = preset;
+                            annotator->setAnnotationInnerColor(preset);
+                        }
                         setSwatch(preset);
-                        return;
+                    } else {
+                        drawingToolSettings[key].color = preset;
+                        if (selectedAnnotation) {
+                            selectedAnnotationChanged = true;
+                            selectedColorChanged = true;
+                        } else {
+                            currentColor = preset;
+                            annotator->setAnnotationColor(preset);
+                        }
+                        setSwatch(preset);
                     }
-                    currentColor = preset;
-                    annotator->setAnnotationColor(preset);
-                    setSwatch(preset);
                 });
             }
         }
@@ -1215,7 +1231,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             selectedOpacityChanged = true;
         });
     }
-    if (*kindIt == DrawingToolKind::Rectangle || *kindIt == DrawingToolKind::Ellipse) {
+    if (*kindIt == DrawingToolKind::Rectangle || *kindIt == DrawingToolKind::Ellipse || *kindIt == DrawingToolKind::Polygon) {
         addColorControl(i18n("Fill color"), true);
         auto *opacityTitle = new QLabel(i18n("Fill opacity"), contents);
         auto *opacityValue = new QLabel(contents);

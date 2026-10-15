@@ -1815,21 +1815,54 @@ void PageViewAnnotator::startTypewriterTextEdit(Okular::TextAnnotation *annotati
 
         const double pageWidth = pageViewItem->uncroppedWidth();
         const double pageHeight = pageViewItem->uncroppedHeight();
-        const QSizeF documentSize = editor->document()->documentLayout()->documentSize();
         const int padding = 4;
-        const int maxTextWidth = qMin<int>(qMax(80, static_cast<int>(pageWidth) - 24), 420);
-        const int desiredWidth = qBound(80, qCeil(documentSize.width()) + padding * 2, maxTextWidth);
-        const int desiredHeight = qMax(24, qCeil(documentSize.height()) + padding * 2);
+        const int minSize = 24;
 
+        // Measure the unwrapped width of the content so the occupying box grows
+        // with the amount of text (two words -> narrow box, ten words -> wider
+        // box). documentSize().width() cannot be used directly because WidgetWidth
+        // wrapping clamps it to the editor's current width.
+        const QFontMetricsF mf(editor->font());
+        int contentWidth = 0;
+        const QString text = editor->document()->toPlainText();
+        for (const QString &line : text.split(QLatin1Char('\n'))) {
+            contentWidth = qMax(contentWidth, qCeil(mf.horizontalAdvance(line)));
+        }
+
+        // Never let the box leave the page horizontally: clamp the width to the
+        // page width so the text wraps within the page instead of overflowing it.
+        const int maxTextWidth = qMax<int>(minSize, static_cast<int>(pageWidth) - 2 * padding);
+        const int desiredWidth = qBound(minSize, contentWidth + padding * 2, maxTextWidth);
+
+        editor->setLineWrapMode(QPlainTextEdit::WidgetWidth);
+
+        // Set the wrap width first so the document layout height reflects wrapping
+        // at this width (clamped to the page so text never overflows horizontally).
+        const QPoint contentTopLeft = pageViewItem->uncroppedGeometry().topLeft() - m_pageView->contentAreaPosition();
         const Okular::NormalizedRect currentBounds = annotation->boundingRectangle();
-        const double left = qBound(0.0, currentBounds.left, 1.0);
-        const double top = qBound(0.0, currentBounds.top, 1.0);
-        const double right = qMin(1.0, left + desiredWidth / pageWidth);
-        const double bottom = qMin(1.0, top + desiredHeight / pageHeight);
+        double left = qBound(0.0, currentBounds.left, 1.0);
+        double top = qBound(0.0, currentBounds.top, 1.0);
+        editor->setGeometry(QRect(contentTopLeft.x() + qRound(left * pageWidth), contentTopLeft.y() + qRound(top * pageHeight), desiredWidth, editor->height()));
+
+        // Height grows with the number of lines (pressing Enter adds a row).
+        const QSizeF docSize = editor->document()->documentLayout()->documentSize();
+        const int desiredHeight = qMax(minSize, qCeil(docSize.height()) + padding * 2);
+
+        // Clamp to the page so the text never leaves the page area, nudging the
+        // anchor back if the box would exceed the right or bottom edge.
+        double right = qMin(1.0, left + desiredWidth / pageWidth);
+        double bottom = qMin(1.0, top + desiredHeight / pageHeight);
+        if (right > 1.0 - 1e-6) {
+            left = qMax(0.0, 1.0 - desiredWidth / pageWidth);
+            right = 1.0;
+        }
+        if (bottom > 1.0 - 1e-6) {
+            top = qMax(0.0, 1.0 - desiredHeight / pageHeight);
+            bottom = 1.0;
+        }
         const Okular::NormalizedRect updatedBounds(left, top, right, bottom);
         annotation->setBoundingRectangle(updatedBounds);
 
-        const QPoint contentTopLeft = pageViewItem->uncroppedGeometry().topLeft() - m_pageView->contentAreaPosition();
         const QRect newEditorRect(QPoint(contentTopLeft.x() + qRound(left * pageWidth), contentTopLeft.y() + qRound(top * pageHeight)), QSize(desiredWidth, desiredHeight));
         editor->setGeometry(newEditorRect);
     };
