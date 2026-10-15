@@ -176,6 +176,8 @@ public:
     void refreshPixmaps(int);
     void beginAnnotationViewportMovementBlock();
     void endAnnotationViewportMovementBlock();
+    void beginAnnotationChangeBatch();
+    void endAnnotationChangeBatch();
     void beginAnnotationPixmapRefreshBatch();
     void endAnnotationPixmapRefreshBatch();
     void refreshAnnotationPixmaps(int page);
@@ -322,6 +324,10 @@ public:
     bool m_annotationEditingEnabled;
     bool m_annotationBeingModified; // is an annotation currently being moved or resized?
     int m_annotationViewportMovementBlockDepth;
+    int m_annotationChangeBatchDepth = 0;
+    QSet<int> m_annotationPagesPendingChangeNotify;
+    // Engine syncs requested while a change batch is open: annotation -> (page, appearanceChanged). Flushed once, with the final state.
+    QHash<Annotation *, QPair<int, bool>> m_annotationsPendingModify;
     int m_annotationPixmapRefreshBatchDepth;
     QSet<int> m_annotationPagesPendingPixmapRefresh;
 

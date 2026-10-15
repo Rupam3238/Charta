@@ -1090,6 +1090,9 @@ void DocumentPrivate::performRemovePageAnnotation(int page, Annotation *annotati
 
     // try to remove the annotation
     if (m_parent->canRemovePageAnnotation(annotation)) {
+        // a deferred sync of an annotation that is going away must never run
+        m_annotationsPendingModify.remove(annotation);
+
         // tell the annotation proxy
         if (proxy && proxy->supports(AnnotationProxy::Removal)) {
             proxy->notifyRemoval(annotation, page);
@@ -1152,6 +1155,24 @@ void DocumentPrivate::performModifyPageAnnotation(int page, Annotation *annotati
     // find out the page
     const Page *kp = m_pagesVector[page];
     if (!m_generator || !kp) {
+        return;
+    }
+
+    // Inside a change batch (undo/redo of a macro, committing a multi-selection) the same annotation can be modified
+    // many times. Only its final state matters to the generator, so remember it and sync once when the batch ends.
+    // Annotations that are being dragged are excluded: their sync is the cheap "hide" path and must happen right away.
+    if (m_annotationChangeBatchDepth > 0 && !(annotation->flags() & (Annotation::BeingMoved | Annotation::BeingResized))) {
+        auto pending = m_annotationsPendingModify.find(annotation);
+        if (pending == m_annotationsPendingModify.end()) {
+            m_annotationsPendingModify.insert(annotation, qMakePair(page, appearanceChanged));
+        } else {
+            pending->second = pending->second || appearanceChanged;
+        }
+        notifyAnnotationChanges(page); // itself deferred by the batch
+        if (appearanceChanged && (annotation->flags() & Annotation::ExternallyDrawn)) {
+            m_annotationBeingModified = false;
+            refreshAnnotationPixmaps(page); // itself deferred by the pixmap batch, and runs after the sync below
+        }
         return;
     }
 
@@ -3494,8 +3515,47 @@ void Document::requestTextPage(uint pageNumber)
     d->m_generator->generateTextPage(kp);
 }
 
+void DocumentPrivate::beginAnnotationChangeBatch()
+{
+    ++m_annotationChangeBatchDepth;
+}
+
+void DocumentPrivate::endAnnotationChangeBatch()
+{
+    Q_ASSERT(m_annotationChangeBatchDepth > 0);
+    if (m_annotationChangeBatchDepth == 0 || --m_annotationChangeBatchDepth > 0) {
+        return;
+    }
+    // 1. synchronize the generator, once per modified annotation
+    const auto pendingModify = m_annotationsPendingModify;
+    m_annotationsPendingModify.clear();
+    Okular::SaveInterface *iface = qobject_cast<Okular::SaveInterface *>(m_generator);
+    AnnotationProxy *proxy = iface ? iface->annotationProxy() : nullptr;
+    if (proxy && proxy->supports(AnnotationProxy::Modification)) {
+        for (auto it = pendingModify.constBegin(); it != pendingModify.constEnd(); ++it) {
+            Annotation *annotation = it.key();
+            const int page = it.value().first;
+            if (m_pagesVector.value(page, nullptr) && annotation->d_ptr->m_page) { // still attached to its page
+                proxy->notifyModification(annotation, page, it.value().second);
+            }
+        }
+    }
+
+    // 2. tell the observers, once per page
+    const QSet<int> pages = m_annotationPagesPendingChangeNotify;
+    m_annotationPagesPendingChangeNotify.clear();
+    for (const int page : pages) {
+        notifyAnnotationChanges(page);
+    }
+}
+
 void DocumentPrivate::notifyAnnotationChanges(int page)
 {
+    if (m_annotationChangeBatchDepth > 0) {
+        // Many commands touching the same page (undo/redo of a big selection, ...): tell the observers once, at the end.
+        m_annotationPagesPendingChangeNotify.insert(page);
+        return;
+    }
     Page *changedPage = m_pagesVector.value(page, nullptr);
     if (!changedPage) {
         return;
@@ -3686,6 +3746,103 @@ void Document::translatePageAnnotation(int page, Annotation *annotation, const N
     d->m_undoStack->push(uc);
 }
 
+void Document::beginAnnotationLiveMove(const QList<AnnotationMoveItem> &items)
+{
+    Okular::SaveInterface *iface = qobject_cast<Okular::SaveInterface *>(d->m_generator);
+    AnnotationProxy *proxy = iface ? iface->annotationProxy() : nullptr;
+
+    // Hide every native annotation first and re-render each page once afterwards. Re-rendering after the first
+    // annotation only would leave all the others baked into the page bitmap (ghosts) and would make the next
+    // notifyModification() call wait for that render.
+    d->beginAnnotationPixmapRefreshBatch();
+    for (const AnnotationMoveItem &item : items) {
+        if (!item.annotation || !d->m_pagesVector.value(item.page, nullptr)) {
+            continue;
+        }
+        if (proxy && proxy->supports(AnnotationProxy::Modification)) {
+            proxy->notifyModification(item.annotation, item.page, true); // BeingMoved is set: only hides
+        }
+        if (item.annotation->flags() & Annotation::ExternallyDrawn) {
+            d->refreshAnnotationPixmaps(item.page);
+        }
+    }
+    d->endAnnotationPixmapRefreshBatch();
+}
+
+void Document::translateAnnotationsLive(const QList<AnnotationMoveItem> &items, const Okular::NormalizedPoint &delta)
+{
+    QSet<int> pages;
+    for (const AnnotationMoveItem &item : items) {
+        if (item.annotation) {
+            item.annotation->translate(delta);
+            pages.insert(item.page);
+        }
+    }
+    for (const int page : std::as_const(pages)) {
+        d->notifyAnnotationChanges(page);
+    }
+}
+
+void Document::commitAnnotationMove(const QList<AnnotationMoveItem> &items, const Okular::NormalizedPoint &totalDelta)
+{
+    const bool moved = !qFuzzyIsNull(totalDelta.x) || !qFuzzyIsNull(totalDelta.y);
+
+    d->beginAnnotationPixmapRefreshBatch();
+    d->beginAnnotationChangeBatch();
+    for (const AnnotationMoveItem &item : items) {
+        if (!item.annotation || !d->m_pagesVector.value(item.page, nullptr)) {
+            continue;
+        }
+        if (moved) {
+            // The live preview already applied totalDelta. Take it back so that the command's redo() applies it
+            // exactly once, which also makes undo/redo symmetric.
+            item.annotation->translate(Okular::NormalizedPoint(-totalDelta.x, -totalDelta.y));
+            d->m_undoStack->push(new Okular::TranslateAnnotationCommand(d, item.annotation, item.page, totalDelta, true));
+        } else {
+            // Nothing moved, but the native annotation was hidden: show it again.
+            d->performModifyPageAnnotation(item.page, item.annotation, true);
+        }
+    }
+    d->endAnnotationChangeBatch();
+    d->endAnnotationPixmapRefreshBatch();
+}
+
+void Document::adjustAnnotationsLive(const QList<AnnotationAdjustItem> &steps)
+{
+    QSet<int> pages;
+    for (const AnnotationAdjustItem &step : steps) {
+        if (step.annotation) {
+            step.annotation->adjust(step.delta1, step.delta2);
+            pages.insert(step.page);
+        }
+    }
+    for (const int page : std::as_const(pages)) {
+        d->notifyAnnotationChanges(page);
+    }
+}
+
+void Document::commitAnnotationAdjust(const QList<AnnotationAdjustItem> &totals)
+{
+    d->beginAnnotationPixmapRefreshBatch();
+    d->beginAnnotationChangeBatch();
+    for (const AnnotationAdjustItem &total : totals) {
+        if (!total.annotation || !d->m_pagesVector.value(total.page, nullptr)) {
+            continue;
+        }
+        const bool changed = !qFuzzyIsNull(total.delta1.x) || !qFuzzyIsNull(total.delta1.y) || !qFuzzyIsNull(total.delta2.x) || !qFuzzyIsNull(total.delta2.y);
+        if (changed) {
+            // Successive adjusts compose into one adjust with the summed deltas (this is exactly what the command's
+            // own mergeWith() relies on). Take the live preview back so redo() applies it once.
+            total.annotation->adjust(Okular::NormalizedPoint(-total.delta1.x, -total.delta1.y), Okular::NormalizedPoint(-total.delta2.x, -total.delta2.y));
+            d->m_undoStack->push(new Okular::AdjustAnnotationCommand(d, total.annotation, total.page, total.delta1, total.delta2, true));
+        } else {
+            d->performModifyPageAnnotation(total.page, total.annotation, true);
+        }
+    }
+    d->endAnnotationChangeBatch();
+    d->endAnnotationPixmapRefreshBatch();
+}
+
 void Document::beginAnnotationViewportMovementBlock()
 {
     d->beginAnnotationViewportMovementBlock();
@@ -3763,12 +3920,14 @@ void Document::removePageAnnotation(int page, Annotation *annotation)
 void Document::removePageAnnotations(int page, const QList<Annotation *> &annotations)
 {
     d->beginAnnotationPixmapRefreshBatch();
+    d->beginAnnotationChangeBatch();
     d->m_undoStack->beginMacro(i18nc("remove a collection of annotations from the page", "remove annotations"));
     for (Annotation *annotation : annotations) {
         QUndoCommand *uc = new RemoveAnnotationCommand(this->d, annotation, page);
         d->m_undoStack->push(uc);
     }
     d->m_undoStack->endMacro();
+    d->endAnnotationChangeBatch();
     d->endAnnotationPixmapRefreshBatch();
 }
 
@@ -4136,12 +4295,23 @@ void Document::cancelSearch()
 
 void Document::undo()
 {
+    // An undo step can be a macro with hundreds of children (e.g. moving a big selection). Without batching, every
+    // child notifies the observers and restarts a page render, and every following child then blocks on the
+    // generator mutex held by that render.
+    d->beginAnnotationPixmapRefreshBatch();
+    d->beginAnnotationChangeBatch();
     d->m_undoStack->undo();
+    d->endAnnotationChangeBatch();
+    d->endAnnotationPixmapRefreshBatch();
 }
 
 void Document::redo()
 {
+    d->beginAnnotationPixmapRefreshBatch();
+    d->beginAnnotationChangeBatch();
     d->m_undoStack->redo();
+    d->endAnnotationChangeBatch();
+    d->endAnnotationPixmapRefreshBatch();
 }
 
 void Document::editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents, int newCursorPos, int prevCursorPos, int prevAnchorPos)

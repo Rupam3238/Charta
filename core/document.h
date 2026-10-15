@@ -569,6 +569,42 @@ public:
      */
     void translatePageAnnotation(int page, Annotation *annotation, const Okular::NormalizedPoint &delta);
 
+    /** An annotation together with the page it lives on, used by the batched move API below. */
+    struct AnnotationMoveItem {
+        int page = -1;
+        Annotation *annotation = nullptr;
+    };
+
+    /**
+     * Interactive (drag) moving of one or many annotations, without creating one undo command per mouse event.
+     *
+     * 1. beginAnnotationLiveMove(): call once, after BeingMoved has been set on every item. Hides the natively
+     *    rendered version and schedules a single page re-render.
+     * 2. translateAnnotationsLive(): call for every drag step. Only moves the in-memory annotations and sends one
+     *    notification per page. No undo command, no generator round trip.
+     * 3. commitAnnotationMove(): call once at the end, after BeingMoved has been cleared. Pushes one undo command
+     *    per annotation carrying the total delta, and synchronizes the generator.
+     */
+    void beginAnnotationLiveMove(const QList<AnnotationMoveItem> &items);
+    void translateAnnotationsLive(const QList<AnnotationMoveItem> &items, const Okular::NormalizedPoint &delta);
+    void commitAnnotationMove(const QList<AnnotationMoveItem> &items, const Okular::NormalizedPoint &totalDelta);
+
+    /** One annotation of an interactive resize: the delta of the current step (live) or the total (commit). */
+    struct AnnotationAdjustItem {
+        int page = -1;
+        Annotation *annotation = nullptr;
+        Okular::NormalizedPoint delta1;
+        Okular::NormalizedPoint delta2;
+    };
+
+    /**
+     * Interactive resizing, same idea as the live move API: call beginAnnotationLiveMove() once (BeingResized set),
+     * adjustAnnotationsLive() per step, and commitAnnotationAdjust() once at the end with the summed deltas
+     * (BeingResized cleared first).
+     */
+    void adjustAnnotationsLive(const QList<AnnotationAdjustItem> &steps);
+    void commitAnnotationAdjust(const QList<AnnotationAdjustItem> &totals);
+
     /** Temporarily suppress automatic viewport repositioning during annotation interaction. */
     void beginAnnotationViewportMovementBlock();
     void endAnnotationViewportMovementBlock();

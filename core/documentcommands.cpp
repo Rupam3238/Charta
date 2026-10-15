@@ -39,6 +39,15 @@ void moveViewportIfBoundingRectNotFullyVisible(Okular::NormalizedRect boundingRe
     }
 }
 
+/*
+ * Annotation commands (add, remove, translate, adjust, edit, ...) deliberately never scroll the view, whether they are
+ * triggered directly by the user or by undo/redo. Only explicit user navigation (pan, scroll, zoom, page jumps) may
+ * change the viewport. Form commands further down still use moveViewportIfBoundingRectNotFullyVisible().
+ */
+static inline void keepViewportForAnnotationCommand(const Okular::NormalizedRect &, DocumentPrivate *, int)
+{
+}
+
 Okular::NormalizedRect buildBoundingRectangleForButtons(const QList<Okular::FormFieldButton *> &formButtons)
 {
     // Initialize coordinates of the bounding rect
@@ -76,14 +85,14 @@ AddAnnotationCommand::~AddAnnotationCommand()
 
 void AddAnnotationCommand::undo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_docPriv->performRemovePageAnnotation(m_pageNumber, m_annotation);
     m_done = false;
 }
 
 void AddAnnotationCommand::redo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_docPriv->performAddPageAnnotation(m_pageNumber, m_annotation, m_index);
     m_done = true;
 }
@@ -126,14 +135,14 @@ RemoveAnnotationCommand::~RemoveAnnotationCommand()
 
 void RemoveAnnotationCommand::undo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_docPriv->performAddPageAnnotation(m_pageNumber, m_annotation, m_oldIndex);
     m_done = false;
 }
 
 void RemoveAnnotationCommand::redo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_docPriv->performRemovePageAnnotation(m_pageNumber, m_annotation);
     m_done = true;
 }
@@ -168,13 +177,13 @@ bool RemoveAnnotationCommand::refreshInternalPageReferences(const QList<Okular::
 
 void ReorderAnnotationCommand::undo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_docPriv->performReorderPageAnnotation(m_pageNumber, m_annotation, m_oldIndex, m_oldNativeIndex);
 }
 
 void ReorderAnnotationCommand::redo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_docPriv->performReorderPageAnnotation(m_pageNumber, m_annotation, m_newIndex, m_newNativeIndex);
 }
 
@@ -199,14 +208,14 @@ ModifyAnnotationPropertiesCommand::ModifyAnnotationPropertiesCommand(DocumentPri
 
 void ModifyAnnotationPropertiesCommand::undo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_annotation->setAnnotationProperties(m_prevProperties);
     m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
 }
 
 void ModifyAnnotationPropertiesCommand::redo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_annotation->setAnnotationProperties(m_newProperties);
     m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
 }
@@ -234,14 +243,14 @@ TranslateAnnotationCommand::TranslateAnnotationCommand(DocumentPrivate *docPriv,
 
 void TranslateAnnotationCommand::undo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(translateBoundingRectangle(minusDelta()), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(translateBoundingRectangle(minusDelta()), m_docPriv, m_pageNumber);
     m_annotation->translate(minusDelta());
     m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
 }
 
 void TranslateAnnotationCommand::redo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(translateBoundingRectangle(m_delta), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(translateBoundingRectangle(m_delta), m_docPriv, m_pageNumber);
     m_annotation->translate(m_delta);
     m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
 }
@@ -309,14 +318,14 @@ void AdjustAnnotationCommand::undo()
 {
     const NormalizedPoint minusDelta1 = Okular::NormalizedPoint(-m_delta1.x, -m_delta1.y);
     const NormalizedPoint minusDelta2 = Okular::NormalizedPoint(-m_delta2.x, -m_delta2.y);
-    moveViewportIfBoundingRectNotFullyVisible(adjustBoundingRectangle(minusDelta1, minusDelta2), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(adjustBoundingRectangle(minusDelta1, minusDelta2), m_docPriv, m_pageNumber);
     m_annotation->adjust(minusDelta1, minusDelta2);
     m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
 }
 
 void AdjustAnnotationCommand::redo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(adjustBoundingRectangle(m_delta1, m_delta2), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(adjustBoundingRectangle(m_delta1, m_delta2), m_docPriv, m_pageNumber);
     m_annotation->adjust(m_delta1, m_delta2);
     m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
 }
@@ -442,14 +451,14 @@ EditAnnotationContentsCommand::EditAnnotationContentsCommand(DocumentPrivate *do
 
 void EditAnnotationContentsCommand::undo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_docPriv->performSetAnnotationContents(m_prevContents, m_annotation, m_pageNumber);
     Q_EMIT m_docPriv->m_parent->annotationContentsChangedByUndoRedo(m_annotation, m_prevContents, m_prevCursorPos, m_prevAnchorPos);
 }
 
 void EditAnnotationContentsCommand::redo()
 {
-    moveViewportIfBoundingRectNotFullyVisible(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
+    keepViewportForAnnotationCommand(m_annotation->boundingRectangle(), m_docPriv, m_pageNumber);
     m_docPriv->performSetAnnotationContents(m_newContents, m_annotation, m_pageNumber);
     Q_EMIT m_docPriv->m_parent->annotationContentsChangedByUndoRedo(m_annotation, m_newContents, m_newCursorPos, m_newCursorPos);
 }

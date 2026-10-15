@@ -206,6 +206,14 @@
    </entry>
  </group>
  <group name="General" >
+  <entry key="AutoSaveEnabled" type="Bool" >
+    <default>true</default>
+  </entry>
+  <entry key="AutoSaveIntervalSeconds" type="Int" >
+    <default>60</default>
+    <min>10</min>
+    <max>3600</max>
+  </entry>
   <entry key="ShellOpenFileInTabs" type="Bool" >
    <default>false</default>
   </entry>

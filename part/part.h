@@ -23,6 +23,7 @@
 #define Q_NOREPLY
 #endif // HAVE_DBUS
 #include <QIcon>
+#include <QElapsedTimer>
 #include <QList>
 #include <QPointer>
 #include <QProcess>
@@ -235,6 +236,7 @@ protected Q_SLOTS:
     void slotFindPrev();
     bool slotSaveFileAs(bool showOkularArchiveAsDefaultFormat = false);
     void slotNewConfig();
+    void slotAutoSave();
     void slotShowMenu(const Okular::Page *page, const QPoint point);
     void slotShowTOCMenu(const Okular::DocumentViewport &vp, const QPoint point, const QString &title);
     void slotShowProperties();
@@ -390,6 +392,13 @@ private:
     KDirWatch *m_watcher;
     QString m_watchedFilePath, m_watchedFileSymlinkTarget;
     QTimer *m_dirtyHandler;
+
+    // Periodic autosave: runs only when the document is modified and the user is idle, never shows a dialog.
+    bool canAutoSaveNow() const;
+    QTimer *m_autoSaveTimer = nullptr;
+    QTimer *m_autoSaveRetryTimer = nullptr;
+    QElapsedTimer m_lastUserInteraction;
+    bool m_autoSaveInProgress = false;
     QUrl m_oldUrl;
     Okular::DocumentViewport m_viewportDirty;
     bool m_isReloading;

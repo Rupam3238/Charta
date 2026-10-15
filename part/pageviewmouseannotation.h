@@ -25,6 +25,7 @@
 #include <QTimer>
 
 #include "core/annotations.h"
+#include "core/document.h"
 #include "pageviewutils.h"
 
 class QHelpEvent;
@@ -160,6 +161,9 @@ private:
     void flushPendingMove();
     void finishCommand();
     void updateViewport(const AnnotationDescription &ad) const;
+    /** Invalidate everything that moves with the current selection: each annotation, plus the group frame and handles. */
+    void updateViewportForSelection() const;
+    QList<Okular::Document::AnnotationMoveItem> moveItems() const;
     ResizeHandle getHandleAt(const QPoint eventPos, const AnnotationDescription &ad) const;
     ResizeHandle getSelectionHandleAt(const QPoint eventPos) const;
     QRect getHandleRect(ResizeHandle handle, const AnnotationDescription &ad) const;
@@ -197,6 +201,11 @@ private:
     Qt::KeyboardModifiers m_pendingMoveModifiers = Qt::NoModifier;
     bool m_hasPendingMove = false;
     bool m_finishing = false;
+    bool m_liveMoveStarted = false;
+    bool m_liveResizeStarted = false;
+    QList<Okular::Document::AnnotationAdjustItem> m_resizeTotals;
+    void applyLiveResize(const QList<Okular::Document::AnnotationAdjustItem> &steps);
+    Okular::NormalizedPoint m_moveTotalDelta;
 
     QList<ResizeHandle> m_resizeHandleList;
 };

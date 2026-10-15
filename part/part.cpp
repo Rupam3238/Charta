@@ -26,6 +26,7 @@
 
 // qt/kde includes
 #include <QApplication>
+#include <QGuiApplication>
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QCursor>
@@ -63,6 +64,7 @@
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QTemporaryFile>
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -1054,6 +1056,16 @@ Part::Part(QObject *parent, const QVariantList &args)
     m_dirtyHandler = new QTimer(this);
     m_dirtyHandler->setSingleShot(true);
     connect(m_dirtyHandler, &QTimer::timeout, this, [this] { slotAttemptReload(); });
+
+    m_autoSaveTimer = new QTimer(this);
+    connect(m_autoSaveTimer, &QTimer::timeout, this, &Part::slotAutoSave);
+    m_autoSaveRetryTimer = new QTimer(this);
+    m_autoSaveRetryTimer->setSingleShot(true);
+    connect(m_autoSaveRetryTimer, &QTimer::timeout, this, &Part::slotAutoSave);
+    m_lastUserInteraction.start();
+    // Only used to learn when the user last interacted with the document view
+    m_pageView->installEventFilter(this);
+    m_pageView->viewport()->installEventFilter(this);
 
     m_maxRecentItems = Okular::Settings::maxRecentItems();
 
@@ -3554,6 +3566,54 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
     return true;
 }
 
+/*
+ * Everything that could make saveAs() open a dialog is checked here first, so that an autosave either runs silently
+ * or does not run at all.
+ */
+bool Part::canAutoSaveNow() const
+{
+    if (m_autoSaveInProgress || !isReadWrite() || !isModified() || !m_document->isOpened()) {
+        return false;
+    }
+    if (m_embedMode == PrintPreviewMode || m_documentOpenWithPassword || !url().isLocalFile()) {
+        return false;
+    }
+    if (!m_document->canSaveChanges() || (isDocumentArchive && !m_document->canSwapBackingFile())) {
+        return false;
+    }
+    const QFileInfo fi(localFilePath());
+    if (!fi.exists() || !fi.isWritable() || m_fileLastModified != fi.lastModified()) {
+        return false; // changed on disk by someone else: that needs a human decision
+    }
+    if (!isDocumentArchive) {
+        bool wontSaveForms = false, wontSaveAnnotations = false;
+        checkNativeSaveDataLoss(&wontSaveForms, &wontSaveAnnotations);
+        if (wontSaveForms || wontSaveAnnotations) {
+            return false; // saving in this format would drop data: needs a human decision
+        }
+    }
+    return true;
+}
+
+void Part::slotAutoSave()
+{
+    if (!Okular::Settings::autoSaveEnabled() || !canAutoSaveNow()) {
+        return;
+    }
+
+    // Never interrupt the user: not while a button is held (drag, stroke, shape), not within 2 s of the last input,
+    // and not while a dialog is open. Try again shortly instead of waiting for the next full interval.
+    const bool busy = QGuiApplication::mouseButtons() != Qt::NoButton || (m_lastUserInteraction.isValid() && m_lastUserInteraction.elapsed() < 2000) || QApplication::activeModalWidget();
+    if (busy) {
+        m_autoSaveRetryTimer->start(2500);
+        return;
+    }
+
+    m_autoSaveInProgress = true;
+    saveFile(); // same code path as Ctrl+S: temp file, atomic copy, backing-file swap, history marked clean
+    m_autoSaveInProgress = false;
+}
+
 // If the user wants to save in the original file's format, some features might
 // not be available. Find out what cannot be saved in this format
 void Part::checkNativeSaveDataLoss(bool *out_wontSaveForms, bool *out_wontSaveAnnotations) const
@@ -3658,6 +3718,16 @@ void Part::slotNewConfig()
 
     // Watch File
     setWatchFileModeEnabled(Okular::Settings::watchFile());
+
+    // Autosave
+    if (m_autoSaveTimer) {
+        if (Okular::Settings::autoSaveEnabled()) {
+            m_autoSaveTimer->start(Okular::Settings::autoSaveIntervalSeconds() * 1000);
+        } else {
+            m_autoSaveTimer->stop();
+            m_autoSaveRetryTimer->stop();
+        }
+    }
 
     // Main View (pageView)
     m_pageView->reparseConfig();
@@ -4448,6 +4518,16 @@ void Part::rebuildBookmarkMenu(bool unplugActions)
 bool Part::eventFilter(QObject *watched, QEvent *event)
 {
     switch (event->type()) {
+    case QEvent::MouseButtonPress:
+    case QEvent::MouseButtonRelease:
+    case QEvent::TabletPress:
+    case QEvent::TabletRelease:
+    case QEvent::KeyPress:
+    case QEvent::Wheel:
+        if (watched == m_pageView || watched == m_pageView->viewport()) {
+            m_lastUserInteraction.restart();
+        }
+        break; // never consume
     case QEvent::ContextMenu: {
         QContextMenuEvent *e = static_cast<QContextMenuEvent *>(event);
         QMenu *menu = static_cast<QMenu *>(watched);

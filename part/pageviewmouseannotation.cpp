@@ -901,6 +901,8 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
 
     switch (state) {
     case StateMoving:
+        m_liveMoveStarted = false;
+        m_moveTotalDelta = Okular::NormalizedPoint();
         m_focusedAnnotation = ad;
         if (m_areaSelectedAnnotations.size() > 1 && !m_selectionMoveUndoMacroOpen) {
             m_document->beginUndoMacro(i18n("move annotations"));
@@ -913,6 +915,8 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
         updateViewport(m_focusedAnnotation);
         break;
     case StateResizing:
+        m_liveResizeStarted = false;
+        m_resizeTotals.clear();
         m_focusedAnnotation = ad;
         m_resizeStartMousePosition = m_mousePosition;
         m_resizeStartRects.clear();
@@ -1002,12 +1006,19 @@ void MouseAnnotation::performCommand(const QPoint newPos, Qt::KeyboardModifiers 
         if (delta.y > 0 && groupRect.bottom + delta.y > 1) {
             delta.y = 1 - groupRect.bottom;
         }
-        for (const AnnotationDescription &description : selected) {
-            if (!qFuzzyIsNull(delta.x) || !qFuzzyIsNull(delta.y)) {
-                m_document->translatePageAnnotation(description.pageNumber, description.annotation, delta);
-                if (selected.size() > 1) {
-                    m_selectionMoveChanged = true;
-                }
+        if (!qFuzzyIsNull(delta.x) || !qFuzzyIsNull(delta.y)) {
+            const QList<Okular::Document::AnnotationMoveItem> items = moveItems();
+            if (!m_liveMoveStarted) {
+                m_document->beginAnnotationLiveMove(items);
+                m_liveMoveStarted = true;
+            }
+            // Moves the in-memory annotations and notifies once per page: no undo command and no generator
+            // round trip per mouse event. The single undo entry is created in finishCommand().
+            m_document->translateAnnotationsLive(items, delta);
+            m_moveTotalDelta.x += delta.x;
+            m_moveTotalDelta.y += delta.y;
+            if (selected.size() > 1) {
+                m_selectionMoveChanged = true;
             }
         }
 
@@ -1022,6 +1033,8 @@ void MouseAnnotation::performCommand(const QPoint newPos, Qt::KeyboardModifiers 
             const double scaleX = oldWidth > 0.000001 ? (targetGroupRect.right - targetGroupRect.left) / oldWidth : 1.0;
             const double scaleY = oldHeight > 0.000001 ? (targetGroupRect.bottom - targetGroupRect.top) / oldHeight : 1.0;
 
+            QList<Okular::Document::AnnotationAdjustItem> steps;
+            steps.reserve(m_areaSelectedAnnotations.size());
             for (qsizetype index = 0; index < m_areaSelectedAnnotations.size(); ++index) {
                 const AnnotationDescription &description = m_areaSelectedAnnotations.at(index);
                 const Okular::NormalizedRect rect = description.annotation->boundingRectangle();
@@ -1030,19 +1043,58 @@ void MouseAnnotation::performCommand(const QPoint newPos, Qt::KeyboardModifiers 
                 const double targetRight = targetGroupRect.left + (startRect.right - m_resizeStartBoundingRect.left) * scaleX;
                 const double targetTop = targetGroupRect.top + (startRect.top - m_resizeStartBoundingRect.top) * scaleY;
                 const double targetBottom = targetGroupRect.top + (startRect.bottom - m_resizeStartBoundingRect.top) * scaleY;
-                m_document->adjustPageAnnotation(description.pageNumber,
-                                                 description.annotation,
-                                                 Okular::NormalizedPoint(targetLeft - rect.left, targetTop - rect.top),
-                                                 Okular::NormalizedPoint(targetRight - rect.right, targetBottom - rect.bottom));
+                Okular::Document::AnnotationAdjustItem step;
+                step.page = description.pageNumber;
+                step.annotation = description.annotation;
+                step.delta1 = Okular::NormalizedPoint(targetLeft - rect.left, targetTop - rect.top);
+                step.delta2 = Okular::NormalizedPoint(targetRight - rect.right, targetBottom - rect.bottom);
+                steps.append(step);
             }
+            applyLiveResize(steps);
         } else {
             const Okular::NormalizedRect rect = m_focusedAnnotation.annotation->boundingRectangle();
             const Okular::NormalizedRect targetRect = resizedRect(m_resizeStartBoundingRect, delta1, delta2, preserveAspectRatio);
-            m_document->adjustPageAnnotation(m_focusedAnnotation.pageNumber,
-                                             m_focusedAnnotation.annotation,
-                                             Okular::NormalizedPoint(targetRect.left - rect.left, targetRect.top - rect.top),
-                                             Okular::NormalizedPoint(targetRect.right - rect.right, targetRect.bottom - rect.bottom));
+            Okular::Document::AnnotationAdjustItem step;
+            step.page = m_focusedAnnotation.pageNumber;
+            step.annotation = m_focusedAnnotation.annotation;
+            step.delta1 = Okular::NormalizedPoint(targetRect.left - rect.left, targetRect.top - rect.top);
+            step.delta2 = Okular::NormalizedPoint(targetRect.right - rect.right, targetRect.bottom - rect.bottom);
+            applyLiveResize({step});
         }
+    }
+}
+
+void MouseAnnotation::applyLiveResize(const QList<Okular::Document::AnnotationAdjustItem> &steps)
+{
+    bool anyChange = false;
+    for (const auto &step : steps) {
+        anyChange = anyChange || !qFuzzyIsNull(step.delta1.x) || !qFuzzyIsNull(step.delta1.y) || !qFuzzyIsNull(step.delta2.x) || !qFuzzyIsNull(step.delta2.y);
+    }
+    if (!anyChange) {
+        return;
+    }
+
+    if (!m_liveResizeStarted) {
+        QList<Okular::Document::AnnotationMoveItem> items;
+        for (const auto &step : steps) {
+            items.append({step.page, step.annotation});
+        }
+        m_document->beginAnnotationLiveMove(items); // hides the native versions, one page re-render
+        m_resizeTotals = steps;
+        for (auto &total : m_resizeTotals) {
+            total.delta1 = Okular::NormalizedPoint();
+            total.delta2 = Okular::NormalizedPoint();
+        }
+        m_liveResizeStarted = true;
+    }
+
+    // The selection does not change while resizing, so steps and totals line up by index.
+    m_document->adjustAnnotationsLive(steps);
+    for (qsizetype i = 0; i < steps.size() && i < m_resizeTotals.size(); ++i) {
+        m_resizeTotals[i].delta1.x += steps[i].delta1.x;
+        m_resizeTotals[i].delta1.y += steps[i].delta1.y;
+        m_resizeTotals[i].delta2.x += steps[i].delta2.x;
+        m_resizeTotals[i].delta2.y += steps[i].delta2.y;
     }
 }
 
@@ -1061,7 +1113,7 @@ void MouseAnnotation::flushPendingMove()
 
 void MouseAnnotation::applyMoveStep(const QPoint eventPos, Qt::KeyboardModifiers modifiers)
 {
-    updateViewport(m_focusedAnnotation);
+    updateViewportForSelection();
     const bool blockViewportMovement = !m_pageView->allowsAnnotationViewportMovement();
     if (blockViewportMovement) {
         m_document->beginAnnotationViewportMovementBlock();
@@ -1071,7 +1123,7 @@ void MouseAnnotation::applyMoveStep(const QPoint eventPos, Qt::KeyboardModifiers
         m_document->endAnnotationViewportMovementBlock();
     }
     m_mousePosition = eventPos - m_focusedAnnotation.pageViewItem->uncroppedGeometry().topLeft();
-    updateViewport(m_focusedAnnotation);
+    updateViewportForSelection();
 }
 
 bool MouseAnnotation::isDragInProgress() const
@@ -1098,18 +1150,11 @@ void MouseAnnotation::finishCommand()
         for (const AnnotationDescription &description : selected) {
             description.annotation->setFlags(description.annotation->flags() & ~Okular::Annotation::BeingMoved);
         }
-        if (selected.size() <= 1 || m_selectionMoveChanged) {
-            const bool batchPixmapRefreshes = selected.size() > 1;
-            if (batchPixmapRefreshes) {
-                m_document->beginAnnotationPixmapRefreshBatch();
-            }
-            for (const AnnotationDescription &description : selected) {
-                m_document->translatePageAnnotation(description.pageNumber, description.annotation, Okular::NormalizedPoint(0.0, 0.0));
-            }
-            if (batchPixmapRefreshes) {
-                m_document->endAnnotationPixmapRefreshBatch();
-            }
+        if (m_liveMoveStarted) {
+            m_document->commitAnnotationMove(moveItems(), m_moveTotalDelta);
         }
+        m_liveMoveStarted = false;
+        m_moveTotalDelta = Okular::NormalizedPoint();
         if (m_selectionMoveUndoMacroOpen) {
             m_document->endUndoMacro();
             m_selectionMoveUndoMacroOpen = false;
@@ -1120,14 +1165,14 @@ void MouseAnnotation::finishCommand()
         for (const AnnotationDescription &description : selected) {
             description.annotation->setFlags(description.annotation->flags() & ~Okular::Annotation::BeingResized);
         }
+        if (m_liveResizeStarted) {
+            m_document->commitAnnotationAdjust(m_resizeTotals);
+        }
+        m_liveResizeStarted = false;
+        m_resizeTotals.clear();
         if (selected.size() > 1 && m_selectionResizeUndoMacroOpen) {
-            for (const AnnotationDescription &description : selected) {
-                m_document->adjustPageAnnotation(description.pageNumber, description.annotation, Okular::NormalizedPoint(0.0, 0.0), Okular::NormalizedPoint(0.0, 0.0));
-            }
             m_document->endUndoMacro();
             m_selectionResizeUndoMacroOpen = false;
-        } else {
-            m_document->adjustPageAnnotation(m_focusedAnnotation.pageNumber, m_focusedAnnotation.annotation, Okular::NormalizedPoint(0.0, 0.0), Okular::NormalizedPoint(0.0, 0.0));
         }
     }
 }
@@ -1138,6 +1183,38 @@ void MouseAnnotation::updateViewport(const AnnotationDescription &ad) const
     const QRect &changedPageViewItemRect = getFullBoundingRect(ad);
     if (changedPageViewItemRect.isValid()) {
         m_pageView->viewport()->update(changedPageViewItemRect.translated(ad.pageViewItem->uncroppedGeometry().topLeft()).translated(-m_pageView->contentAreaPosition()));
+    }
+}
+
+QList<Okular::Document::AnnotationMoveItem> MouseAnnotation::moveItems() const
+{
+    QList<Okular::Document::AnnotationMoveItem> items;
+    const QList<AnnotationDescription> selected = selectedAnnotations();
+    items.reserve(selected.size());
+    for (const AnnotationDescription &description : selected) {
+        if (description.isValid()) {
+            items.append({description.pageNumber, description.annotation});
+        }
+    }
+    return items;
+}
+
+void MouseAnnotation::updateViewportForSelection() const
+{
+    const QList<AnnotationDescription> selected = selectedAnnotations();
+    for (const AnnotationDescription &description : selected) {
+        updateViewport(description);
+    }
+
+    if (m_areaSelectedAnnotations.size() > 1) {
+        // Frame and handles of the group live on the frame's border, so invalidate a band around it instead of the
+        // whole (possibly page-sized) interior.
+        const QRect frame = selectedBoundingRect();
+        if (!frame.isNull()) {
+            const QPoint offset = m_areaSelectedAnnotations.constFirst().pageViewItem->uncroppedGeometry().topLeft() - m_pageView->contentAreaPosition();
+            const QRegion band = QRegion(frame.adjusted(-handlePadding, -handlePadding, handlePadding, handlePadding)).subtracted(QRegion(frame.adjusted(handlePadding, handlePadding, -handlePadding, -handlePadding)));
+            m_pageView->viewport()->update(band.translated(offset));
+        }
     }
 }
 
