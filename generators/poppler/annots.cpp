@@ -848,8 +848,7 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
     const bool positionOnlyGeomChange = ppl_ann->boundary() != newBoundary && sameStyle(okl_ann->style(), ppl_ann->style()) && okl_ann->subType() == Okular::Annotation::AGeom
         && static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalInnerColor() == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomInnerColor()
         && okularToPoppler(static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalType()) == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomType();
-    const bool positionOnlyClipboardStampChange = ppl_ann->boundary() != newBoundary && sameStyle(okl_ann->style(), ppl_ann->style()) && okl_ann->subType() == Okular::Annotation::AStamp
-        && isChartaClipboardImageAnnotation(okl_ann->uniqueName());
+    const bool positionOnlyClipboardStampChange = false; // Disabled for clipboard image stamps because their appearance depends on the boundary
     if (positionOnlyGeomChange || positionOnlyClipboardStampChange) {
         savedAppearance = ppl_ann->annotationAppearance();
     }

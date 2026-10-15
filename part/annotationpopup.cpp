@@ -48,6 +48,9 @@ public:
         if (m_imageFile.open() && image.save(&m_imageFile, "PNG") && m_imageFile.flush()) {
             setStampIconName(m_imageFile.fileName());
         }
+
+        Okular::Annotation::Style &style = this->style();
+        style.setWidth(0);
     }
 
     bool isValid() const
