@@ -32,6 +32,7 @@
 #include <QTemporaryFile>
 #include <QUuid>
 #include <QUrl>
+#include <QStandardPaths>
 
 Q_DECLARE_METATYPE(AnnotationPopup::AnnotPagePair)
 
@@ -41,12 +42,33 @@ class ClipboardImageStampAnnotation final : public Okular::StampAnnotation
 {
 public:
     explicit ClipboardImageStampAnnotation(const QImage &image)
-        : m_imageFile(QDir::tempPath() + QLatin1String("/charta-clipboard-XXXXXX.png"))
     {
         setStampIconName(QString());
         setUniqueName(QStringLiteral("charta-clipboard-image-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
-        if (m_imageFile.open() && image.save(&m_imageFile, "PNG") && m_imageFile.flush()) {
-            setStampIconName(m_imageFile.fileName());
+
+        // Create cache directory for clipboard stamp images
+        const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QLatin1String("/okular/clipboard-stamps/");
+        QDir dir(cacheDir);
+        if (!dir.exists()) {
+            dir.mkpath(cacheDir);
+        }
+
+        // Clean up old clipboard stamp images (keep only the 10 most recent)
+        QStringList filters = QStringList() << QStringLiteral("charta-clipboard-*.png");
+        QFileInfoList files = dir.entryInfoList(filters, QDir::Files | QDir::Readable, QDir::Time);
+        // Remove files beyond the 10 most recent
+        for (int i = 10; i < files.size(); ++i) {
+            QFile::remove(files[i].absoluteFilePath());
+        }
+
+        // Generate unique filename
+        const QString fileName = QStringLiteral("charta-clipboard-%1.png").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        const QString filePath = cacheDir + fileName;
+        m_imageFilePath = filePath;
+
+        // Save image to persistent cache file
+        if (image.save(m_imageFilePath, "PNG")) {
+            setStampIconName(m_imageFilePath);
         }
 
         Okular::Annotation::Style &style = this->style();
@@ -55,11 +77,11 @@ public:
 
     bool isValid() const
     {
-        return !stampIconName().isEmpty() && m_imageFile.isOpen();
+        return !stampIconName().isEmpty() && QFile::exists(stampIconName());
     }
 
 private:
-    QTemporaryFile m_imageFile;
+    QString m_imageFilePath;
 };
 
 QImage clipboardImage(const QMimeData *mimeData)
