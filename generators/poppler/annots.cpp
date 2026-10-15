@@ -828,6 +828,19 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
         return;
     }
 
+    if (okl_ann->flags() & (Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized)) {
+        // Okular's UI renders the annotation on its own while it is dragged.
+        // Hide the native annotation only once. Every later drag step must return
+        // without touching the mutex: the generator thread holds it for the whole
+        // duration of a page render (which the first step just triggered), so
+        // locking here would block the GUI thread on every mouse move.
+        if (!(ppl_ann->flags() & Poppler::Annotation::Hidden)) {
+            QMutexLocker ml(mutex);
+            ppl_ann->setFlags(Poppler::Annotation::Hidden);
+        }
+        return;
+    }
+
     QMutexLocker ml(mutex);
 
     const QRectF newBoundary = normRectToRectF(okl_ann->boundingRectangle());
@@ -839,12 +852,6 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
         && isChartaClipboardImageAnnotation(okl_ann->uniqueName());
     if (positionOnlyGeomChange || positionOnlyClipboardStampChange) {
         savedAppearance = ppl_ann->annotationAppearance();
-    }
-
-    if (okl_ann->flags() & (Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized)) {
-        // Okular ui already renders the annotation on its own
-        ppl_ann->setFlags(Poppler::Annotation::Hidden);
-        return;
     }
 
     // Set basic properties

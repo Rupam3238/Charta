@@ -178,7 +178,10 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
                 }
 
                 if (annFlags & Okular::Annotation::ExternallyDrawn) {
-                    if ((annFlags & Okular::Annotation::BeingResized) && boundary.intersects(limitRect)) {
+                    // While an externally drawn (native) annotation is being resized *or moved*, the generator no
+                    // longer renders it (see PopplerAnnotationProxy::notifyModification), so Okular draws it live
+                    // from its own model. This gives a real preview instead of just an outline.
+                    if ((annFlags & (Okular::Annotation::BeingResized | Okular::Annotation::BeingMoved)) && boundary.intersects(limitRect)) {
                         switch (ann->subType()) {
                         case Okular::Annotation::ALine:
                         case Okular::Annotation::AHighlight:
@@ -195,7 +198,8 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
                             break;
                         }
                     } else if (annFlags & Okular::Annotation::BeingMoved) {
-                        // Moving externally drawn annotations retains the existing bounding-box preview.
+                        // Not visible in this paint region: nothing to draw live. Types without a live renderer
+                        // (default case above) fall back to the bounding-box preview.
                         boundingRectOnlyAnn = ann;
                     }
                     continue;

@@ -692,10 +692,30 @@ public:
         }
         rect.right = rect.left + size;
         rect.bottom = rect.top + size;
-        QRect boundrect = rect.geometry((int)xScale, (int)yScale).adjusted(0, 0, 1, 1);
+        // Dirty rect of the live preview, in item pixels. Two requirements:
+        //  - It must cover everything paint() can touch, including half the pen width and the antialiasing
+        //    bleed on every side. A rect that is too tight leaves the previous frame's outline behind as residue.
+        //  - It must not be larger than needed: every pixel in it is repainted (page + all annotations below)
+        //    on each mouse move. `rect` above mixes normalized coordinates with `size` (pixels), so using it
+        //    here would invalidate everything right of / below the cursor.
+        const QString annotationType = m_annotElement.attribute(QStringLiteral("type"));
+        const bool isGeometry = annotationType == QLatin1String("GeomSquare") || annotationType == QLatin1String("GeomCircle");
+        const qreal penWidth = isGeometry ? qMax<qreal>(1.0, m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("1")).toDouble() * xScale / pagewidth) : 1.0;
+        const int margin = qMax(3, qCeil(penWidth / 2.0) + 2);
+
+        QRect boundrect;
+        if (!pixmap.isNull()) {
+            // hover icon, drawn with its top-left at `rect` and `size` pixels wide
+            boundrect = QRect(qFloor(rect.left * xScale), qFloor(rect.top * yScale), size, size).adjusted(-2, -2, 2, 2);
+        }
         if (m_block) {
             const Okular::NormalizedRect tmprect(qMin(startpoint.x, point.x), qMin(startpoint.y, point.y), qMax(startpoint.x, point.x), qMax(startpoint.y, point.y));
-            boundrect |= tmprect.geometry((int)xScale, (int)yScale).adjusted(0, 0, 1, 1);
+            const QRect dragRect = tmprect.geometry((int)xScale, (int)yScale).normalized().adjusted(-margin, -margin, margin + 1, margin + 1);
+            boundrect = boundrect.isNull() ? dragRect : (boundrect | dragRect);
+        }
+        if (boundrect.isNull()) {
+            // nothing is painted for this tool; just report the pointer position
+            boundrect = QRect(qFloor(point.x * xScale), qFloor(point.y * yScale), 1, 1);
         }
         return boundrect;
     }

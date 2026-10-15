@@ -1683,6 +1683,14 @@ void PageView::notifyPageChanged(int pageNumber, int changedFlags)
         return;
     }
 
+    // While an annotation is dragged, MouseAnnotation already invalidates the old and new
+    // bounding rects on every step. Rebuilding annotation windows/panels and repainting the
+    // whole page per mouse move is redundant and is what makes dragging stutter.
+    if (changedFlags == DocumentObserver::Annotations && d->mouseAnnotation->isDragInProgress()) {
+        updateAnnotationSelectionPanel(); // keep the floating panel attached to the dragged annotation
+        return;
+    }
+
     if (changedFlags & DocumentObserver::Annotations) {
         if (changedFlags & DocumentObserver::Pixmap) {
             d->annotator->cancelPendingFreehandHandoff();
