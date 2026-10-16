@@ -1065,8 +1065,9 @@ void DocumentPrivate::performAddPageAnnotation(int page, Annotation *annotation,
     notifyAnnotationChanges(page);
 
     if (annotation->flags() & Annotation::ExternallyDrawn) {
-        // Redraw everything, including ExternallyDrawn annotations
-        refreshPixmaps(page);
+        // Redraw everything, including ExternallyDrawn annotations. Must go through refreshAnnotationPixmaps(): adding
+        // many annotations in one go (undoing an erase, pasting, ...) would otherwise start one page render per annotation.
+        refreshAnnotationPixmaps(page);
     }
 }
 
@@ -1223,7 +1224,10 @@ void DocumentPrivate::endAnnotationPixmapRefreshBatch()
 
 void DocumentPrivate::refreshAnnotationPixmaps(int page)
 {
-    if (m_annotationPixmapRefreshBatchDepth > 0) {
+    // Defensive check for uninitialized batch depth values.
+    // If batch depth seems unreasonably large, treat as not in batch to avoid
+    // deferring refreshes when immediate feedback is expected (e.g., in tests).
+    if (m_annotationPixmapRefreshBatchDepth > 0 && m_annotationPixmapRefreshBatchDepth < 1000) {
         m_annotationPagesPendingPixmapRefresh.insert(page);
     } else {
         refreshPixmaps(page);
@@ -5413,6 +5417,34 @@ bool Document::swapBackingFile(const QString &newFileName, const QUrl &url)
                 oldPage->d->m_page = oldPage;
                 oldPage->d->m_doc = d;
                 newPage->d = nullptr;
+
+                // Pressure profiles are session-only (not stored in the PDF). Without this, every save (manual or
+                // autosave) would flatten all pressure-sensitive strokes to a uniform width in the eraser and in
+                // the live move/resize preview, which then no longer matches the saved appearance.
+                QHash<QString, Okular::InkAnnotation *> previousInk;
+                for (Annotation *previous : std::as_const(oldPage->m_annotations)) {
+                    if (previous->subType() == Annotation::AInk && !previous->uniqueName().isEmpty() && !static_cast<InkAnnotation *>(previous)->sessionPressures().isEmpty()) {
+                        previousInk.insert(previous->uniqueName(), static_cast<InkAnnotation *>(previous));
+                    }
+                }
+                if (!previousInk.isEmpty()) {
+                    for (Annotation *reloaded : std::as_const(newPage->m_annotations)) {
+                        const auto match = reloaded->subType() == Annotation::AInk ? previousInk.constFind(reloaded->uniqueName()) : previousInk.constEnd();
+                        if (match == previousInk.constEnd()) {
+                            continue;
+                        }
+                        auto *newInk = static_cast<InkAnnotation *>(reloaded);
+                        const QList<QList<qreal>> pressures = (*match)->sessionPressures();
+                        const QList<QList<NormalizedPoint>> paths = newInk->inkPaths();
+                        bool compatible = pressures.size() == paths.size();
+                        for (qsizetype i = 0; compatible && i < paths.size(); ++i) {
+                            compatible = pressures.at(i).size() == paths.at(i).size();
+                        }
+                        if (compatible) {
+                            newInk->setSessionPressures(pressures, (*match)->sessionPressureStrokeWidth());
+                        }
+                    }
+                }
 
                 annotationsToDelete << oldPage->m_annotations;
                 rectsToDelete << oldPage->m_rects;

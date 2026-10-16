@@ -19,3 +19,6 @@ build-dir
 .DS_Store
 /CLAUDE.md
 /AGENTS.md
+
+# CTest output
+/Testing/

@@ -134,6 +134,25 @@ void PagePrivate::imageRotationDone(RotationJob *job)
 
 namespace
 {
+// True if every annotation rect comes before every other rect, which is the order synchronizeAnnotationObjectRects()
+// produces. *firstOther receives the index of the first non-annotation rect (rects.size() if there is none).
+// This is a cheap allocation-free scan, used to skip the full rebuild in the common append/remove cases.
+bool annotationRectsComeFirst(const QList<ObjectRect *> &rects, int *firstOther)
+{
+    int other = rects.size();
+    for (int i = 0; i < rects.size(); ++i) {
+        if (rects.at(i)->objectType() == ObjectRect::OAnnotation) {
+            if (other < i) {
+                return false;
+            }
+        } else if (other == rects.size()) {
+            other = i;
+        }
+    }
+    *firstOther = other;
+    return true;
+}
+
 void synchronizeAnnotationObjectRects(QList<ObjectRect *> &rects, const QList<Annotation *> &annotations)
 {
     QHash<Annotation *, ObjectRect *> annotationRects;
@@ -171,9 +190,17 @@ void PagePrivate::addAnnotation(Annotation *annotation, bool isLastAnnotationChi
         const QTransform matrix = rotationMatrix();
         annotation->d_ptr->annotationTransform(matrix);
 
-        m_page->m_rects.append(rect);
+        // Appending at the end is by far the most common case (loading a page, drawing, pasting). Insert the rect
+        // in its final place directly instead of rebuilding the whole list for every single annotation, which made
+        // loading a page with N annotations O(N^2).
+        int firstOther = 0;
+        if (insertIndex == m_page->m_annotations.size() - 1 && annotationRectsComeFirst(m_page->m_rects, &firstOther)) {
+            m_page->m_rects.insert(firstOther, rect);
+        } else {
+            m_page->m_rects.append(rect);
+            synchronizeAnnotationObjectRects(m_page->m_rects, m_page->m_annotations);
+        }
     }
-    synchronizeAnnotationObjectRects(m_page->m_rects, m_page->m_annotations);
 }
 
 QTransform PagePrivate::rotationMatrix() const
@@ -820,7 +847,11 @@ bool Page::removeAnnotation(Annotation *annotation)
         }
     }
 
-    synchronizeAnnotationObjectRects(m_rects, m_annotations);
+    // Removing keeps the relative order of everything else, so a rebuild is only needed if it was not canonical already.
+    int firstOther = 0;
+    if (!annotationRectsComeFirst(m_rects, &firstOther)) {
+        synchronizeAnnotationObjectRects(m_rects, m_annotations);
+    }
     return true;
 }
 

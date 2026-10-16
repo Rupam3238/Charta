@@ -153,6 +153,7 @@ public:
             }
 
             const QPainterPath sweptCircle = makeSweptCircle(start, m_center);
+            const QLineF sweep(start, m_center);
             const QList<Okular::Annotation *> annotations = page->annotations();
             QSet<Okular::Annotation *> &pendingOnPage = m_pendingAnnotations[pageNumber];
             const QRectF sweptBounds = sweptCircle.boundingRect();
@@ -167,7 +168,7 @@ public:
                 if (!sweptBounds.intersects(candidateBounds)) {
                     continue;
                 }
-                if (sweptCircleIntersectsAnnotation(sweptCircle, annotation, xScale, yScale, page)) {
+                if (sweptCircleIntersectsAnnotation(sweptCircle, sweep, m_width / 2.0, annotation, xScale, yScale, page)) {
                     pendingOnPage.insert(annotation);
                 }
             }
@@ -454,7 +455,36 @@ private:
         }
     }
 
+    // --- plain geometry for ink hit testing: no QPainterPath / QPainterPathStroker allocations per segment ---
+    static qreal crossProduct(const QPointF &a, const QPointF &b, const QPointF &c)
+    {
+        return (b.x() - a.x()) * (c.y() - a.y()) - (b.y() - a.y()) * (c.x() - a.x());
+    }
+
+    static qreal pointSegmentDistanceSq(const QPointF &p, const QPointF &a, const QPointF &b)
+    {
+        const QPointF ab = b - a;
+        const qreal lengthSq = ab.x() * ab.x() + ab.y() * ab.y();
+        const qreal t = lengthSq > 0.0 ? qBound<qreal>(0.0, ((p.x() - a.x()) * ab.x() + (p.y() - a.y()) * ab.y()) / lengthSq, 1.0) : 0.0;
+        const QPointF d = p - (a + ab * t);
+        return d.x() * d.x() + d.y() * d.y();
+    }
+
+    static qreal segmentDistanceSq(const QPointF &a, const QPointF &b, const QPointF &c, const QPointF &d)
+    {
+        const qreal d1 = crossProduct(a, b, c);
+        const qreal d2 = crossProduct(a, b, d);
+        const qreal d3 = crossProduct(c, d, a);
+        const qreal d4 = crossProduct(c, d, b);
+        if (((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0)) && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))) {
+            return 0.0; // the segments cross
+        }
+        return qMin(qMin(pointSegmentDistanceSq(a, c, d), pointSegmentDistanceSq(b, c, d)), qMin(pointSegmentDistanceSq(c, a, b), pointSegmentDistanceSq(d, a, b)));
+    }
+
     static bool sweptCircleIntersectsAnnotation(const QPainterPath &sweptCircle,
+                                                const QLineF &sweep,
+                                                qreal sweepRadius,
                                                 const Okular::Annotation *annotation,
                                                 double xScale,
                                                 double yScale,
@@ -469,6 +499,8 @@ private:
             const qreal baseWidth = qMax<qreal>(1.0, annotation->style().width() * pageScale);
             const qreal storedPressureWidth = ink->sessionPressureStrokeWidth() > 0.0 ? ink->sessionPressureStrokeWidth() : annotation->style().width();
             const qreal pressureWidth = storedPressureWidth * pageScale;
+            // The eraser is a round brush: a stroke is hit when the distance between the brush sweep and the
+            // stroke's centre line is at most (brush radius + half the stroke width at that point).
 
             for (qsizetype pathIndex = 0; pathIndex < paths.size(); ++pathIndex) {
                 const auto &points = paths.at(pathIndex);
@@ -476,31 +508,16 @@ private:
                     continue;
                 }
                 const auto pressurePath = pressures.value(pathIndex);
-                if (pressurePath.size() == points.size() && pressurePath.size() > 1) {
-                    for (qsizetype i = 1; i < points.size(); ++i) {
-                        QPainterPath segment;
-                        segment.moveTo(toPagePixels(points.at(i - 1), xScale, yScale));
-                        segment.lineTo(toPagePixels(points.at(i), xScale, yScale));
-                        QPainterPathStroker stroker;
-                        stroker.setWidth(qBound<qreal>(0.5, pressurePath.at(i) * pressureWidth, 100.0));
-                        stroker.setCapStyle(Qt::RoundCap);
-                        if (sweptCircle.intersects(stroker.createStroke(segment))) {
-                            return true;
-                        }
-                    }
-                } else {
-                    QPainterPath path;
-                    path.moveTo(toPagePixels(points.first(), xScale, yScale));
-                    for (qsizetype i = 1; i < points.size(); ++i) {
-                        path.lineTo(toPagePixels(points.at(i), xScale, yScale));
-                    }
-                    QPainterPathStroker stroker;
-                    stroker.setWidth(baseWidth);
-                    stroker.setCapStyle(Qt::SquareCap);
-                    stroker.setJoinStyle(Qt::MiterJoin);
-                    if (sweptCircle.intersects(stroker.createStroke(path))) {
+                const bool hasPressure = pressurePath.size() == points.size() && pressurePath.size() > 1;
+                QPointF previous = toPagePixels(points.first(), xScale, yScale);
+                for (qsizetype i = 1; i < points.size(); ++i) {
+                    const QPointF current = toPagePixels(points.at(i), xScale, yScale);
+                    const qreal halfWidth = (hasPressure ? qBound<qreal>(0.5, pressurePath.at(i) * pressureWidth, 100.0) : baseWidth) / 2.0;
+                    const qreal reach = sweepRadius + halfWidth;
+                    if (segmentDistanceSq(sweep.p1(), sweep.p2(), previous, current) <= reach * reach) {
                         return true;
                     }
+                    previous = current;
                 }
             }
             return false;
