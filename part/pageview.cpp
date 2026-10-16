@@ -2939,7 +2939,9 @@ void PageView::mouseReleaseEvent(QMouseEvent *e)
                     if (d->annotationSelectionPath.isEmpty() || QLineF(d->annotationSelectionPath.constLast(), eventPos).length() >= 2.0) {
                         d->annotationSelectionPath.append(eventPos);
                     }
-                    if (d->annotationSelectionPath.size() >= 3 && (eventPos - d->annotationSelectionStart).manhattanLength() >= QApplication::startDragDistance()) {
+                    if (d->annotationSelectionPath.size() >= 3
+                        && d->annotationSelectionPath.boundingRect().width() >= 20.0
+                        && d->annotationSelectionPath.boundingRect().height() >= 20.0) {
                         QPolygonF pagePath;
                         const QPoint pageOrigin = d->annotationSelectionItem->uncroppedGeometry().topLeft();
                         for (const QPointF &point : std::as_const(d->annotationSelectionPath)) {
