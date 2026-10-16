@@ -213,6 +213,9 @@ public:
         OpenNeedsPassword //< The document needs a password to be opened or the one provided is not the correct
     };
 
+    /// @since 24.12
+    static const uint InvalidPage = static_cast<uint>(-1);
+
     /**
      * Opens the document.
      * @since 0.20 (KDE 4.14)
@@ -324,6 +327,47 @@ public:
      * Returns the number of pages of the document.
      */
     uint pages() const;
+
+    /**
+     * Inserts a page at the specified position.
+     * @param position The position at which to insert the page (0-based index)
+     * @param page The page to insert (ownership is transferred to the document)
+     * @return The actual position where the page was inserted, or InvalidPage on failure
+     * @since 24.12
+     */
+    uint insertPage(uint position, Okular::Page *page);
+
+    /**
+     * Appends a page to the end of the document.
+     * @param page The page to append (ownership is transferred to the document)
+     * @return The position where the page was inserted, or InvalidPage on failure
+     * @since 24.12
+     */
+    uint appendPage(Okular::Page *page);
+
+    /**
+     * Removes the page at the specified position.
+     * @param position The position of the page to remove (0-based index)
+     * @return true if the page was successfully removed, false otherwise
+     * @since 24.12
+     */
+    bool removePage(uint position);
+
+    /**
+     * Moves a page from one position to another.
+     * @param fromPosition The current position of the page (0-based index)
+     * @param toPosition The new position for the page (0-based index)
+     * @return true if the page was successfully moved, false otherwise
+     * @since 24.12
+     */
+    bool movePage(uint fromPosition, uint toPosition);
+
+    /**
+     * Returns the list of all pages in the document.
+     * @return A list containing all pages in the document
+     * @since 24.12
+     */
+    QList<Okular::Page *> allPages() const;
 
     /**
      * Returns the url of the currently opened document.

@@ -56,8 +56,12 @@ public:
     enum SetupFlags {
         DocumentChanged = 1,   ///< The document is a new document.
         NewLayoutForPages = 2, ///< All the pages have
-        UrlChanged = 4         ///< The URL has changed @since 1.3
+        UrlChanged = 4,        ///< The URL has changed @since 1.3
+        PagesInserted = 8,     ///< Pages have been inserted @since 24.12
+        PagesRemoved = 16,     ///< Pages have been removed @since 24.12
+        PagesMoved = 32        ///< Pages have been moved/reordered @since 24.12
     };
+Q_DECLARE_FLAGS(SetupFlagsValue, SetupFlags)
 
     /**
      * This method is called whenever the document is initialized or reconstructed.

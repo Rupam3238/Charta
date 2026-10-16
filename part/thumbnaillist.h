@@ -12,6 +12,13 @@
 
 #include "core/observer.h"
 
+struct NewPageData {
+    double width;
+    double height;
+    QColor backgroundColor;
+    int count;
+};
+
 class ThumbnailListPrivate;
 
 namespace Okular
@@ -63,6 +70,15 @@ protected:
 
 Q_SIGNALS:
     void rightClick(const Okular::Page *, const QPoint);
+    void pagesDeleted(const QList<int> &pageNumbers);
+    void pageAddedBefore(int pageNumber);
+    void pageAddedAfter(int pageNumber);
+    void pageAdded(const NewPageData &data);
+    void pagesReordered(int fromIndex, int toIndex);
+
+public:
+    QList<int> selectedPageNumbers() const;
+    void setMultiSelect(bool enabled);
 
 private:
     friend class ThumbnailListPrivate;

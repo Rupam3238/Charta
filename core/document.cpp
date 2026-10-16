@@ -11,6 +11,7 @@
 #include "document.h"
 #include "document_p.h"
 #include "documentcommands_p.h"
+#include "observer.h"
 
 #include <algorithm>
 #include <limits.h>
@@ -6484,6 +6485,81 @@ QString DocumentInfo::getKeyTitle(Key key) // const
         return QString();
         break;
     }
+}
+
+uint Document::insertPage(uint position, Okular::Page *page)
+{
+    if (!d->m_generator) {
+        delete page;
+        return InvalidPage;
+    }
+
+    if (position > d->m_pagesVector.size()) {
+        position = d->m_pagesVector.size();
+    }
+
+    d->m_pagesVector.insert(position, page);
+
+    // Notify observers about the page insertion
+    for (DocumentObserver *observer : std::as_const(d->m_observers)) {
+        observer->notifySetup(QList<Okular::Page *>() << page, static_cast<int>(Okular::DocumentObserver::SetupFlags::PagesInserted));
+    }
+
+    return position;
+}
+
+uint Document::appendPage(Okular::Page *page)
+{
+    return insertPage(pages(), page);
+}
+
+bool Document::removePage(uint position)
+{
+    if (!d->m_generator || position >= d->m_pagesVector.size()) {
+        return false;
+    }
+
+    Okular::Page *page = d->m_pagesVector.takeAt(position);
+    delete page;
+
+    // Notify observers about the page removal
+    for (DocumentObserver *observer : std::as_const(d->m_observers)) {
+        observer->notifySetup(QList<Okular::Page *>(), static_cast<int>(Okular::DocumentObserver::SetupFlags::PagesRemoved));
+    }
+
+    return true;
+}
+
+bool Document::movePage(uint fromPosition, uint toPosition)
+{
+    if (!d->m_generator || fromPosition >= d->m_pagesVector.size() || toPosition > d->m_pagesVector.size()) {
+        return false;
+    }
+
+    if (fromPosition == toPosition) {
+        return true;
+    }
+
+    Okular::Page *page = d->m_pagesVector.takeAt(fromPosition);
+
+    // Adjust toPosition if we're moving an item before it
+    if (toPosition > fromPosition) {
+        toPosition--;
+    }
+
+    d->m_pagesVector.insert(toPosition, page);
+
+    // Notify observers about the page movement
+    for (DocumentObserver *observer : std::as_const(d->m_observers)) {
+        observer->notifySetup(QList<Okular::Page *>() << page, static_cast<int>(Okular::DocumentObserver::SetupFlags::PagesMoved));
+    }
+
+    return true;
+}
+
+QList<Okular::Page *> Document::allPages() const
+{
+    return d->m_pagesVector;
 }
 
 QString DocumentInfo::getKeyTitle(const QString &key) const
