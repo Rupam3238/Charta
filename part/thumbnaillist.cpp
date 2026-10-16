@@ -10,6 +10,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QIcon>
+#include <QMenu>
 #include <QPainter>
 #include <QResizeEvent>
 #include <QScrollBar>
@@ -75,6 +76,15 @@ public:
     ThumbnailWidget *m_mouseGrabItem;
     int m_pageCurrentlyGrabbed;
 
+    // Multi-select variables
+    QSet<int> m_selectedPageNumbers;
+    int m_lastSelectedPage;
+    bool m_multiSelect;
+
+    // Drag reorder variables
+    int m_dragFromIndex;
+    QPoint m_dragStartPos;
+
     // resize thumbnails to fit the width
     void viewportResizeEvent(QResizeEvent *);
     // called by ThumbnailWidgets to send (forward) the mouse move signals
@@ -91,6 +101,14 @@ public:
     ThumbnailWidget *getPageByNumber(int page) const;
     int getNewPageOffset(int n, ThumbnailListPrivate::ChangePageDirection dir) const;
     ThumbnailWidget *getThumbnailbyOffset(int current, int offset) const;
+
+public:
+    void setMultiSelect(bool enabled) {
+        m_multiSelect = enabled;
+        if (!enabled) {
+            m_selectedPageNumbers.clear();
+        }
+    }
 
 protected:
     void mousePressEvent(QMouseEvent *e) override;
@@ -198,6 +216,9 @@ ThumbnailListPrivate::ThumbnailListPrivate(ThumbnailList *qq, Okular::Document *
     , m_delayTimer(nullptr)
     , m_vectorIndex(0)
     , m_pageCurrentlyGrabbed(0)
+    , m_lastSelectedPage(-1)
+    , m_multiSelect(false)
+    , m_dragFromIndex(-1)
 {
     setMouseTracking(true);
     m_mouseGrabItem = nullptr;
@@ -278,6 +299,12 @@ ThumbnailList::~ThumbnailList()
 // BEGIN DocumentObserver inherited methods
 void ThumbnailList::notifySetup(const QList<Okular::Page *> &pages, int setupFlags)
 {
+    // Preserve selection across rebuilds
+    QSet<int> preservedSelection;
+    if (!(setupFlags & Okular::DocumentObserver::DocumentChanged)) {
+        preservedSelection = d->m_selectedPageNumbers;
+    }
+
     // if there was a widget selected, save its pagenumber to restore
     // its selection (if available in the new set of pages)
     int prevPage = -1;
@@ -337,6 +364,22 @@ void ThumbnailList::notifySetup(const QList<Okular::Page *> &pages, int setupFla
                 centerHeight = height + t->height() / 2;
             }
             height += t->height() + this->style()->layoutSpacing(QSizePolicy::Frame, QSizePolicy::Frame, Qt::Vertical);
+        }
+    }
+
+    // Restore selection after thumbnail regeneration
+    if (!preservedSelection.isEmpty()) {
+        d->m_selectedPageNumbers = preservedSelection;
+        // Update selection states of all thumbnails
+        for (ThumbnailWidget *thumb : d->m_thumbnails) {
+            thumb->setSelected(d->m_selectedPageNumbers.contains(thumb->pageNumber()));
+        }
+        // Update m_selected to the first selected item if any
+        for (ThumbnailWidget *thumb : d->m_thumbnails) {
+            if (d->m_selectedPageNumbers.contains(thumb->pageNumber())) {
+                d->m_selected = thumb;
+                break;
+            }
         }
     }
 
@@ -448,6 +491,14 @@ bool ThumbnailList::canUnloadPixmap(int pageNumber) const
     return true;
 }
 // END DocumentObserver inherited methods
+
+QList<int> ThumbnailList::selectedPageNumbers() const {
+    QList<int> result;
+    for (int page : d->m_selectedPageNumbers) {
+        result.append(page);
+    }
+    return result;
+}
 
 void ThumbnailList::updateWidgets()
 {
@@ -756,20 +807,82 @@ void ThumbnailListPrivate::mousePressEvent(QMouseEvent *e)
     const QRect r = item->visibleRect();
     const int margin = ThumbnailWidget::margin();
     const QPoint p = e->pos() - item->pos();
+    const int clickedPageNumber = item->pageNumber();
 
-    if (e->button() != Qt::RightButton && r.contains(p - QPoint(margin / 2, margin / 2))) {
-        m_mouseGrabPos.setX(0);
-        m_mouseGrabPos.setY(0);
-        m_mouseGrabItem = item;
-        m_pageCurrentlyGrabbed = item->pageNumber();
-        m_mouseGrabItem = item;
+    // Handle multi-select modifiers
+    if (m_multiSelect) {
+        if (e->modifiers() & Qt::ControlModifier) {
+            // Ctrl/Cmd+click: toggle selection of clicked item
+            if (m_selectedPageNumbers.contains(clickedPageNumber)) {
+                m_selectedPageNumbers.remove(clickedPageNumber);
+                item->setSelected(false);
+            } else {
+                m_selectedPageNumbers.insert(clickedPageNumber);
+                item->setSelected(true);
+            }
+            m_lastSelectedPage = clickedPageNumber;
+        } else if (e->modifiers() & Qt::ShiftModifier && m_lastSelectedPage != -1) {
+            // Shift+click: select range from last selected to clicked
+            int start = qMin(m_lastSelectedPage, clickedPageNumber);
+            int end = qMax(m_lastSelectedPage, clickedPageNumber);
+
+            // Clear current selection and select range
+            m_selectedPageNumbers.clear();
+            for (int i = start; i <= end; ++i) {
+                m_selectedPageNumbers.insert(i);
+            }
+
+            // Update selection states of all thumbnails
+            for (ThumbnailWidget *thumb : m_thumbnails) {
+                thumb->setSelected(m_selectedPageNumbers.contains(thumb->pageNumber()));
+            }
+
+            m_lastSelectedPage = clickedPageNumber;
+        } else {
+            // Regular click: select only this item
+            if (!m_selectedPageNumbers.contains(clickedPageNumber)) {
+                m_selectedPageNumbers.clear();
+                m_selectedPageNumbers.insert(clickedPageNumber);
+                m_lastSelectedPage = clickedPageNumber;
+
+                // Update selection states
+                for (ThumbnailWidget *thumb : m_thumbnails) {
+                    thumb->setSelected(m_selectedPageNumbers.contains(thumb->pageNumber()));
+                }
+            }
+        }
     } else {
-        m_mouseGrabPos.setX(0);
-        m_mouseGrabPos.setY(0);
-        m_mouseGrabItem = nullptr;
+        // Single select mode (original behavior)
+        if (e->button() != Qt::RightButton && r.contains(p - QPoint(margin / 2, margin / 2))) {
+            m_mouseGrabPos.setX(0);
+            m_mouseGrabPos.setY(0);
+            m_mouseGrabItem = item;
+            m_pageCurrentlyGrabbed = item->pageNumber();
+            m_mouseGrabItem = item;
+        } else {
+            m_mouseGrabPos.setX(0);
+            m_mouseGrabPos.setY(0);
+            m_mouseGrabItem = nullptr;
+        }
     }
 
-    CursorWrapHelper::startDrag();
+    // Start drag operation if not a right-click and we're in single select mode
+    // or if we clicked on the drag area (not just selecting)
+    if (!m_multiSelect || !(e->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier))) {
+        if (e->button() != Qt::RightButton && r.contains(p - QPoint(margin / 2, margin / 2))) {
+            m_mouseGrabPos.setX(0);
+            m_mouseGrabPos.setY(0);
+            m_mouseGrabItem = item;
+            m_pageCurrentlyGrabbed = item->pageNumber();
+            m_mouseGrabItem = item;
+
+            // Initialize drag start position
+            m_dragStartPos = e->pos();
+            m_dragFromIndex = item->pageNumber();
+
+            CursorWrapHelper::startDrag();
+        }
+    }
 }
 
 void ThumbnailListPrivate::mouseReleaseEvent(QMouseEvent *e)
@@ -795,6 +908,10 @@ void ThumbnailListPrivate::mouseReleaseEvent(QMouseEvent *e)
     setCursor(Qt::OpenHandCursor);
     m_mouseGrabPos.setX(0);
     m_mouseGrabPos.setY(0);
+
+    // Reset drag state
+    m_dragStartPos = QPoint();
+    m_dragFromIndex = -1;
 }
 
 void ThumbnailListPrivate::mouseMoveEvent(QMouseEvent *e)
@@ -823,6 +940,24 @@ void ThumbnailListPrivate::mouseMoveEvent(QMouseEvent *e)
         e->ignore();
         return;
     }
+
+    // Drag reorder functionality
+    if (m_mouseGrabItem && !m_dragStartPos.isNull()) {
+        // Check if we've moved far enough to start a drag operation
+        int dragDistance = (e->pos() - m_dragStartPos).manhattanLength();
+        if (dragDistance >= QApplication::startDragDistance()) {
+            // We're dragging - reorder the thumbnail
+            const ThumbnailWidget *item = itemFor(e->pos());
+            if (item && item != m_mouseGrabItem) {
+                int toIndex = item->pageNumber();
+                // Emit the reorder signal
+                Q_EMIT q->pagesReordered(m_dragFromIndex, toIndex);
+                // Update our drag source index for continued dragging
+                m_dragFromIndex = toIndex;
+            }
+        }
+    }
+
     const QRect r = m_mouseGrabItem->rect();
     if (!m_mouseGrabPos.isNull()) {
         const QPoint mousePos = e->pos();
@@ -926,9 +1061,63 @@ void ThumbnailListPrivate::wheelEvent(QWheelEvent *e)
 void ThumbnailListPrivate::contextMenuEvent(QContextMenuEvent *e)
 {
     const ThumbnailWidget *item = itemFor(e->pos());
-    if (item) {
-        Q_EMIT q->rightClick(item->page(), e->globalPos());
+    if (!item) {
+        e->ignore();
+        return;
     }
+
+    QMenu menu;
+    QList<int> selectedPages = q->selectedPageNumbers();
+    bool hasSelection = !selectedPages.isEmpty();
+    bool isItemSelected = selectedPages.contains(item->pageNumber());
+
+    // Add actions based on selection state
+    if (hasSelection) {
+        if (selectedPages.size() == 1) {
+            // Single page selected
+            menu.addAction(i18n("Delete this page"), this, [this, item]() {
+                Q_EMIT q->pagesDeleted(QList<int>() << item->pageNumber());
+            });
+            menu.addAction(i18n("Add page before"), this, [this, item]() {
+                Q_EMIT q->pageAddedBefore(item->pageNumber());
+            });
+            menu.addAction(i18n("Add page after"), this, [this, item]() {
+                Q_EMIT q->pageAddedAfter(item->pageNumber());
+            });
+        } else {
+            // Multiple pages selected
+            menu.addAction(i18n("Delete %1 pages").arg(selectedPages.size()), this, [this, selectedPages]() {
+                Q_EMIT q->pagesDeleted(selectedPages);
+            });
+        }
+        menu.addSeparator();
+    }
+
+    // Always available actions
+    menu.addAction(i18n("Add page…"), this, [this]() {
+        // In a real implementation, this would open a NewPageDialog
+        // For now, we'll create a default page
+        NewPageData data;
+        data.width = 595.0;  // A4 width in points
+        data.height = 842.0; // A4 height in points
+        data.backgroundColor = Qt::white;
+        data.count = 1;
+        Q_EMIT q->pageAdded(data);
+    });
+    menu.addAction(i18n("Select all"), this, [this]() {
+        // Select all pages
+        QList<int> allPages;
+        for (int i = 0; i < m_document->pages(); ++i) {
+            allPages.append(i);
+        }
+        m_selectedPageNumbers = QSet<int>(allPages.begin(), allPages.end());
+        // Update thumbnail selection states
+        for (ThumbnailWidget *thumb : m_thumbnails) {
+            thumb->setSelected(m_selectedPageNumbers.contains(thumb->pageNumber()));
+        }
+    });
+
+    menu.exec(e->globalPos());
 }
 
 void ThumbnailWidget::paint(QPainter &p, const QRect _clipRect)

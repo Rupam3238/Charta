@@ -188,6 +188,13 @@ public Q_SLOTS: // dbus
     Q_SCRIPTABLE void slotCopyTextSelectionOrAnnotation();
     Q_SCRIPTABLE void slotPasteAnnotation();
 
+// Document Builder Page Management Slots
+    void slotDeletePages(const QList<int> &pageNumbers);
+    void slotInsertPageBefore(int pageNumber);
+    void slotInsertPageAfter(int pageNumber);
+    void slotAddPage();
+    void slotReorderPages(int fromIndex, int toIndex);
+
 Q_SIGNALS:
     void enablePrintAction(bool enable);
     void openSourceReference(const QString &absFileName, int line, int column); /* NOLINT(bugprone-derived-method-shadowing-base-method) cppcheck-suppress duplInheritedMember; see viewerinterface*/
