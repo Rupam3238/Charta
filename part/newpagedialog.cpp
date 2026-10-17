@@ -20,7 +20,9 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 #include <QVariant>
+#include <KConfigGroup>
 #include <KLocalizedString>
+#include <KSharedConfig>
 
 #include <cmath>
 #include <utility>
@@ -33,6 +35,12 @@ namespace
 bool nearlyEqual(double a, double b)
 {
     return std::abs(a - b) < 0.5;
+}
+
+// The background color is remembered between dialogs (and sessions): a new page starts with the color used last
+KConfigGroup newPageConfigGroup()
+{
+    return KConfigGroup(KSharedConfig::openConfig(QStringLiteral("okularrc")), QStringLiteral("New Page Dialog"));
 }
 }
 
@@ -59,6 +67,11 @@ NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize)
 {
     setWindowTitle(i18n("Add New Page"));
     setModal(true);
+
+    const QColor rememberedColor = newPageConfigGroup().readEntry("BackgroundColor", QColor(Qt::white));
+    if (rememberedColor.isValid()) {
+        d->backgroundColor = rememberedColor;
+    }
 
     d->hasReference = referenceSize.isValid() && referenceSize.width() >= 10.0 && referenceSize.height() >= 10.0;
 
@@ -250,6 +263,11 @@ void NewPageDialog::accept()
     d->widthSpinBox->interpretText();
     d->heightSpinBox->interpretText();
     d->countSpinBox->interpretText();
+
+    KConfigGroup group = newPageConfigGroup();
+    group.writeEntry("BackgroundColor", d->backgroundColor);
+    group.sync();
+
     QDialog::accept();
 }
 

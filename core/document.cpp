@@ -2340,13 +2340,11 @@ QList<int> DocumentPrivate::beginPageStructureChange(const QList<int> &oldToNew)
     // nothing may be running or queued for the old page indices
     clearAndWaitForRequests();
 
-    // drop searches (they keep page indices) and the undo history (it refers to pages and annotations)
+    // drop searches (they keep page indices). The undo history is kept: page edits are undoable commands, and
+    // undoing in order always finds the pages in the layout the older commands were made for.
     const QList<int> searchIds = m_searches.keys();
     for (const int id : searchIds) {
         m_parent->resetSearch(id);
-    }
-    if (m_undoStack) {
-        m_undoStack->clear();
     }
 
     // bookmarks are stored by page index: take them off the old indices, they are put back on the new ones later
@@ -2418,6 +2416,56 @@ void DocumentPrivate::endPageStructureChange(const QList<int> &oldToNew, const Q
     }
 }
 
+void DocumentPrivate::applyPageOrder(const QList<Page *> &newOrder)
+{
+    const QList<Page *> oldOrder = m_pagesVector;
+
+    QHash<const Page *, int> newIndexOf;
+    newIndexOf.reserve(newOrder.size());
+    for (int i = 0; i < newOrder.size(); ++i) {
+        newIndexOf.insert(newOrder.at(i), i);
+    }
+    QSet<const Page *> oldSet;
+    oldSet.reserve(oldOrder.size());
+
+    QList<int> oldToNew(oldOrder.size());
+    bool anyRemoved = false;
+    for (int i = 0; i < oldOrder.size(); ++i) {
+        oldSet.insert(oldOrder.at(i));
+        oldToNew[i] = newIndexOf.value(oldOrder.at(i), -1);
+        anyRemoved = anyRemoved || oldToNew.at(i) < 0;
+    }
+    bool anyInserted = false;
+    for (const Page *page : newOrder) {
+        anyInserted = anyInserted || !oldSet.contains(page);
+    }
+
+    int setupFlag = DocumentObserver::PagesMoved;
+    if (anyRemoved || anyInserted) {
+        setupFlag = (anyRemoved ? DocumentObserver::PagesRemoved : 0) | (anyInserted ? DocumentObserver::PagesInserted : 0);
+    }
+
+    const QList<int> bookmarked = beginPageStructureChange(oldToNew);
+
+    for (Page *page : newOrder) {
+        if (!oldSet.contains(page)) {
+            page->d->m_doc = this;
+            page->d->rotateAt(m_rotation);
+        }
+    }
+    m_pagesVector = newOrder;
+    renumberPages();
+
+    endPageStructureChange(oldToNew, bookmarked, setupFlag);
+
+    // the pages that left the document keep their content for a later undo, but not what was rendered for the views
+    for (Page *page : oldOrder) {
+        if (!newIndexOf.contains(page)) {
+            page->deletePixmaps();
+        }
+    }
+}
+
 bool Document::canModifyPages() const
 {
     return d->m_generator && !d->m_generatorName.isEmpty() && d->m_generatorName.contains(QLatin1String("poppler"), Qt::CaseInsensitive);
@@ -2444,24 +2492,15 @@ bool Document::insertPages(int index, const QList<Page *> &pages)
         }
     }
 
-    const int oldCount = d->m_pagesVector.size();
-    const int added = pages.size();
-    QList<int> oldToNew(oldCount);
-    for (int i = 0; i < oldCount; ++i) {
-        oldToNew[i] = (i < index) ? i : i + added;
-    }
-
-    const QList<int> bookmarked = d->beginPageStructureChange(oldToNew);
-
+    const QList<Page *> before = d->m_pagesVector;
+    QList<Page *> after = before;
     int position = index;
     for (Page *page : pages) {
-        page->d->m_doc = d;
-        page->d->rotateAt(d->m_rotation);
-        d->m_pagesVector.insert(position++, page);
+        after.insert(position++, page);
     }
-    d->renumberPages();
 
-    d->endPageStructureChange(oldToNew, bookmarked, DocumentObserver::PagesInserted);
+    // pushing the command applies it
+    d->m_undoStack->push(new PageStructureCommand(d, before, after, i18np("insert page", "insert %1 pages", pages.size())));
     return true;
 }
 
@@ -2493,31 +2532,17 @@ bool Document::removePages(const QList<int> &indices)
         return false;
     }
 
-    QList<int> oldToNew(oldCount);
-    int next = 0;
+    const QList<Page *> before = d->m_pagesVector;
+    QList<Page *> after;
+    after.reserve(oldCount - toRemove.size());
     for (int i = 0; i < oldCount; ++i) {
-        oldToNew[i] = toRemove.contains(i) ? -1 : next++;
-    }
-
-    const QList<int> bookmarked = d->beginPageStructureChange(oldToNew);
-
-    QList<Page *> removedPages;
-    QList<Page *> kept;
-    kept.reserve(oldCount - toRemove.size());
-    for (int i = 0; i < oldCount; ++i) {
-        if (toRemove.contains(i)) {
-            removedPages.append(d->m_pagesVector.at(i));
-        } else {
-            kept.append(d->m_pagesVector.at(i));
+        if (!toRemove.contains(i)) {
+            after.append(before.at(i));
         }
     }
-    d->m_pagesVector = kept;
-    d->renumberPages();
 
-    d->endPageStructureChange(oldToNew, bookmarked, DocumentObserver::PagesRemoved);
-
-    // the observers do not know the removed pages any more: it is safe to delete them now
-    qDeleteAll(removedPages);
+    // the removed pages are kept by the command, until the history is cleared
+    d->m_undoStack->push(new PageStructureCommand(d, before, after, i18np("delete page", "delete %1 pages", toRemove.size())));
     return true;
 }
 
@@ -2570,17 +2595,14 @@ bool Document::movePages(const QList<int> &indices, int to)
         return false;
     }
 
-    const QList<int> bookmarked = d->beginPageStructureChange(oldToNew);
-
+    const QList<Page *> before = d->m_pagesVector;
     QList<Page *> reordered;
     reordered.reserve(count);
     for (const int oldIndex : std::as_const(newOrder)) {
-        reordered.append(d->m_pagesVector.at(oldIndex));
+        reordered.append(before.at(oldIndex));
     }
-    d->m_pagesVector = reordered;
-    d->renumberPages();
 
-    d->endPageStructureChange(oldToNew, bookmarked, DocumentObserver::PagesMoved);
+    d->m_undoStack->push(new PageStructureCommand(d, before, reordered, i18np("move page", "move %1 pages", moved.size())));
     return true;
 }
 

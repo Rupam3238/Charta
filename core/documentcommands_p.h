@@ -253,6 +253,32 @@ private:
     int m_prevIndex;
 };
 
+/**
+ * Undoable change of the page layout of the document: pages inserted, removed or moved.
+ *
+ * It keeps the whole page order before and after the change. The pages that are not part of the document in the
+ * current state (deleted pages when the command is applied, inserted pages when it is undone) are kept alive here,
+ * so that undoing brings back the very same pages, annotations included, and are deleted with the command, that is
+ * when the history is cleared (the document is closed or reloaded) or the redo branch is discarded.
+ */
+class PageStructureCommand : public OkularUndoCommand
+{
+public:
+    PageStructureCommand(Okular::DocumentPrivate *docPriv, const QList<Okular::Page *> &before, const QList<Okular::Page *> &after, const QString &text);
+    ~PageStructureCommand() override;
+
+    void undo() override;
+    void redo() override;
+
+    bool refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector) override;
+
+private:
+    Okular::DocumentPrivate *m_docPriv;
+    QList<Okular::Page *> m_before;
+    QList<Okular::Page *> m_after;
+    bool m_applied;
+};
+
 class EditFormButtonsCommand : public OkularUndoCommand
 {
 public:

@@ -235,6 +235,9 @@ public:
     QList<int> beginPageStructureChange(const QList<int> &oldToNew);
     // Remaps all the state that is keyed by page index and tells the observers about the new layout
     void endPageStructureChange(const QList<int> &oldToNew, const QList<int> &bookmarkedPages, int setupFlag);
+    // Makes @p newOrder the list of pages of the document. The pages that are not in it any more are not deleted
+    // (they are owned by the undo command that removed them), the ones that were not in the document are adopted.
+    void applyPageOrder(const QList<Page *> &newOrder);
     // Fills a pixmap request for a blank page without involving the generator
     void generateBlankPagePixmap(PixmapRequest *request);
 

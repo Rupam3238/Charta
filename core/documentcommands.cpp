@@ -19,6 +19,8 @@
 
 #include <KLocalizedString>
 
+#include <QSet>
+
 namespace Okular
 {
 void moveViewportIfBoundingRectNotFullyVisible(Okular::NormalizedRect boundingRect, DocumentPrivate *docPriv, int pageNumber)
@@ -719,6 +721,51 @@ void EditFormButtonsCommand::clearFormButtonStates()
     for (FormFieldButton *formButton : std::as_const(m_formButtons)) {
         formButton->setState(false);
     }
+}
+
+
+PageStructureCommand::PageStructureCommand(Okular::DocumentPrivate *docPriv, const QList<Okular::Page *> &before, const QList<Okular::Page *> &after, const QString &text)
+    : m_docPriv(docPriv)
+    , m_before(before)
+    , m_after(after)
+    , m_applied(false)
+{
+    setText(text);
+}
+
+PageStructureCommand::~PageStructureCommand()
+{
+    // The pages that are not in the document in the current state are owned by the command. Only pointers are
+    // compared here: the pages of the document may already be gone when the document is closed.
+    const QList<Okular::Page *> &present = m_applied ? m_after : m_before;
+    const QList<Okular::Page *> &absent = m_applied ? m_before : m_after;
+    const QSet<const Okular::Page *> presentSet(present.cbegin(), present.cend());
+    QSet<const Okular::Page *> deleted;
+    for (Okular::Page *page : absent) {
+        if (!presentSet.contains(page) && !deleted.contains(page)) {
+            deleted.insert(page);
+            delete page;
+        }
+    }
+}
+
+void PageStructureCommand::undo()
+{
+    m_docPriv->applyPageOrder(m_before);
+    m_applied = false;
+}
+
+void PageStructureCommand::redo()
+{
+    m_docPriv->applyPageOrder(m_after);
+    m_applied = true;
+}
+
+bool PageStructureCommand::refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector)
+{
+    // The Page objects are the same before and after a reload of the file: nothing to refresh
+    Q_UNUSED(newPagesVector)
+    return true;
 }
 
 }
