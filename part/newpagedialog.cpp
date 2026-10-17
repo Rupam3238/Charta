@@ -47,6 +47,7 @@ KConfigGroup newPageConfigGroup()
 class NewPageDialog::Private
 {
 public:
+    QComboBox *positionCombo = nullptr;
     QComboBox *presetCombo = nullptr;
     QDoubleSpinBox *widthSpinBox = nullptr;
     QDoubleSpinBox *heightSpinBox = nullptr;
@@ -61,7 +62,7 @@ public:
     bool updating = false;
 };
 
-NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize)
+NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize, InsertPosition position)
     : QDialog(parent)
     , d(new Private)
 {
@@ -76,6 +77,18 @@ NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize)
     d->hasReference = referenceSize.isValid() && referenceSize.width() >= 10.0 && referenceSize.height() >= 10.0;
 
     auto *mainLayout = new QVBoxLayout(this);
+
+    // Position group: where the new pages go relative to the page the dialog was opened for
+    auto *positionGroup = new QGroupBox(i18n("Position"), this);
+    auto *positionLayout = new QHBoxLayout(positionGroup);
+    positionLayout->addWidget(new QLabel(i18n("Insert the new pages:"), positionGroup));
+    d->positionCombo = new QComboBox(positionGroup);
+    d->positionCombo->addItem(i18n("After this page"), static_cast<int>(InsertAfter));
+    d->positionCombo->addItem(i18n("Before this page"), static_cast<int>(InsertBefore));
+    d->positionCombo->setCurrentIndex(position == InsertBefore ? 1 : 0);
+    positionLayout->addWidget(d->positionCombo);
+    positionLayout->addStretch();
+    mainLayout->addWidget(positionGroup);
 
     // Page size group
     auto *sizeGroup = new QGroupBox(i18n("Page Size"), this);
@@ -278,6 +291,7 @@ NewPageDialog::NewPageData NewPageDialog::data() const
     data.height = d->heightSpinBox->value();
     data.backgroundColor = d->backgroundColor;
     data.count = d->countSpinBox->value();
+    data.insertBefore = d->positionCombo->currentData().toInt() == static_cast<int>(InsertBefore);
     return data;
 }
 

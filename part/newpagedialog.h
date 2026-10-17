@@ -23,11 +23,18 @@ class NewPageDialog : public QDialog
 {
     Q_OBJECT
 public:
+    /// Where the new pages are inserted relative to the page the dialog was opened for.
+    enum InsertPosition {
+        InsertAfter,  ///< after that page
+        InsertBefore, ///< before that page
+    };
+
     /**
      * @param referenceSize size (in points, as displayed) of the page next to which the new pages
      *                      are added. When valid it is offered as the default "Same as ..." size.
+     * @param position      position offered by default; the user can still change it in the dialog
      */
-    explicit NewPageDialog(QWidget *parent = nullptr, const QSizeF &referenceSize = QSizeF());
+    explicit NewPageDialog(QWidget *parent = nullptr, const QSizeF &referenceSize = QSizeF(), InsertPosition position = InsertAfter);
     ~NewPageDialog() override;
 
     struct NewPageData {
@@ -35,6 +42,8 @@ public:
         double height;
         QColor backgroundColor;
         int count;
+        /// whether the new pages go before the reference page instead of after it
+        bool insertBefore = false;
     };
 
     NewPageData data() const;

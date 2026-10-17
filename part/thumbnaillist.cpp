@@ -1203,6 +1203,7 @@ void ThumbnailListPrivate::contextMenuEvent(QContextMenuEvent *e)
         deleteAction->setEnabled(!selectedPages.isEmpty() && selectedPages.size() < pageCount);
         menu.addAction(QIcon::fromTheme(QStringLiteral("dialog-ok-apply")), i18n("Done selecting"), [this]() { setSelectMode(false); });
     } else {
+        menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add Pages After"), [this, clickedPage]() { Q_EMIT q->pageAddedAfter(clickedPage); });
         QAction *deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")), i18n("Delete this page"), [this, clickedPage]() { Q_EMIT q->pagesDeleted(QList<int>() << clickedPage); });
         deleteAction->setEnabled(pageCount > 1);
         menu.addAction(QIcon::fromTheme(QStringLiteral("edit-select")), i18n("Select"), [this, clickedPage]() {

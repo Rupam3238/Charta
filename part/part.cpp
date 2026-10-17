@@ -3870,6 +3870,9 @@ void Part::showMenu(const Okular::Page *page, const QPoint point, const QString 
             hasPastePoint = m_pageView->mapGlobalPosToPagePoint(point, &targetPageNumber, &pastePoint) && targetPageNumber == page->number();
             pasteAnnotation = popup.addAction(QIcon::fromTheme(QStringLiteral("edit-paste")), i18n("Paste Annotation"));
         }
+        if (!showTOCActions && m_document->canModifyPages()) {
+            popup.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add Pages After"), this, [this, pageNumber = page->number()]() { slotInsertPageAfter(pageNumber); });
+        }
         popup.addAction(m_prevBookmark);
         popup.addAction(m_nextBookmark);
         reallyShow = true;
@@ -4721,19 +4724,23 @@ static QSizeF unrotatedPageSize(const Okular::Document *document, int pageNumber
     return swapped ? QSizeF(page->height(), page->width()) : QSizeF(page->width(), page->height());
 }
 
+// Both slots open the same dialog; they only differ in the position it starts with, since the
+// dialog lets the user change it.
 void Part::slotInsertPageBefore(int pageNumber)
 {
-    NewPageDialog dialog(widget(), unrotatedPageSize(m_document, pageNumber));
+    NewPageDialog dialog(widget(), unrotatedPageSize(m_document, pageNumber), NewPageDialog::InsertBefore);
     if (dialog.exec() == QDialog::Accepted) {
-        insertBlankPages(pageNumber, dialog.data());
+        const NewPageDialog::NewPageData data = dialog.data();
+        insertBlankPages(data.insertBefore ? pageNumber : pageNumber + 1, data);
     }
 }
 
 void Part::slotInsertPageAfter(int pageNumber)
 {
-    NewPageDialog dialog(widget(), unrotatedPageSize(m_document, pageNumber));
+    NewPageDialog dialog(widget(), unrotatedPageSize(m_document, pageNumber), NewPageDialog::InsertAfter);
     if (dialog.exec() == QDialog::Accepted) {
-        insertBlankPages(pageNumber + 1, dialog.data());
+        const NewPageDialog::NewPageData data = dialog.data();
+        insertBlankPages(data.insertBefore ? pageNumber : pageNumber + 1, data);
     }
 }
 
