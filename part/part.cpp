@@ -23,6 +23,7 @@
 #include "part.h"
 
 #include "config-okular.h"
+#include "blankpageswriter.h"
 
 // qt/kde includes
 #include <QApplication>
@@ -37,8 +38,10 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QEvent>
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -67,6 +70,7 @@
 #include <QTemporaryFile>
 #include <QElapsedTimer>
 #include <QTimer>
+#include <QUuid>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidgetAction>
@@ -1499,6 +1503,9 @@ Part::~Part()
         Part::closeUrl(false);
     }
 
+    // A document that was never saved only exists as a temporary file: it goes away with the part
+    cleanupUntitledTempFile();
+
     delete m_toc;
     delete m_layers;
     delete m_pageView;
@@ -2307,6 +2314,11 @@ bool Part::openUrl(const QUrl &_url, bool swapInsteadOfOpening)
 
     // Close current document if any
     if (!closeUrl()) {
+        // The document that is open refused to close (the user declined to save its changes), so
+        // nothing is opened: the freshly written file would never have an owner, remove it right away.
+        const QString orphan = m_pendingUntitledPath;
+        m_pendingUntitledPath.clear();
+        removeUntitledTempFile(orphan);
         return false;
     }
 
@@ -2345,6 +2357,15 @@ bool Part::openUrl(const QUrl &_url, bool swapInsteadOfOpening)
 
     // this calls in sequence the 'closeUrl' and 'openFile' methods
     bool openOk = KParts::ReadWritePart::openUrl(url);
+
+    // A brand-new document is adopted even when the open failed: whoever asked for it (the shell)
+    // closes the tab on failure, and that closeUrl() has to be able to remove the temporary file
+    if (!m_pendingUntitledPath.isEmpty()) {
+        m_untitledTempPath = m_pendingUntitledPath;
+        m_untitledTempDir = QFileInfo(m_untitledTempPath).absolutePath();
+        m_untitledDocument = true;
+        m_pendingUntitledPath.clear();
+    }
 
     if (openOk) {
         m_viewportDirty.pageNumber = -1;
@@ -2443,6 +2464,10 @@ bool Part::closeUrl(bool promptToSave)
         QFile::remove(m_temporaryLocalFile);
         m_temporaryLocalFile.clear();
     }
+
+    // A brand-new document keeps its content in a temporary file until it is saved somewhere: once
+    // this part stops showing it (tab closed, document replaced, open failed) nobody owns it anymore
+    cleanupUntitledTempFile();
 
     slotHidePresentation();
     Q_EMIT enableCloseAction(false);
@@ -3109,6 +3134,15 @@ void Part::slotFindPrev()
 
 bool Part::saveFile()
 {
+    // A document that was just created has no location yet: saving always asks for one first.
+    // The autosave timer goes through this same function, so it refuses to run for untitled
+    // documents (see canAutoSaveNow()) instead of opening the Save As dialog on its own.
+    // This has to come before the isModified() check: a brand-new document is not modified, so
+    // otherwise Ctrl+S would look like a no-op.
+    if (m_untitledDocument) {
+        return slotSaveFileAs(false);
+    }
+
     if (!isModified()) {
         return true;
     } else {
@@ -3145,7 +3179,17 @@ bool Part::slotSaveFileAs(bool showOkularArchiveAsDefaultFormat)
 
     QString filter = originalMimeTypeFilter + QStringLiteral(";;") + okularArchiveMimeTypeFilter;
 
-    const QUrl saveUrl = QFileDialog::getSaveFileUrl(widget(), i18n("Save As"), url(), filter, &selectedFilter);
+    // A brand-new document has no sensible location yet: offer "Untitled.pdf" in the user's Documents
+    QUrl startUrl = url();
+    if (m_untitledDocument) {
+        QString dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+        if (dir.isEmpty() || !QFileInfo(dir).isDir()) {
+            dir = QDir::homePath();
+        }
+        startUrl = QUrl::fromLocalFile(QDir(dir).filePath(QStringLiteral("Untitled.pdf")));
+    }
+
+    const QUrl saveUrl = QFileDialog::getSaveFileUrl(widget(), i18n("Save As"), startUrl, filter, &selectedFilter);
 
     if (!saveUrl.isValid() || saveUrl.isEmpty()) {
         return false;
@@ -3237,6 +3281,11 @@ static bool copyFileAtomically(const QString &sourcePath, const QString &destina
 
 bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
 {
+    // Captured before the backing file is swapped to saveUrl below
+    const bool wasUntitled = m_untitledDocument;
+    const QString untitledTempPath = m_untitledTempPath;
+    const QString untitledTempDir = m_untitledTempDir;
+
     // Count nested saves so that autosave never starts while a save (and its event loops) is running
     ++m_saveDepth;
     const auto saveDepthGuard = qScopeGuard([this] { --m_saveDepth; });
@@ -3576,6 +3625,27 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
         setFileToWatch(localFilePath());
     }
 
+    if (wasUntitled) {
+        // The content now lives where the user wanted it: drop the temporary copy, unless the user
+        // deliberately saved into that private directory (then keeping it is what was asked for).
+        // Must happen here and not in closeUrl(): during a Save As the backing file is swapped, and
+        // closeUrl() returns early for that.
+        const bool savedIntoTempDir = !untitledTempDir.isEmpty() && QFileInfo(saveUrl.toLocalFile()).absolutePath() == untitledTempDir;
+        if (savedIntoTempDir) {
+            m_untitledDocument = false;
+            m_untitledTempPath.clear();
+            m_untitledTempDir.clear();
+        } else {
+            m_untitledTempPath = untitledTempPath;
+            m_untitledTempDir = untitledTempDir;
+            cleanupUntitledTempFile();
+        }
+        if (saveUrl.isLocalFile()) {
+            // Only local files can be listed as recent files
+            Q_EMIT requestAddRecentFile(saveUrl.toLocalFile());
+        }
+    }
+
     return true;
 }
 
@@ -3585,7 +3655,9 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
  */
 bool Part::canAutoSaveNow() const
 {
-    if (m_autoSaveInProgress || m_saveDepth > 0 || !isReadWrite() || !isModified() || !m_document->isOpened()) {
+    // An untitled document has no location to autosave to, and saveFile() would ask for one: the
+    // autosave timer shares the Ctrl+S code path, so it must never fire here.
+    if (m_autoSaveInProgress || m_saveDepth > 0 || !isReadWrite() || !isModified() || !m_document->isOpened() || m_untitledDocument) {
         return false;
     }
     if (m_embedMode == PrintPreviewMode || m_documentOpenWithPassword || !url().isLocalFile()) {
@@ -4751,6 +4823,80 @@ void Part::slotAddPage(const NewPageDialog::NewPageData &data)
     }
     // new pages go to the end of the document
     insertBlankPages(static_cast<int>(m_document->pages()), data);
+}
+
+void Part::setUntitledDocument(const QString &tempPath)
+{
+    // Only the pending value is touched here: m_untitledDocument and the paths describe the
+    // document that is open right now, and they must keep describing it until openUrl() adopts the
+    // new one (otherwise closeUrl() would delete the file that is about to be opened).
+    m_pendingUntitledPath = tempPath;
+}
+
+bool Part::isUntitledDocument() const
+{
+    return m_untitledDocument;
+}
+
+void Part::cleanupUntitledTempFile()
+{
+    if (m_untitledTempPath.isEmpty()) {
+        return;
+    }
+
+    const QString path = m_untitledTempPath;
+    m_untitledTempPath.clear();
+    m_untitledTempDir.clear();
+    m_untitledDocument = false;
+
+    removeUntitledTempFile(path);
+}
+
+void Part::removeUntitledTempFile(const QString &path)
+{
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QFile::remove(path);
+
+    // Remove a private directory of ours, never a directory the user chose
+    const QFileInfo info(path);
+    if (info.fileName() != QLatin1String("Untitled.pdf")) {
+        return;
+    }
+    const QFileInfo dirInfo(info.absolutePath());
+    if (dirInfo.absolutePath() != QDir::tempPath() || !dirInfo.fileName().startsWith(QLatin1String("charta-untitled-"))) {
+        return;
+    }
+    QDir(dirInfo.absoluteFilePath()).removeRecursively();
+}
+
+void Part::slotCreateNewDocument()
+{
+    NewPageDialog dialog(widget(), QSizeF(), NewPageDialog::InsertAfter, NewPageDialog::CreateDocument);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+    const NewPageDialog::NewPageData data = dialog.data();
+
+    // A private directory per document, so two untitled documents never collide and the file can be
+    // called "Untitled.pdf" (that is the name the tab and the window title show for a nameless document)
+    const QString dirPath = QDir(QDir::tempPath()).filePath(QStringLiteral("charta-untitled-%1").arg(QUuid::createUuid().toString(QUuid::Id128)));
+    if (!QDir().mkpath(dirPath)) {
+        KMessageBox::error(widget(), i18n("Could not create the temporary document."));
+        return;
+    }
+
+    const QString path = QDir(dirPath).filePath(QStringLiteral("Untitled.pdf"));
+    QString errorText;
+    if (!Okular::writeBlankPagesPdf(path, data.count, QSizeF(data.width, data.height), data.backgroundColor, &errorText)) {
+        QDir(dirPath).removeRecursively();
+        KMessageBox::error(widget(), i18n("Could not create the document. %1", errorText));
+        return;
+    }
+
+    Q_EMIT requestOpenNewUntitledDocument(path);
 }
 
 void Part::slotReorderPages(const QList<int> &pageNumbers, int toIndex)

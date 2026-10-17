@@ -661,6 +661,7 @@ if(BUILD_DESKTOP)
     part/signaturepanel.cpp
     part/signingcertificatelistmodel.cpp
     part/newpagedialog.cpp
+    part/blankpageswriter.cpp
     part/part.qrc
   )
   ki18n_wrap_ui(okularpart_SRCS part/selectcertificatedialog.ui)

@@ -215,7 +215,7 @@ Shell::Shell(const QString &serializedOptions)
         // Setup the welcome screen
         m_welcomeScreen = new WelcomeScreen(this);
         connect(m_welcomeScreen, &WelcomeScreen::openClicked, this, &Shell::fileOpen);
-        connect(m_welcomeScreen, &WelcomeScreen::closeClicked, this, &Shell::hideWelcomeScreen);
+        connect(m_welcomeScreen, &WelcomeScreen::createClicked, this, &Shell::createNewDocument);
         connect(m_welcomeScreen, &WelcomeScreen::recentItemClicked, this, [this](const QUrl &url) { openUrl(url); });
         connect(m_welcomeScreen, &WelcomeScreen::forgetRecentItem, this, &Shell::forgetRecentItem);
         m_centralStackedWidget->addWidget(m_welcomeScreen);
@@ -485,6 +485,10 @@ void Shell::openUrl(const QUrl &url, const QString &serializedOptions)
             } else {
                 Shell *newShell = new Shell(serializedOptions);
                 newShell->show();
+                // The new shell performs the open, so the untitled handoff has to travel with it
+                // (otherwise a brand-new document would be treated as a file that has a location)
+                newShell->m_untitledPath = m_untitledPath;
+                m_untitledPath.clear();
                 newShell->openUrl(url, serializedOptions);
             }
         }
@@ -492,12 +496,17 @@ void Shell::openUrl(const QUrl &url, const QString &serializedOptions)
         m_tabWidget->setTabText(activeTab, url.fileName());
         m_tabWidget->setTabToolTip(activeTab, url.fileName());
 
+        const bool untitled = !m_untitledPath.isEmpty(); // read before applyOptionsToPart() clears it
         applyOptionsToPart(activePart, serializedOptions);
         bool openOk = activePart->openUrl(url);
         const bool isstdin = url.fileName() == QLatin1String("-") || url.scheme() == QLatin1String("fd");
         if (!isstdin) {
             if (openOk) {
-                m_recent->addUrl(url);
+                // A brand-new document lives in a temporary file: it is not a file the user has, so
+                // it must not appear in the recent files
+                if (!untitled) {
+                    m_recent->addUrl(url);
+                }
             } else {
                 m_recent->removeUrl(url);
                 closeTab(activeTab);
@@ -569,6 +578,7 @@ void Shell::saveRecents()
 void Shell::setupActions()
 {
     KStandardAction::open(this, SLOT(fileOpen()), actionCollection());
+    KStandardAction::openNew(this, SLOT(createNewDocument()), actionCollection());
     m_recent = KStandardAction::openRecent(this, SLOT(openUrl(QUrl)), actionCollection());
     m_recent->setToolBarMode(KRecentFilesAction::MenuMode);
     connect(m_recent, &QAction::triggered, this, &Shell::showOpenRecentMenu);
@@ -993,12 +1003,16 @@ void Shell::openNewTab(const QUrl &url, const QString &serializedOptions)
     m_tabWidget->addTab(part->widget(), url.fileName());
     m_tabWidget->setTabToolTip(newIndex, url.fileName());
 
+    const bool untitled = !m_untitledPath.isEmpty();
+
     applyOptionsToPart(part, serializedOptions);
 
     setActiveTab(m_tabs.size() - 1);
 
     if (part->openUrl(url)) {
-        m_recent->addUrl(url);
+        if (!untitled) {
+            m_recent->addUrl(url);
+        }
     } else {
         setActiveTab(previousActiveTab);
         closeTab(m_tabs.size() - 1);
@@ -1022,6 +1036,14 @@ void Shell::applyOptionsToPart(QObject *part, const QString &serializedOptions)
     if (!find.isEmpty()) {
         QMetaObject::invokeMethod(part, "enableStartWithFind", Q_ARG(QString, find));
     }
+
+    // A brand-new document: the part needs to know so Ctrl+S asks for a location and autosave stays
+    // off. Always invoked (with an empty path for ordinary opens) so opening a real file in the same
+    // part clears the state again. Must happen before the open (the callers guarantee that).
+    const bool ok = QMetaObject::invokeMethod(part, "setUntitledDocument", Q_ARG(QString, m_untitledPath));
+    Q_ASSERT(ok);
+    Q_UNUSED(ok)
+    m_untitledPath.clear();
 }
 
 void Shell::connectPart(const KParts::ReadWritePart *part)
@@ -1039,13 +1061,48 @@ void Shell::connectPart(const KParts::ReadWritePart *part)
     // Formatting disabled to keep signature normalized
     connect(part, SIGNAL(requestOpenNewlySignedFile(QString,int)), this, SLOT(openNewlySignedFile(QString,int)));
     connect(part, SIGNAL(fitWindowToPage(QSize,QSize)), this, SLOT(slotFitWindowToPage(QSize,QSize)));
+    const bool newDocOk = connect(part, SIGNAL(requestOpenNewUntitledDocument(QString)), this, SLOT(openNewUntitledDocument(QString)));
+    const bool recentOk = connect(part, SIGNAL(requestAddRecentFile(QString)), this, SLOT(addRecentFile(QString)));
     // clang-format on
+    // String-based connects fail silently on a typo: assert in debug builds
+    Q_ASSERT(newDocOk);
+    Q_ASSERT(recentOk);
+    Q_UNUSED(newDocOk)
+    Q_UNUSED(recentOk)
     // NOLINTEND(clazy-old-style-connect);
 }
 
 void Shell::print()
 {
     QMetaObject::invokeMethod(m_tabs[m_tabWidget->currentIndex()].part, "slotPrint");
+}
+
+void Shell::createNewDocument()
+{
+    const int activeTab = m_tabWidget->currentIndex();
+    if (activeTab < 0 || activeTab >= m_tabs.size()) {
+        return;
+    }
+
+    // The dialog and the blank-page writer live in the part (it is loaded as a plugin), so ask the
+    // active part to run the flow; it comes back through requestOpenNewUntitledDocument(). The
+    // invocation is by name because the shell must not link against the part.
+    const bool ok = QMetaObject::invokeMethod(m_tabs[activeTab].part, "slotCreateNewDocument");
+    Q_ASSERT(ok);
+    Q_UNUSED(ok)
+}
+
+void Shell::openNewUntitledDocument(const QString &path)
+{
+    // Consumed by applyOptionsToPart() so the part knows Ctrl+S has to ask for a location
+    m_untitledPath = path;
+    openUrl(QUrl::fromLocalFile(path));
+}
+
+void Shell::addRecentFile(const QString &path)
+{
+    m_recent->addUrl(QUrl::fromLocalFile(path));
+    refreshRecentsOnWelcomeScreen();
 }
 
 void Shell::setPrintEnabled(bool enabled)

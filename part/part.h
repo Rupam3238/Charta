@@ -205,6 +205,18 @@ Q_SIGNALS:
      */
     void requestOpenNewlySignedFile(const QString &path, int pageNumber);
 
+    /**
+     * Request to open a brand-new document that has no location yet: its blank pages were just
+     * written to \p path (a private temporary file named "Untitled.pdf").
+     */
+    void requestOpenNewUntitledDocument(const QString &path);
+
+    /**
+     * A document that had no location yet has just been saved to \p path: the shell can add it to
+     * the list of recent files now.
+     */
+    void requestAddRecentFile(const QString &path);
+
 protected:
     // reimplemented from KParts::ReadWritePart
     bool openFile() override;
@@ -279,6 +291,27 @@ public Q_SLOTS:
     // connected to Shell action (and browserExtension), not local one
     void slotPrint();
     void slotFileDirty(const QString &);
+
+    /**
+     * Shows the Add-Pages dialog in CreateDocument mode, writes the chosen blank pages to a private
+     * temporary file and asks the shell (requestOpenNewUntitledDocument) to open it.
+     * Invoked by name from the shell ("Create a PDF..." on the welcome screen, File -> New).
+     */
+    void slotCreateNewDocument();
+
+    /**
+     * Tells this part that the document it is about to open has no location yet, \p tempPath being
+     * the freshly written file. Pass an empty path for ordinary documents (that also clears the
+     * pending state). Invoked by name from the shell.
+     */
+    void setUntitledDocument(const QString &tempPath);
+
+    /**
+     * Whether the document currently open has no location yet, that is its content only lives in a
+     * temporary file. Informational, also used by the autotests.
+     */
+    bool isUntitledDocument() const;
+
     bool slotAttemptReload(bool oneShot = false, const QUrl &newUrl = QUrl());
     void psTransformEnded(int, QProcess::ExitStatus);
 
@@ -401,6 +434,19 @@ private:
     QElapsedTimer m_lastUserInteraction;
     bool m_autoSaveInProgress = false;
     int m_saveDepth = 0;
+
+    // A brand-new document that has no location yet: its content lives in a temporary file named
+    // "Untitled.pdf" in a private directory, saving always asks for a location first (Save As),
+    // autosave is disabled, and the temporary file is removed once it is saved elsewhere or closed.
+    bool m_untitledDocument = false; ///< describes the document that is open right now
+    QString m_untitledTempPath;      ///< that document's file, empty when there is none
+    QString m_untitledTempDir;       ///< the private directory made for it (recorded, not derived)
+    QString m_pendingUntitledPath;   ///< set before an open, adopted (or discarded) by openUrl()
+
+    // Removes m_untitledTempPath and m_untitledTempDir and clears the untitled state. Idempotent.
+    void cleanupUntitledTempFile();
+    // Removes a temporary document file and the private directory that holds it
+    static void removeUntitledTempFile(const QString &path);
     QUrl m_oldUrl;
     Okular::DocumentViewport m_viewportDirty;
     bool m_isReloading;

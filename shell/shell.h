@@ -105,6 +105,10 @@ protected:
 private Q_SLOTS:
     void fileOpen();
 
+    void createNewDocument();
+    void openNewUntitledDocument(const QString &path);
+    void addRecentFile(const QString &path);
+
     void slotUpdateFullScreen();
     void slotShowMenubar();
 
@@ -175,6 +179,9 @@ private:
     KToggleAction *m_showMenuBarAction;
     bool m_menuBarWasShown;
     bool m_unique;
+    // Path of the brand-new document that the next open must treat as untitled (no location yet).
+    // Set just before openUrl(), consumed (and cleared) by applyOptionsToPart(). Empty otherwise.
+    QString m_untitledPath;
     QTabWidget *m_tabWidget;
     KToggleAction *m_openInTab;
     WelcomeScreen *m_welcomeScreen;

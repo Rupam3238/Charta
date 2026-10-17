@@ -62,11 +62,13 @@ public:
     bool updating = false;
 };
 
-NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize, InsertPosition position)
+NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize, InsertPosition position, Mode mode)
     : QDialog(parent)
     , d(new Private)
 {
-    setWindowTitle(i18n("Add New Page"));
+    const bool createDocument = (mode == CreateDocument);
+
+    setWindowTitle(createDocument ? i18n("Create a PDF") : i18n("Add New Page"));
     setModal(true);
 
     const QColor rememberedColor = newPageConfigGroup().readEntry("BackgroundColor", QColor(Qt::white));
@@ -78,7 +80,8 @@ NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize, Inser
 
     auto *mainLayout = new QVBoxLayout(this);
 
-    // Position group: where the new pages go relative to the page the dialog was opened for
+    // Position group: where the new pages go relative to the page the dialog was opened for.
+    // Not added when creating a new document: there is no page to be before or after.
     auto *positionGroup = new QGroupBox(i18n("Position"), this);
     auto *positionLayout = new QHBoxLayout(positionGroup);
     positionLayout->addWidget(new QLabel(i18n("Insert the new pages:"), positionGroup));
@@ -88,7 +91,11 @@ NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize, Inser
     d->positionCombo->setCurrentIndex(position == InsertBefore ? 1 : 0);
     positionLayout->addWidget(d->positionCombo);
     positionLayout->addStretch();
-    mainLayout->addWidget(positionGroup);
+    if (createDocument) {
+        positionGroup->hide();
+    } else {
+        mainLayout->addWidget(positionGroup);
+    }
 
     // Page size group
     auto *sizeGroup = new QGroupBox(i18n("Page Size"), this);
@@ -158,6 +165,10 @@ NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize, Inser
     // Buttons
     auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     mainLayout->addWidget(buttonBox);
+
+    if (createDocument) {
+        buttonBox->button(QDialogButtonBox::Ok)->setText(i18n("Create"));
+    }
 
     // Initial size: the reference page, or A4 portrait
     d->portraitRadio->setChecked(true);

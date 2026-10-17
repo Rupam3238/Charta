@@ -29,12 +29,21 @@ public:
         InsertBefore, ///< before that page
     };
 
+    /// What the dialog is used for: adding pages to the open document, or creating a new one.
+    enum Mode {
+        AddPages,       ///< add blank pages to the document already open in the part (the default)
+        CreateDocument, ///< create a brand-new PDF made only of these pages
+    };
+
     /**
      * @param referenceSize size (in points, as displayed) of the page next to which the new pages
      *                      are added. When valid it is offered as the default "Same as ..." size.
      * @param position      position offered by default; the user can still change it in the dialog
+     * @param mode          AddPages (default) keeps the current behavior; CreateDocument hides the
+     *                      Position row (there is no page to be before or after), retitles the
+     *                      dialog and labels the accept button "Create"
      */
-    explicit NewPageDialog(QWidget *parent = nullptr, const QSizeF &referenceSize = QSizeF(), InsertPosition position = InsertAfter);
+    explicit NewPageDialog(QWidget *parent = nullptr, const QSizeF &referenceSize = QSizeF(), InsertPosition position = InsertAfter, Mode mode = AddPages);
     ~NewPageDialog() override;
 
     struct NewPageData {

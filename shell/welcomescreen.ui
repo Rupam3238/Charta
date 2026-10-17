@@ -111,7 +111,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
         </property>
         <property name="maximumSize">
          <size>
-          <width>192</width>
+          <width>280</width>
           <height>16777215</height>
          </size>
         </property>
@@ -209,28 +209,18 @@ SPDX-License-Identifier: GPL-2.0-or-later
           </spacer>
          </item>
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout">
-           <property name="sizeConstraint">
-            <enum>QLayout::SetMinimumSize</enum>
+          <layout class="QVBoxLayout" name="buttonLayout">
+           <property name="spacing">
+            <number>8</number>
            </property>
            <item>
-            <spacer name="horizontalSpacer">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Expanding</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
+            <widget class="QPushButton" name="openButton">
+             <property name="minimumSize">
               <size>
-               <width>48</width>
-               <height>0</height>
+               <width>220</width>
+               <height>44</height>
               </size>
              </property>
-            </spacer>
-           </item>
-           <item>
-            <widget class="QPushButton" name="openButton">
              <property name="text">
               <string comment="on welcome screen">Open Document...</string>
              </property>
@@ -240,20 +230,20 @@ SPDX-License-Identifier: GPL-2.0-or-later
             </widget>
            </item>
            <item>
-            <spacer name="horizontalSpacer_2">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Expanding</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
+            <widget class="QPushButton" name="createButton">
+             <property name="minimumSize">
               <size>
-               <width>48</width>
-               <height>0</height>
+               <width>220</width>
+               <height>44</height>
               </size>
              </property>
-            </spacer>
+             <property name="text">
+              <string comment="on welcome screen">Create a PDF...</string>
+             </property>
+             <property name="icon">
+              <iconset theme="document-new" />
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
@@ -436,58 +426,6 @@ SPDX-License-Identifier: GPL-2.0-or-later
      </layout>
     </widget>
    </item>
-   <item row="0" column="2">
-    <layout class="QGridLayout" name="gridLayout_2">
-     <item row="0" column="0">
-      <spacer name="horizontalSpacer_5">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item row="0" column="1">
-      <widget class="QPushButton" name="closeButton">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="toolTip">
-        <string>Hide welcome screen</string>
-       </property>
-       <property name="text">
-        <string comment="on welcome screen"/>
-       </property>
-       <property name="icon">
-        <iconset theme="window-close"/>
-       </property>
-       <property name="flat">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="1">
-      <spacer name="verticalSpacer">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>40</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-    </layout>
-   </item>
    <item row="1" column="2" rowspan="3">
     <spacer name="horizontalSpacer_6">
      <property name="orientation">
@@ -521,6 +459,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
  </widget>
  <tabstops>
   <tabstop>openButton</tabstop>
+  <tabstop>createButton</tabstop>
  </tabstops>
  <resources/>
  <connections/>

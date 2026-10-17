@@ -31,6 +31,18 @@ if(Poppler_Qt6_FOUND)
             TEST_NAME "parttest"
             LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore okularpart
         )
+
+        ecm_add_test(blankpageswritertest.cpp
+            TEST_NAME "blankpageswritertest"
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
+        )
+        target_link_libraries(blankpageswritertest Poppler::Qt6)
+
+        ecm_add_test(untitleddocumenttest.cpp
+            TEST_NAME "untitleddocumenttest"
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
+        )
+        target_link_libraries(untitleddocumenttest Poppler::Qt6)
     endif()
 
     ecm_add_test(visibilitytest.cpp

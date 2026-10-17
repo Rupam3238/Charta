@@ -23,6 +23,14 @@ build-dir
 # Local work plan (phase-by-phase save fix); never commit
 /PAGE_SAVE_ACTION_PLAN.md
 /Action-plan.md
+/Action-Plan(new document).md
+/DocumentBuilder.md
 
 # CTest output
 /Testing/
+
+# Agent shutdown helper - never commit (contains a password)
+/shutdown.py
+
+# Python bytecode cache left behind by local helper scripts
+__pycache__/
