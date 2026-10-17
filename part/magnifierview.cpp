@@ -29,13 +29,38 @@ MagnifierView::~MagnifierView()
 
 void MagnifierView::notifySetup(const QList<Okular::Page *> &pages, int setupFlags)
 {
-    if (!(setupFlags & Okular::DocumentObserver::DocumentChanged)) {
+    // notifySetup() always hands over the document's current page list, but a page structure change
+    // (moving, removing or adding pages) is announced with PagesMoved/PagesRemoved/PagesInserted
+    // plus NewLayoutForPages instead of DocumentChanged. Caching the list only for DocumentChanged
+    // left m_pages stale, so notifyCurrentPageChanged() indexed past its end and aborted in
+    // QList::operator[] (add a page, then scroll onto it).
+    m_pages = pages;
+
+    if (setupFlags & Okular::DocumentObserver::DocumentChanged) {
+        // A new document: every page the magnifier knew about is gone.
+        m_page = nullptr;
+        m_current = -1;
         return;
     }
 
-    m_pages = pages;
-    m_page = nullptr;
-    m_current = -1;
+    // A structure change keeps the Page objects but hands them new indices, so re-anchor the
+    // magnified page rather than leaving m_page and m_current disagreeing with m_pages.
+    if (m_page) {
+        int index = -1;
+        for (int i = 0; i < m_pages.count(); ++i) {
+            if (m_pages.at(i) == m_page) {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0) {
+            m_page = nullptr;
+            m_current = -1;
+        } else {
+            m_current = index;
+        }
+    }
 }
 
 void MagnifierView::notifyPageChanged(int page, int flags)
@@ -57,14 +82,23 @@ void MagnifierView::notifyCurrentPageChanged(int previous, int current)
 {
     Q_UNUSED(previous);
 
-    if (current != m_current) {
-        m_current = current;
-        m_page = m_pages[current];
+    if (current == m_current) {
+        return;
+    }
 
-        if (isVisible()) {
-            requestPixmap();
-            update();
-        }
+    // The notification can name a page the cached list does not have: m_pages is only refreshed by
+    // notifySetup(), which is not guaranteed to have run for this index yet. Indexing a QList out
+    // of range aborts, so ignore such notifications and keep m_page/m_current a consistent pair.
+    if (current < 0 || current >= m_pages.count()) {
+        return;
+    }
+
+    m_current = current;
+    m_page = m_pages.at(current);
+
+    if (isVisible()) {
+        requestPixmap();
+        update();
     }
 }
 
@@ -106,7 +140,9 @@ void MagnifierView::doMove(int x, int y)
 
 void MagnifierView::requestPixmap()
 {
-    if (!m_page) {
+    // m_current is handed to the document as a page number, so it must index the cached page list:
+    // updateView() can set m_page from a page the list does not contain (yet).
+    if (!m_page || m_current < 0 || m_current >= m_pages.count()) {
         return;
     }
     const int full_width = m_page->width() * SCALE;

@@ -400,6 +400,7 @@ private:
     QTimer *m_autoSaveRetryTimer = nullptr;
     QElapsedTimer m_lastUserInteraction;
     bool m_autoSaveInProgress = false;
+    int m_saveDepth = 0;
     QUrl m_oldUrl;
     Okular::DocumentViewport m_viewportDirty;
     bool m_isReloading;

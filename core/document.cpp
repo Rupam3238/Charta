@@ -1047,21 +1047,22 @@ void DocumentPrivate::performAddPageAnnotation(int page, Annotation *annotation,
     }
 
     if (orderProxy && (annotation->flags() & Annotation::ExternallyDrawn) && index >= 0) {
+        const int srcPage = proxyPageNumber(page);
         const int modelIndex = kp->annotationIndex(annotation);
         const QList<Annotation *> annotations = kp->annotations();
         int nativeTargetIndex = -1;
         for (int i = modelIndex + 1; i < annotations.size(); ++i) {
-            nativeTargetIndex = orderProxy->annotationIndex(page, annotations.at(i));
+            nativeTargetIndex = orderProxy->annotationIndex(srcPage, annotations.at(i));
             if (nativeTargetIndex >= 0) {
                 break;
             }
         }
         if (nativeTargetIndex < 0) {
-            nativeTargetIndex = orderProxy->annotationCount(page) - 1;
+            nativeTargetIndex = orderProxy->annotationCount(srcPage) - 1;
         }
-        const int nativeCurrentIndex = orderProxy->annotationIndex(page, annotation);
+        const int nativeCurrentIndex = orderProxy->annotationIndex(srcPage, annotation);
         if (nativeCurrentIndex >= 0 && nativeTargetIndex >= 0 && nativeCurrentIndex != nativeTargetIndex) {
-            orderProxy->moveAnnotationToIndex(page, annotation, nativeTargetIndex);
+            orderProxy->moveAnnotationToIndex(srcPage, annotation, nativeTargetIndex);
         }
     }
 
@@ -1143,7 +1144,7 @@ void DocumentPrivate::performReorderPageAnnotation(int page, Annotation *annotat
     if (externallyDrawn) {
         Okular::SaveInterface *iface = qobject_cast<Okular::SaveInterface *>(m_generator);
         auto *orderProxy = iface ? dynamic_cast<AnnotationOrderProxy *>(iface->annotationProxy()) : nullptr;
-        if (!orderProxy || nativeIndex < 0 || !orderProxy->moveAnnotationToIndex(page, annotation, nativeIndex)) {
+        if (!orderProxy || nativeIndex < 0 || !orderProxy->moveAnnotationToIndex(proxyPageNumber(page), annotation, nativeIndex)) {
             return;
         }
     }
@@ -3942,9 +3943,9 @@ void Document::movePageAnnotation(int page, Annotation *annotation, int index)
         if (!orderProxy) {
             return;
         }
-        oldNativeIndex = orderProxy->annotationIndex(page, annotation);
+        oldNativeIndex = orderProxy->annotationIndex(d->proxyPageNumber(page), annotation);
         const QList<Annotation *> annotations = p->annotations();
-        newNativeIndex = orderProxy->annotationIndex(page, annotations.at(newIndex));
+        newNativeIndex = orderProxy->annotationIndex(d->proxyPageNumber(page), annotations.at(newIndex));
         if (oldNativeIndex < 0 || newNativeIndex < 0 || oldNativeIndex == newNativeIndex) {
             return;
         }

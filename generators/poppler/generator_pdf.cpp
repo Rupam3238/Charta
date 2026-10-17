@@ -2270,36 +2270,41 @@ bool PDFGenerator::applyPageLayout(const QString &fileName, const QList<PageLayo
 
         // Remap outlines pointing to deleted pages so bookmarks do not dangle
         std::map<QPDFObjGen, QPDFObjectHandle> deletedPageReplacements;
-        for (size_t origIdx = 0; origIdx < original.size(); ++origIdx) {
-            bool kept = false;
+        {
+            // linear time: the old version scanned every layout entry for every page, nested up to three levels deep
+            const size_t originalCount = original.size();
+            std::vector<char> keptPage(originalCount, 0);
             for (const PageLayoutEntry &entry : pages) {
-                if (entry.sourceNumber == static_cast<int>(origIdx)) {
-                    kept = true;
-                    break;
+                if (entry.sourceNumber >= 0 && static_cast<size_t>(entry.sourceNumber) < originalCount) {
+                    keptPage[entry.sourceNumber] = 1;
                 }
             }
-            if (!kept) {
-                // Find replacement: closest remaining page
+            std::vector<long> nextKept(originalCount, -1);
+            std::vector<long> prevKept(originalCount, -1);
+            long lastSeen = -1;
+            for (size_t i = 0; i < originalCount; ++i) {
+                if (keptPage[i]) {
+                    lastSeen = static_cast<long>(i);
+                }
+                prevKept[i] = lastSeen;
+            }
+            lastSeen = -1;
+            for (size_t i = originalCount; i-- > 0;) {
+                if (keptPage[i]) {
+                    lastSeen = static_cast<long>(i);
+                }
+                nextKept[i] = lastSeen;
+            }
+            for (size_t origIdx = 0; origIdx < originalCount; ++origIdx) {
+                if (keptPage[origIdx]) {
+                    continue;
+                }
                 QPDFObjectHandle replacement;
-                for (size_t nextIdx = origIdx + 1; nextIdx < original.size() && replacement.isNull(); ++nextIdx) {
-                    for (const PageLayoutEntry &entry : pages) {
-                        if (entry.sourceNumber == static_cast<int>(nextIdx)) {
-                            replacement = original[nextIdx].getObjectHandle();
-                            break;
-                        }
-                    }
-                }
-                if (replacement.isNull()) {
-                    for (int prevIdx = static_cast<int>(origIdx) - 1; prevIdx >= 0 && replacement.isNull(); --prevIdx) {
-                        for (const PageLayoutEntry &entry : pages) {
-                            if (entry.sourceNumber == prevIdx) {
-                                replacement = original[prevIdx].getObjectHandle();
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (replacement.isNull() && !wanted.empty()) {
+                if (nextKept[origIdx] >= 0) {
+                    replacement = original[nextKept[origIdx]].getObjectHandle();
+                } else if (prevKept[origIdx] >= 0) {
+                    replacement = original[prevKept[origIdx]].getObjectHandle();
+                } else if (!wanted.empty()) {
                     replacement = wanted.front().getObjectHandle();
                 }
                 if (!replacement.isNull()) {
@@ -2334,11 +2339,18 @@ bool PDFGenerator::applyPageLayout(const QString &fileName, const QList<PageLayo
             }
         }
 
-        for (const QPDFPageObjectHelper &page : original) {
-            helper.removePage(page);
-        }
-        for (const QPDFPageObjectHelper &page : wanted) {
-            helper.addPage(page, false);
+        // Rewrite the page tree in one step: removePage()/addPage() once per page is quadratic on big documents
+        {
+            QPDFObjectHandle pagesRoot = pdf.getRoot().getKey("/Pages");
+            std::vector<QPDFObjectHandle> kids;
+            kids.reserve(wanted.size());
+            for (const QPDFPageObjectHelper &page : wanted) {
+                QPDFObjectHandle pageObject = page.getObjectHandle();
+                pageObject.replaceKey("/Parent", pagesRoot);
+                kids.push_back(pageObject);
+            }
+            pagesRoot.replaceKey("/Kids", QPDFObjectHandle::newArray(kids));
+            pagesRoot.replaceKey("/Count", QPDFObjectHandle::newInteger(static_cast<long long>(kids.size())));
         }
 
         {
@@ -2389,17 +2401,9 @@ bool PDFGenerator::applyPageLayout(const QString &fileName, const QList<PageLayo
         process.setProcessChannelMode(QProcess::MergedChannels);
         process.setStandardInputFile(QProcess::nullDevice());
 
-        QEventLoop loop;
-        QTimer timeout;
-        timeout.setSingleShot(true);
-        QObject::connect(&process, &QProcess::finished, &loop, &QEventLoop::quit);
-        QObject::connect(&process, &QProcess::errorOccurred, &loop, &QEventLoop::quit);
-        QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-
         process.start(program, arguments);
-        timeout.start(120000);
-        if (process.state() != QProcess::NotRunning) {
-            loop.exec(QEventLoop::ExcludeUserInputEvents);
+        if (process.waitForStarted(10000)) {
+            process.waitForFinished(120000);
         }
 
         bool ok = false;

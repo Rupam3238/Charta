@@ -57,6 +57,7 @@
 #include <QPrintPreviewDialog>
 #include <QPrinter>
 #include <QScopedValueRollback>
+#include <QScopeGuard>
 #include <QScrollBar>
 #include <QSaveFile>
 #include <QSlider>
@@ -3236,6 +3237,10 @@ static bool copyFileAtomically(const QString &sourcePath, const QString &destina
 
 bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
 {
+    // Count nested saves so that autosave never starts while a save (and its event loops) is running
+    ++m_saveDepth;
+    const auto saveDepthGuard = qScopeGuard([this] { --m_saveDepth; });
+
     // TODO When we get different saving backends we need to query the backend
     // as to if it can save changes even if the open file has been modified,
     // since we only have poppler as saving backend for now we're skipping that check
@@ -3580,7 +3585,7 @@ bool Part::saveAs(const QUrl &saveUrl, SaveAsFlags flags)
  */
 bool Part::canAutoSaveNow() const
 {
-    if (m_autoSaveInProgress || !isReadWrite() || !isModified() || !m_document->isOpened()) {
+    if (m_autoSaveInProgress || m_saveDepth > 0 || !isReadWrite() || !isModified() || !m_document->isOpened()) {
         return false;
     }
     if (m_embedMode == PrintPreviewMode || m_documentOpenWithPassword || !url().isLocalFile()) {

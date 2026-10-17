@@ -231,17 +231,36 @@ endif()
 
 if (NOT QPDF_LINK_TARGET)
     include(FetchContent)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
-    set(BUILD_DOC OFF CACHE BOOL "" FORCE)
-    set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-    set(BUILD_FUZZ_TARGETS OFF CACHE BOOL "" FORCE)
-    set(INSTALL_CMAKE_PACKAGE OFF CACHE BOOL "" FORCE)
-    set(REQUIRE_CRYPTO_GNUTLS OFF CACHE BOOL "" FORCE)
-    set(REQUIRE_CRYPTO_OPENSSL OFF CACHE BOOL "" FORCE)
-    set(USE_IMPL_CRYPTO_OPENSSL OFF CACHE BOOL "" FORCE)
-    set(USE_IMPL_CRYPTO_GNUTLS OFF CACHE BOOL "" FORCE)
-    set(USE_IMPL_CRYPTO_NATIVE ON CACHE BOOL "" FORCE)
+
+    # qpdf must be built as a static library, but BUILD_SHARED_LIBS must not outlive this block:
+    # if it is still OFF when add_subdirectory(generators) is reached, kcoreaddons_add_plugin()
+    # (KF6CoreAddonsMacros.cmake: "if (NOT BUILD_SHARED_LIBS) set(ARGS_STATIC ON)") builds every
+    # document generator as a STATIC archive instead of a MODULE plugin, and its static branch
+    # returns before setting LIBRARY_OUTPUT_DIRECTORY or creating an install() rule. No .so would
+    # then be produced in ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/okular_generators or installed, while
+    # the app discovers generators at runtime only (KPluginMetaData::findPlugins("okular_generators")
+    # in core/document.cpp) -- so the running app would silently keep using whatever stale plugin
+    # .so an earlier configuration happened to leave in build/bin/okular_generators/.
+    #
+    # The options are therefore set as normal (non-cache) variables, which are visible inside the
+    # qpdf subdirectory only. cmake_minimum_required(3.22) implies CMP0077 NEW, so qpdf's
+    # option(BUILD_SHARED_LIBS ...) honours the normal variable and creates no cache entry. The
+    # values in effect for the rest of Charta are restored below, because a normal variable set
+    # here would otherwise also be inherited by add_subdirectory(generators).
+    set(_charta_build_shared_libs_saved "${BUILD_SHARED_LIBS}")
+    set(_charta_build_static_libs_saved "${BUILD_STATIC_LIBS}")
+    set(_charta_build_doc_saved "${BUILD_DOC}")
+    set(BUILD_SHARED_LIBS OFF)
+    set(BUILD_STATIC_LIBS ON)
+    set(BUILD_DOC OFF)
+    set(BUILD_TOOLS OFF)
+    set(BUILD_FUZZ_TARGETS OFF)
+    set(INSTALL_CMAKE_PACKAGE OFF)
+    set(REQUIRE_CRYPTO_GNUTLS OFF)
+    set(REQUIRE_CRYPTO_OPENSSL OFF)
+    set(USE_IMPL_CRYPTO_OPENSSL OFF)
+    set(USE_IMPL_CRYPTO_GNUTLS OFF)
+    set(USE_IMPL_CRYPTO_NATIVE ON)
     FetchContent_Declare(
         qpdf
         GIT_REPOSITORY https://github.com/qpdf/qpdf.git
@@ -255,11 +274,38 @@ if (NOT QPDF_LINK_TARGET)
     endif()
     if (TARGET libqpdf_object)
         target_compile_options(libqpdf_object PRIVATE -fexceptions -w)
+        # qpdf only produces position-independent objects when it is not building a static
+        # library (libqpdf/CMakeLists.txt:391-395 sets OBJECT_LIB_IS_PIC OFF as soon as
+        # BUILD_STATIC_LIBS is ON, and then sets POSITION_INDEPENDENT_CODE to that value on
+        # libqpdf_object; libqpdf.a is archived straight from those objects). Charta links
+        # libqpdf.a into okularGenerator_poppler, which kcoreaddons_add_plugin() builds as a
+        # MODULE -- a shared object -- so without PIC the final link fails with
+        # "relocation ... can not be used when making a shared object; recompile with -fPIC".
+        # Forcing the property here overrides what qpdf set a few lines earlier. On GCC/Linux
+        # this needs none of qpdf's libqpdf_EXPORTS define, which only matters for __declspec
+        # on Windows (include/qpdf/DLL.h).
+        set_target_properties(libqpdf_object PROPERTIES POSITION_INDEPENDENT_CODE ON)
     endif()
     if (TARGET libqpdf)
         target_compile_options(libqpdf PRIVATE -fexceptions -w)
+        # Belt and braces: qpdf compiles the static library from the object library above, but
+        # if that ever changes to compiling the sources itself it would lose PIC again.
+        set_target_properties(libqpdf PROPERTIES POSITION_INDEPENDENT_CODE ON)
         set(QPDF_LINK_TARGET libqpdf)
     endif()
+
+    # Restore Charta's own defaults for everything configured after this block (generators, part,
+    # shell, autotests). BUILD_SHARED_LIBS normally comes from KDECMakeSettings.cmake, which does
+    # set(BUILD_SHARED_LIBS TRUE CACHE BOOL ...) without FORCE, i.e. it is stored once per build
+    # directory and still honours -DBUILD_SHARED_LIBS=... on the command line -- so echo the saved
+    # value back instead of hardcoding TRUE. If it was undefined at all, the empty value restored
+    # here leaves it effectively off, exactly as before.
+    set(BUILD_SHARED_LIBS "${_charta_build_shared_libs_saved}")
+    set(BUILD_STATIC_LIBS "${_charta_build_static_libs_saved}")
+    set(BUILD_DOC "${_charta_build_doc_saved}")
+    unset(_charta_build_shared_libs_saved)
+    unset(_charta_build_static_libs_saved)
+    unset(_charta_build_doc_saved)
 endif()
 
 if (QPDF_LINK_TARGET)

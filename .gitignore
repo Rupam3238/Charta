@@ -20,5 +20,9 @@ build-dir
 /CLAUDE.md
 /AGENTS.md
 
+# Local work plan (phase-by-phase save fix); never commit
+/PAGE_SAVE_ACTION_PLAN.md
+/Action-plan.md
+
 # CTest output
 /Testing/
