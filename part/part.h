@@ -500,7 +500,8 @@ private Q_SLOTS:
     void slotInsertPageBefore(int pageNumber);
     void slotInsertPageAfter(int pageNumber);
     void slotAddPage(const NewPageDialog::NewPageData &data);
-    void slotReorderPages(int fromIndex, int toIndex);
+    void slotReorderPages(const QList<int> &pageNumbers, int toIndex);
+    void slotThumbnailPageActivated(int pageNumber);
     void slotThumbnailMenu(QMenu *menu, const Okular::Page *page, const QPoint &globalPos);
 
     void slotAccessibilityPreferences();

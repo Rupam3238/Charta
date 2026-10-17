@@ -2523,28 +2523,64 @@ bool Document::removePages(const QList<int> &indices)
 
 bool Document::movePage(int from, int to)
 {
+    return movePages(QList<int>() << from, to);
+}
+
+bool Document::movePages(const QList<int> &indices, int to)
+{
     const int count = d->m_pagesVector.size();
-    if (!canModifyPages() || from == to || from < 0 || from >= count || to < 0 || to >= count) {
+    if (!canModifyPages() || indices.isEmpty()) {
         return false;
     }
 
-    QList<int> oldToNew(count);
+    QSet<int> movedSet;
+    for (const int index : indices) {
+        if (index < 0 || index >= count) {
+            return false;
+        }
+        movedSet.insert(index);
+    }
+    QList<int> moved = movedSet.values();
+    std::sort(moved.begin(), moved.end());
+
+    const int remainingCount = count - moved.size();
+    if (to < 0 || to > remainingCount) {
+        return false;
+    }
+
+    // newOrder lists the old index of the page found at each new position
+    QList<int> newOrder;
+    newOrder.reserve(count);
     for (int i = 0; i < count; ++i) {
-        oldToNew[i] = i;
+        if (!movedSet.contains(i)) {
+            newOrder.append(i);
+        }
     }
-    oldToNew.move(from, to);
-    // oldToNew now lists the old index found at each new position: invert it
-    QList<int> inverse(count);
+    for (int k = 0; k < moved.size(); ++k) {
+        newOrder.insert(to + k, moved.at(k));
+    }
+
+    bool identity = true;
+    QList<int> oldToNew(count);
     for (int newIndex = 0; newIndex < count; ++newIndex) {
-        inverse[oldToNew.at(newIndex)] = newIndex;
+        oldToNew[newOrder.at(newIndex)] = newIndex;
+        identity = identity && newOrder.at(newIndex) == newIndex;
+    }
+    if (identity) {
+        return false;
     }
 
-    const QList<int> bookmarked = d->beginPageStructureChange(inverse);
+    const QList<int> bookmarked = d->beginPageStructureChange(oldToNew);
 
-    d->m_pagesVector.move(from, to);
+    QList<Page *> reordered;
+    reordered.reserve(count);
+    for (const int oldIndex : std::as_const(newOrder)) {
+        reordered.append(d->m_pagesVector.at(oldIndex));
+    }
+    d->m_pagesVector = reordered;
     d->renumberPages();
 
-    d->endPageStructureChange(inverse, bookmarked, DocumentObserver::PagesMoved);
+    d->endPageStructureChange(oldToNew, bookmarked, DocumentObserver::PagesMoved);
     return true;
 }
 

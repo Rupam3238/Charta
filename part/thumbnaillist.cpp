@@ -10,14 +10,18 @@
 #include <QAction>
 #include <QApplication>
 #include <QDialog>
+#include <QHBoxLayout>
 #include <QIcon>
+#include <QLabel>
 #include <QMenu>
 #include <QPainter>
+#include <QPainterPath>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QSizePolicy>
 #include <QStyle>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -33,7 +37,6 @@
 #include "core/document.h"
 #include "core/generator.h"
 #include "core/page.h"
-#include "cursorwraphelper.h"
 #include "gui/pagepainter.h"
 #include "gui/priorities.h"
 #include "settings.h"
@@ -58,14 +61,71 @@ QSize ThumbnailsBox::sizeHint() const
     return QSize();
 }
 
+// The bar shown at the bottom of the list while pages are being selected
+class SelectionBar : public QWidget
+{
+public:
+    explicit SelectionBar(QWidget *parent)
+        : QWidget(parent)
+    {
+        setAutoFillBackground(true);
+        setBackgroundRole(QPalette::Window);
+
+        auto *outer = new QVBoxLayout(this);
+        outer->setContentsMargins(6, 4, 6, 4);
+        outer->setSpacing(2);
+
+        auto *top = new QHBoxLayout();
+        label = new QLabel(this);
+        top->addWidget(label, 1);
+        done = new QToolButton(this);
+        done->setAutoRaise(true);
+        done->setIcon(QIcon::fromTheme(QStringLiteral("dialog-ok-apply")));
+        done->setText(i18n("Done"));
+        done->setToolTip(i18n("Leave selection mode"));
+        done->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        top->addWidget(done);
+        outer->addLayout(top);
+
+        auto *row = new QHBoxLayout();
+        selectAll = makeButton(QStringLiteral("edit-select-all"), i18n("Select all pages"));
+        add = makeButton(QStringLiteral("list-add"), i18n("Add page"));
+        add->setPopupMode(QToolButton::InstantPopup);
+        addMenu = new QMenu(add);
+        add->setMenu(addMenu);
+        del = makeButton(QStringLiteral("edit-delete"), i18n("Delete the selected pages"));
+        row->addWidget(selectAll);
+        row->addWidget(add);
+        row->addWidget(del);
+        row->addStretch();
+        outer->addLayout(row);
+    }
+
+    QLabel *label;
+    QToolButton *done;
+    QToolButton *selectAll;
+    QToolButton *add;
+    QMenu *addMenu;
+    QToolButton *del;
+
+private:
+    QToolButton *makeButton(const QString &iconName, const QString &toolTip)
+    {
+        auto *button = new QToolButton(this);
+        button->setAutoRaise(true);
+        button->setIcon(QIcon::fromTheme(iconName));
+        button->setToolTip(toolTip);
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        return button;
+    }
+};
+
 class ThumbnailListPrivate : public QWidget
 {
     Q_OBJECT
 public:
     ThumbnailListPrivate(ThumbnailList *qq, Okular::Document *document);
     ~ThumbnailListPrivate() override;
-
-    enum ChangePageDirection { Null, Left, Right, Up, Down };
 
     ThumbnailList *q;
     Okular::Document *m_document;
@@ -75,32 +135,48 @@ public:
     QList<ThumbnailWidget *> m_thumbnails;
     QList<ThumbnailWidget *> m_visibleThumbnails;
     int m_vectorIndex;
-    // Grabbing variables
-    QPoint m_mouseGrabPos;
-    ThumbnailWidget *m_mouseGrabItem;
-    int m_pageCurrentlyGrabbed;
 
-    // Multi-select variables
+    // Selection mode: pages are ticked, then deleted or moved together
+    bool m_selectMode;
     QSet<int> m_selectedPageNumbers;
-    int m_lastSelectedPage;
-    bool m_multiSelect;
-    // the current mouse press only changed the selection (Ctrl / Shift click)
-    bool m_selectionClick;
+    SelectionBar *m_selectionBar;
 
-    // Drag reorder variables
-    int m_dragFromIndex;
-    QPoint m_dragStartPos;
-    bool m_reordering;
+    // Mouse press (click / long press)
+    QTimer *m_longPressTimer;
+    QPoint m_pressPos;
+    int m_pressedPage;
+    bool m_pressedOnCheckBox;
 
-    // selection helpers
+    // Drag and drop of pages
+    bool m_dragging;
+    QList<int> m_dragPages;
+    QPixmap m_dragPixmap;
+    QPoint m_dragOffset;
+    QPoint m_dragPos;
+    // the dragged pages are dropped before this page (the number of pages means "at the end"), -1 if none
+    int m_dropPage;
+    QTimer *m_autoScrollTimer;
+
+    // selection mode helpers
+    void createSelectionBar();
+    void layoutSelectionBar();
+    void setSelectMode(bool enabled);
+    void toggleSelected(int page);
+    void selectAllPages();
     void updateSelectionHighlights();
-    void selectOnly(int page);
-    void selectRange(int first, int last);
+    void updateSelectionBar();
+
+    // drag and drop helpers
+    void startDrag();
+    void updateDrag(const QPoint &pos);
+    void finishDrag(bool drop);
+    void cancelDrag();
+    void autoScrollStep();
+    int dropPageFor(const QPoint &pos) const;
+    QRect dropIndicatorRect() const;
 
     // resize thumbnails to fit the width
     void viewportResizeEvent(QResizeEvent *);
-    // called by ThumbnailWidgets to send (forward) the mouse move signals
-    ChangePageDirection forwardTrack(const QPoint, const QSize);
 
     ThumbnailWidget *itemFor(const QPoint p) const;
     void delayedRequestVisiblePixmaps(int delayMs = 0);
@@ -111,22 +187,11 @@ public:
     // delay timeout: resize overlays and requests pixmaps
     void slotDelayTimeout();
     ThumbnailWidget *getPageByNumber(int page) const;
-    int getNewPageOffset(int n, ThumbnailListPrivate::ChangePageDirection dir) const;
-    ThumbnailWidget *getThumbnailbyOffset(int current, int offset) const;
-
-public:
-    void setMultiSelect(bool enabled) {
-        m_multiSelect = enabled;
-        if (!enabled) {
-            m_selectedPageNumbers.clear();
-        }
-    }
 
 protected:
     void mousePressEvent(QMouseEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
     void mouseMoveEvent(QMouseEvent *e) override;
-    void wheelEvent(QWheelEvent *e) override;
     void contextMenuEvent(QContextMenuEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
 };
@@ -170,6 +235,11 @@ public:
     QRect visibleRect() const
     {
         return m_visibleRect.geometry(m_pixmapWidth, m_pixmapHeight);
+    }
+    // the check box shown in selection mode, in the coordinates of the thumbnail (with some room around it)
+    QRect checkBoxRect() const
+    {
+        return QRect(m_margin / 2 + m_pixmapWidth - 26, m_margin / 2 + m_pixmapHeight - 26, 22, 22).adjusted(-6, -6, 6, 6);
     }
 
     void paint(QPainter &p, const QRect clipRect);
@@ -230,16 +300,21 @@ ThumbnailListPrivate::ThumbnailListPrivate(ThumbnailList *qq, Okular::Document *
     , m_selected(nullptr)
     , m_delayTimer(nullptr)
     , m_vectorIndex(0)
-    , m_pageCurrentlyGrabbed(0)
-    , m_lastSelectedPage(-1)
-    , m_multiSelect(true)
-    , m_selectionClick(false)
-    , m_dragFromIndex(-1)
-    , m_dragStartPos(QPoint())
-    , m_reordering(false)
+    , m_selectMode(false)
+    , m_selectionBar(nullptr)
+    , m_pressedPage(-1)
+    , m_pressedOnCheckBox(false)
+    , m_dragging(false)
+    , m_dropPage(-1)
 {
-    setMouseTracking(true);
-    m_mouseGrabItem = nullptr;
+    m_longPressTimer = new QTimer(this);
+    m_longPressTimer->setSingleShot(true);
+    m_longPressTimer->setInterval(350);
+    connect(m_longPressTimer, &QTimer::timeout, this, &ThumbnailListPrivate::startDrag);
+
+    m_autoScrollTimer = new QTimer(this);
+    m_autoScrollTimer->setInterval(30);
+    connect(m_autoScrollTimer, &QTimer::timeout, this, &ThumbnailListPrivate::autoScrollStep);
 }
 
 ThumbnailWidget *ThumbnailListPrivate::getPageByNumber(int page) const
@@ -268,11 +343,71 @@ ThumbnailWidget *ThumbnailListPrivate::itemFor(const QPoint p) const
     return nullptr;
 }
 
-// The size of the page in points, as it is when the document is not rotated
-static QSizeF unrotatedPageSize(const Okular::Document *document, const Okular::Page *page)
+void ThumbnailListPrivate::createSelectionBar()
 {
-    const bool swapped = static_cast<int>(document->rotation()) % 2 != 0;
-    return swapped ? QSizeF(page->height(), page->width()) : QSizeF(page->width(), page->height());
+    m_selectionBar = new SelectionBar(q);
+    m_selectionBar->hide();
+    connect(m_selectionBar->done, &QToolButton::clicked, this, [this]() { setSelectMode(false); });
+    connect(m_selectionBar->selectAll, &QToolButton::clicked, this, [this]() { selectAllPages(); });
+    connect(m_selectionBar->del, &QToolButton::clicked, this, [this]() { Q_EMIT q->pagesDeleted(q->selectedPageNumbers()); });
+    m_selectionBar->addMenu->addAction(QIcon::fromTheme(QStringLiteral("go-up")), i18n("Before the first selected page"), this, [this]() {
+        const QList<int> selected = q->selectedPageNumbers();
+        if (!selected.isEmpty()) {
+            Q_EMIT q->pageAddedBefore(selected.first());
+        }
+    });
+    m_selectionBar->addMenu->addAction(QIcon::fromTheme(QStringLiteral("go-down")), i18n("After the last selected page"), this, [this]() {
+        const QList<int> selected = q->selectedPageNumbers();
+        if (!selected.isEmpty()) {
+            Q_EMIT q->pageAddedAfter(selected.last());
+        }
+    });
+}
+
+void ThumbnailListPrivate::layoutSelectionBar()
+{
+    if (!m_selectionBar) {
+        return;
+    }
+    const int height = m_selectionBar->sizeHint().height();
+    m_selectionBar->setGeometry(0, q->height() - height, q->width(), height);
+    m_selectionBar->raise();
+}
+
+void ThumbnailListPrivate::setSelectMode(bool enabled)
+{
+    if (m_selectMode == enabled) {
+        return;
+    }
+    cancelDrag();
+    m_selectMode = enabled;
+    if (!enabled) {
+        m_selectedPageNumbers.clear();
+    }
+    updateSelectionHighlights();
+    updateSelectionBar();
+    update();
+}
+
+void ThumbnailListPrivate::toggleSelected(int page)
+{
+    if (m_selectedPageNumbers.contains(page)) {
+        m_selectedPageNumbers.remove(page);
+    } else {
+        m_selectedPageNumbers.insert(page);
+    }
+    updateSelectionHighlights();
+    updateSelectionBar();
+}
+
+void ThumbnailListPrivate::selectAllPages()
+{
+    m_selectedPageNumbers.clear();
+    for (const ThumbnailWidget *thumb : std::as_const(m_thumbnails)) {
+        m_selectedPageNumbers.insert(thumb->pageNumber());
+    }
+    updateSelectionHighlights();
+    updateSelectionBar();
 }
 
 void ThumbnailListPrivate::updateSelectionHighlights()
@@ -282,35 +417,204 @@ void ThumbnailListPrivate::updateSelectionHighlights()
     }
 }
 
-void ThumbnailListPrivate::selectOnly(int page)
+void ThumbnailListPrivate::updateSelectionBar()
 {
-    m_selectedPageNumbers.clear();
-    m_selectedPageNumbers.insert(page);
-    m_lastSelectedPage = page;
-    updateSelectionHighlights();
+    if (!m_selectionBar) {
+        return;
+    }
+    const int count = m_selectedPageNumbers.size();
+    m_selectionBar->label->setText(i18np("%1 page selected", "%1 pages selected", count));
+    m_selectionBar->del->setEnabled(count > 0 && count < static_cast<int>(m_document->pages()) && m_document->canModifyPages());
+    m_selectionBar->add->setEnabled(count > 0 && m_document->canModifyPages());
+    m_selectionBar->selectAll->setEnabled(!m_thumbnails.isEmpty());
+
+    if (m_selectionBar->isVisible() != m_selectMode) {
+        const int barHeight = m_selectMode ? m_selectionBar->sizeHint().height() : 0;
+        q->setViewportMargins(0, 0, 0, barHeight);
+        m_selectionBar->setVisible(m_selectMode);
+    }
+    layoutSelectionBar();
 }
 
-void ThumbnailListPrivate::selectRange(int first, int last)
+int ThumbnailListPrivate::dropPageFor(const QPoint &pos) const
 {
-    m_selectedPageNumbers.clear();
-    for (int i = qMin(first, last); i <= qMax(first, last); ++i) {
-        m_selectedPageNumbers.insert(i);
+    for (const ThumbnailWidget *thumb : std::as_const(m_thumbnails)) {
+        if (pos.y() < thumb->rect().center().y()) {
+            return thumb->pageNumber();
+        }
     }
-    updateSelectionHighlights();
+    return static_cast<int>(m_document->pages());
+}
+
+QRect ThumbnailListPrivate::dropIndicatorRect() const
+{
+    if (m_thumbnails.isEmpty()) {
+        return QRect();
+    }
+    const int spacing = qMax(4, style()->layoutSpacing(QSizePolicy::Frame, QSizePolicy::Frame, Qt::Vertical));
+    int y = m_thumbnails.last()->rect().bottom() + spacing / 2;
+    for (const ThumbnailWidget *thumb : std::as_const(m_thumbnails)) {
+        if (thumb->pageNumber() >= m_dropPage) {
+            y = thumb->pos().y() - spacing / 2;
+            break;
+        }
+    }
+    return QRect(8, y - 2, qMax(0, width() - 16), 4);
+}
+
+void ThumbnailListPrivate::startDrag()
+{
+    ThumbnailWidget *item = getPageByNumber(m_pressedPage);
+    if (!item || !m_document->canModifyPages() || !(QApplication::mouseButtons() & Qt::LeftButton)) {
+        return;
+    }
+
+    // in selection mode the whole selection moves when one of its pages is picked up
+    if (m_selectMode && m_selectedPageNumbers.contains(m_pressedPage)) {
+        m_dragPages = q->selectedPageNumbers();
+    } else {
+        m_dragPages = QList<int>() << m_pressedPage;
+    }
+
+    // the picked up page: a reduced copy of its thumbnail that follows the cursor
+    const qreal scale = 0.6;
+    const qreal ratio = devicePixelRatioF();
+    const QSize ghostSize(qMax(1, qRound(item->width() * scale)), qMax(1, qRound(item->height() * scale)));
+    m_dragPixmap = QPixmap(ghostSize * ratio);
+    m_dragPixmap.setDevicePixelRatio(ratio);
+    m_dragPixmap.fill(Qt::transparent);
+    {
+        QPainter painter(&m_dragPixmap);
+        painter.scale(scale, scale);
+        item->paint(painter, QRect(QPoint(0, 0), item->rect().size()));
+    }
+    m_dragOffset = QPointF((m_pressPos - item->pos()) * scale).toPoint();
+
+    m_dragging = true;
+    m_longPressTimer->stop();
+    setCursor(Qt::ClosedHandCursor);
+    m_autoScrollTimer->start();
+    updateDrag(mapFromGlobal(QCursor::pos()));
+}
+
+void ThumbnailListPrivate::updateDrag(const QPoint &pos)
+{
+    m_dragPos = pos;
+    m_dropPage = dropPageFor(pos);
+    update();
+}
+
+void ThumbnailListPrivate::autoScrollStep()
+{
+    if (!m_dragging) {
+        m_autoScrollTimer->stop();
+        return;
+    }
+    const int edge = 48;
+    const int maxStep = 28;
+    const int viewportHeight = q->viewport()->height();
+    const int y = q->viewport()->mapFromGlobal(QCursor::pos()).y();
+    int delta = 0;
+    if (y < edge) {
+        delta = -qMax(2, (edge - y) * maxStep / edge);
+    } else if (y > viewportHeight - edge) {
+        delta = qMax(2, (y - (viewportHeight - edge)) * maxStep / edge);
+    }
+    if (delta != 0) {
+        QScrollBar *scrollBar = q->verticalScrollBar();
+        scrollBar->setValue(scrollBar->value() + delta);
+    }
+    // the list may have scrolled under a motionless cursor
+    updateDrag(mapFromGlobal(QCursor::pos()));
+}
+
+void ThumbnailListPrivate::cancelDrag()
+{
+    m_longPressTimer->stop();
+    m_autoScrollTimer->stop();
+    const bool wasDragging = m_dragging;
+    m_dragging = false;
+    m_dragPages.clear();
+    m_dragPixmap = QPixmap();
+    m_dropPage = -1;
+    m_pressedPage = -1;
+    m_pressedOnCheckBox = false;
+    if (wasDragging) {
+        unsetCursor();
+        update();
+    }
+}
+
+void ThumbnailListPrivate::finishDrag(bool drop)
+{
+    const QList<int> pages = m_dragPages;
+    const int dropPage = m_dropPage;
+    cancelDrag();
+    if (!drop || pages.isEmpty() || dropPage < 0) {
+        return;
+    }
+
+    // where the first of the pages ends up once all of them have been taken out of the document
+    int before = 0;
+    for (const int page : pages) {
+        if (page < dropPage) {
+            ++before;
+        }
+    }
+    const int to = dropPage - before;
+
+    const bool movedTheSelection = m_selectMode && QSet<int>(pages.begin(), pages.end()) == m_selectedPageNumbers;
+    Q_EMIT q->pagesReordered(pages, to);
+
+    // the thumbnails have been rebuilt: keep the moved pages selected
+    if (movedTheSelection) {
+        m_selectedPageNumbers.clear();
+        for (int i = 0; i < pages.size(); ++i) {
+            m_selectedPageNumbers.insert(to + i);
+        }
+        updateSelectionHighlights();
+        updateSelectionBar();
+    }
 }
 
 void ThumbnailListPrivate::paintEvent(QPaintEvent *e)
 {
     QPainter painter(this);
-    QList<ThumbnailWidget *>::const_iterator tIt = m_thumbnails.constBegin(), tEnd = m_thumbnails.constEnd();
-    for (; tIt != tEnd; ++tIt) {
-        QRect rect = e->rect().intersected((*tIt)->rect());
+    for (ThumbnailWidget *thumb : std::as_const(m_thumbnails)) {
+        QRect rect = e->rect().intersected(thumb->rect());
         if (!rect.isNull()) {
-            rect.translate(-(*tIt)->pos());
+            rect.translate(-thumb->pos());
             painter.save();
-            painter.translate((*tIt)->pos());
-            (*tIt)->paint(painter, rect);
+            painter.translate(thumb->pos());
+            if (m_dragging && m_dragPages.contains(thumb->pageNumber())) {
+                // the pages that have been picked up are faded where they were
+                painter.setOpacity(0.35);
+            }
+            thumb->paint(painter, rect);
             painter.restore();
+        }
+    }
+
+    if (m_dragging) {
+        painter.setRenderHint(QPainter::Antialiasing);
+        // where the pages will be dropped
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(palette().color(QPalette::Highlight));
+        painter.drawRoundedRect(dropIndicatorRect(), 2, 2);
+
+        // the pages under the cursor
+        const QPoint topLeft = m_dragPos - m_dragOffset;
+        painter.setOpacity(0.8);
+        painter.drawPixmap(topLeft, m_dragPixmap);
+        painter.setOpacity(1.0);
+        if (m_dragPages.size() > 1) {
+            QRect badge(0, 0, 26, 26);
+            badge.moveCenter(QRect(topLeft, m_dragPixmap.deviceIndependentSize().toSize()).topRight());
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(palette().color(QPalette::Highlight));
+            painter.drawEllipse(badge);
+            painter.setPen(palette().color(QPalette::HighlightedText));
+            painter.drawText(badge, Qt::AlignCenter, QString::number(m_dragPages.size()));
         }
     }
 }
@@ -338,6 +642,14 @@ ThumbnailList::ThumbnailList(QWidget *parent, Okular::Document *document)
     widget()->setBackgroundRole(QPalette::Base);
 
     connect(verticalScrollBar(), &QScrollBar::valueChanged, d, &ThumbnailListPrivate::slotRequestVisiblePixmaps);
+
+    d->createSelectionBar();
+}
+
+void ThumbnailList::resizeEvent(QResizeEvent *event)
+{
+    QScrollArea::resizeEvent(event);
+    d->layoutSelectionBar();
 }
 
 ThumbnailList::~ThumbnailList()
@@ -350,9 +662,12 @@ void ThumbnailList::notifySetup(const QList<Okular::Page *> &pages, int setupFla
 {
     // page numbers change when pages are added, removed or moved: the selection is not valid any more
     const bool pagesChanged = setupFlags & (Okular::DocumentObserver::PagesInserted | Okular::DocumentObserver::PagesRemoved | Okular::DocumentObserver::PagesMoved);
-    if ((setupFlags & Okular::DocumentObserver::DocumentChanged) || pagesChanged) {
+    d->cancelDrag();
+    if (setupFlags & Okular::DocumentObserver::DocumentChanged) {
+        d->setSelectMode(false);
+    }
+    if (pagesChanged) {
         d->m_selectedPageNumbers.clear();
-        d->m_lastSelectedPage = -1;
     }
     const int previousScrollValue = verticalScrollBar()->value();
 
@@ -373,7 +688,6 @@ void ThumbnailList::notifySetup(const QList<Okular::Page *> &pages, int setupFla
     d->m_thumbnails.clear();
     d->m_visibleThumbnails.clear();
     d->m_selected = nullptr;
-    d->m_mouseGrabItem = nullptr;
 
     if (pages.count() < 1) {
         widget()->resize(0, 0);
@@ -418,8 +732,9 @@ void ThumbnailList::notifySetup(const QList<Okular::Page *> &pages, int setupFla
         }
     }
 
-    // Restore the multi page selection after the thumbnails have been regenerated
+    // Restore the selection after the thumbnails have been regenerated
     d->updateSelectionHighlights();
+    d->updateSelectionBar();
 
     // update scrollview's contents size (sets scrollbars limits)
     height -= this->style()->layoutSpacing(QSizePolicy::Frame, QSizePolicy::Frame, Qt::Vertical);
@@ -551,81 +866,6 @@ void ThumbnailList::updateWidgets()
     }
 }
 
-int ThumbnailListPrivate::getNewPageOffset(int n, ThumbnailListPrivate::ChangePageDirection dir) const
-{
-    int reason = 1;
-    int facingFirst = 0; // facingFirstCentered cornercase
-    if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Facing) {
-        reason = 2;
-    } else if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::FacingFirstCentered) {
-        facingFirst = 1;
-        reason = 2;
-    } else if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::Summary) {
-        reason = 3;
-    }
-    if (dir == ThumbnailListPrivate::Up) {
-        if (facingFirst && n == 1) {
-            return -1;
-        }
-        return -reason;
-    }
-    if (dir == ThumbnailListPrivate::Down) {
-        return reason;
-    }
-    if (dir == ThumbnailListPrivate::Left && reason > 1 && (n + facingFirst) % reason) {
-        return -1;
-    }
-    if (dir == ThumbnailListPrivate::Right && reason > 1 && (n + 1 + facingFirst) % reason) {
-        return 1;
-    }
-    return 0;
-}
-
-ThumbnailWidget *ThumbnailListPrivate::getThumbnailbyOffset(int current, int offset) const
-{
-    QList<ThumbnailWidget *>::const_iterator it = m_thumbnails.begin();
-    QList<ThumbnailWidget *>::const_iterator itE = m_thumbnails.end();
-    int idx = 0;
-    while (it != itE) {
-        if ((*it)->pageNumber() == current) {
-            break;
-        }
-        ++idx;
-        ++it;
-    }
-    if (it == itE) {
-        return nullptr;
-    }
-    idx += offset;
-    if (idx < 0 || idx >= m_thumbnails.size()) {
-        return nullptr;
-    }
-    return m_thumbnails[idx];
-}
-
-ThumbnailListPrivate::ChangePageDirection ThumbnailListPrivate::forwardTrack(const QPoint point, const QSize r)
-{
-    Okular::DocumentViewport vp = m_document->viewport();
-    const double deltaX = (double)point.x() / r.width(), deltaY = (double)point.y() / r.height();
-    vp.rePos.normalizedX -= deltaX;
-    vp.rePos.normalizedY -= deltaY;
-    if (vp.rePos.normalizedY > 1.0) {
-        return ThumbnailListPrivate::Down;
-    }
-    if (vp.rePos.normalizedY < 0.0) {
-        return ThumbnailListPrivate::Up;
-    }
-    if (vp.rePos.normalizedX > 1.0) {
-        return ThumbnailListPrivate::Right;
-    }
-    if (vp.rePos.normalizedX < 0.0) {
-        return ThumbnailListPrivate::Left;
-    }
-    vp.rePos.enabled = true;
-    m_document->setViewport(vp);
-    return ThumbnailListPrivate::Null;
-}
-
 void ThumbnailList::slotFilterBookmarks(bool filterOn)
 {
     // save state
@@ -645,17 +885,20 @@ void ThumbnailList::keyPressEvent(QKeyEvent *keyEvent)
         return;
     }
 
-    if ((keyEvent->modifiers() & Qt::AltModifier) && (keyEvent->key() == Qt::Key_Up || keyEvent->key() == Qt::Key_Down) && d->m_document->canModifyPages() && d->m_selectedPageNumbers.size() == 1) {
-        const int page = *d->m_selectedPageNumbers.constBegin();
-        const int target = keyEvent->key() == Qt::Key_Up ? page - 1 : page + 1;
-        if (target >= 0 && target < static_cast<int>(d->m_document->pages())) {
-            Q_EMIT pagesReordered(page, target);
-            d->selectOnly(target);
+    if (keyEvent->key() == Qt::Key_Escape) {
+        if (d->m_dragging) {
+            d->cancelDrag();
+            keyEvent->accept();
+            return;
         }
-        return;
+        if (d->m_selectMode) {
+            d->setSelectMode(false);
+            keyEvent->accept();
+            return;
+        }
     }
 
-    if (keyEvent->key() == Qt::Key_Delete && d->m_document->canModifyPages() && !d->m_selectedPageNumbers.isEmpty()) {
+    if (keyEvent->key() == Qt::Key_Delete && d->m_selectMode && d->m_document->canModifyPages() && !d->m_selectedPageNumbers.isEmpty()) {
         Q_EMIT pagesDeleted(selectedPageNumbers());
         return;
     }
@@ -863,280 +1106,85 @@ void ThumbnailWidget::setVisibleRect(const Okular::NormalizedRect &rect)
 
 void ThumbnailListPrivate::mousePressEvent(QMouseEvent *e)
 {
+    cancelDrag();
+
     ThumbnailWidget *item = itemFor(e->pos());
     if (!item) { // mouse on the spacing between items
         e->ignore();
         return;
     }
-
-    m_mouseGrabPos.setX(0);
-    m_mouseGrabPos.setY(0);
-    m_mouseGrabItem = nullptr;
-    m_reordering = false;
-    m_selectionClick = false;
-    m_dragFromIndex = -1;
-    m_dragStartPos = QPoint();
-
-    const int clickedPageNumber = item->pageNumber();
-
-    if (e->button() == Qt::RightButton) {
-        // the context menu works on the selection: a click outside of it selects only the clicked page
-        if (m_multiSelect && !m_selectedPageNumbers.contains(clickedPageNumber)) {
-            selectOnly(clickedPageNumber);
-        }
+    if (e->button() != Qt::LeftButton) {
         return;
     }
 
-    if (m_multiSelect && e->button() == Qt::LeftButton) {
-        if (e->modifiers() & Qt::ControlModifier) {
-            // Ctrl+click toggles the clicked page
-            if (m_selectedPageNumbers.contains(clickedPageNumber)) {
-                m_selectedPageNumbers.remove(clickedPageNumber);
-            } else {
-                m_selectedPageNumbers.insert(clickedPageNumber);
-            }
-            m_lastSelectedPage = clickedPageNumber;
-            updateSelectionHighlights();
-            m_selectionClick = true;
-            return;
-        }
-        if ((e->modifiers() & Qt::ShiftModifier) && m_lastSelectedPage != -1) {
-            // Shift+click selects the range from the last clicked page
-            selectRange(m_lastSelectedPage, clickedPageNumber);
-            m_selectionClick = true;
-            return;
-        }
+    m_pressPos = e->pos();
+    m_pressedPage = item->pageNumber();
+
+    // in selection mode the check box of a page ticks it
+    if (m_selectMode && item->checkBoxRect().contains(e->pos() - item->pos())) {
+        m_pressedOnCheckBox = true;
+        toggleSelected(m_pressedPage);
+        return;
     }
 
-    const QRect r = item->visibleRect();
-    const int margin = ThumbnailWidget::margin();
-    const QPoint p = e->pos() - item->pos();
-
-    // The part of the thumbnail that is shown in the page view can be dragged to scroll it. When it covers
-    // most of the thumbnail (whole page visible, as for the current page in "fit page" mode) there is nothing
-    // to scroll, so the drag moves the page instead, like it does with Alt pressed.
-    const QRect thumbRect = item->rect();
-    const bool visibleRectIsMostOfThumbnail = r.width() * r.height() * 10 >= thumbRect.width() * thumbRect.height() * 7;
-    const bool forceMove = e->modifiers() & Qt::AltModifier;
-    if (e->button() != Qt::RightButton && !forceMove && !visibleRectIsMostOfThumbnail && r.contains(p - QPoint(margin / 2, margin / 2))) {
-        m_mouseGrabItem = item;
-        m_pageCurrentlyGrabbed = item->pageNumber();
-    } else if (m_multiSelect && e->button() == Qt::LeftButton) {
-        selectOnly(clickedPageNumber);
-        if (m_document->canModifyPages()) {
-            // the rest of the thumbnail can be dragged to move the page
-            m_dragStartPos = e->pos();
-            m_dragFromIndex = clickedPageNumber;
-        }
+    // holding the page picks it up
+    if (m_document->canModifyPages()) {
+        m_longPressTimer->start();
     }
-
-    CursorWrapHelper::startDrag();
 }
 
 void ThumbnailListPrivate::mouseReleaseEvent(QMouseEvent *e)
 {
-    const bool wasReordering = m_reordering;
-    const bool onlySelected = m_selectionClick;
-    m_reordering = false;
-    m_selectionClick = false;
-    m_dragFromIndex = -1;
-    m_dragStartPos = QPoint();
-
-    if (wasReordering || onlySelected || e->button() == Qt::RightButton) {
-        m_mouseGrabItem = nullptr;
-        m_mouseGrabPos.setX(0);
-        m_mouseGrabPos.setY(0);
-        setCursor(Qt::ArrowCursor);
+    if (e->button() != Qt::LeftButton) {
         return;
     }
 
-    ThumbnailWidget *item = itemFor(e->pos());
-    m_mouseGrabItem = item;
-    if (!item) { // mouse on the spacing between items
-        e->ignore();
+    m_longPressTimer->stop();
+    if (m_dragging) {
+        finishDrag(true);
         return;
     }
 
-    const QPoint p = e->pos() - item->pos();
-
-    // jump center of viewport to cursor if it wasn't dragged
-    if (m_mouseGrabPos.isNull()) {
-        Okular::DocumentViewport vp = Okular::DocumentViewport(item->pageNumber());
-        vp.rePos.normalizedX = double(p.x()) / double(item->rect().width());
-        vp.rePos.normalizedY = double(p.y()) / double(item->rect().height());
-        vp.rePos.pos = Okular::DocumentViewport::Center;
-        vp.rePos.enabled = true;
-        m_document->setViewport(vp, nullptr, true);
+    const int pressedPage = m_pressedPage;
+    const bool onCheckBox = m_pressedOnCheckBox;
+    m_pressedPage = -1;
+    m_pressedOnCheckBox = false;
+    if (pressedPage < 0 || onCheckBox) {
+        return;
     }
-    setCursor(Qt::OpenHandCursor);
-    m_mouseGrabPos.setX(0);
-    m_mouseGrabPos.setY(0);
+
+    // a plain click shows the page
+    const ThumbnailWidget *item = itemFor(e->pos());
+    if (item && item->pageNumber() == pressedPage) {
+        Q_EMIT q->pageActivated(pressedPage);
+    }
 }
 
 void ThumbnailListPrivate::mouseMoveEvent(QMouseEvent *e)
 {
-    if (e->buttons() == Qt::NoButton) {
-        const ThumbnailWidget *item = itemFor(e->pos());
-        if (!item) { // mouse on the spacing between items
-            e->ignore();
-            return;
-        }
-
-        QRect r = item->visibleRect();
-        const int margin = ThumbnailWidget::margin();
-        const QPoint p = e->pos() - item->pos();
-        if (r.contains(p - QPoint(margin / 2, margin / 2))) {
-            setCursor(Qt::OpenHandCursor);
-        } else {
-            setCursor(Qt::ArrowCursor);
-        }
-
-        e->ignore();
-        return;
-    }
-    // dragging a thumbnail moves its page
-    if (m_dragFromIndex >= 0 && (e->buttons() & Qt::LeftButton)) {
-        if (!m_reordering && (e->pos() - m_dragStartPos).manhattanLength() < QApplication::startDragDistance()) {
-            return;
-        }
-        m_reordering = true;
-        setCursor(Qt::ClosedHandCursor);
-
-        // scroll the list when the page is dragged near its top or bottom edge
-        QScrollBar *scrollBar = q->verticalScrollBar();
-        const int viewportY = q->viewport()->mapFromGlobal(e->globalPosition().toPoint()).y();
-        const int edge = 30;
-        if (viewportY < edge) {
-            scrollBar->setValue(scrollBar->value() - scrollBar->singleStep());
-        } else if (viewportY > q->viewport()->height() - edge) {
-            scrollBar->setValue(scrollBar->value() + scrollBar->singleStep());
-        }
-
-        const ThumbnailWidget *target = itemFor(e->pos());
-        if (target && target->pageNumber() != m_dragFromIndex) {
-            const int from = m_dragFromIndex;
-            const int to = target->pageNumber();
-            // the thumbnails are rebuilt while the page is moved: do not touch them afterwards
-            m_dragFromIndex = to;
-            Q_EMIT q->pagesReordered(from, to);
-            selectOnly(to);
-        }
+    if (m_dragging) {
+        updateDrag(e->pos());
         return;
     }
 
-    // no item under the mouse or previously selected
-    if (!m_mouseGrabItem) {
-        e->ignore();
-        return;
-    }
-
-    const QRect r = m_mouseGrabItem->rect();
-    if (!m_mouseGrabPos.isNull()) {
-        const QPoint mousePos = e->pos();
-        const QPoint delta = m_mouseGrabPos - mousePos;
-        m_mouseGrabPos = e->pos();
-        // don't handle the mouse move, forward it to the thumbnail list
-        ThumbnailListPrivate::ChangePageDirection direction;
-        if ((direction = forwardTrack(delta, r.size())) != ThumbnailListPrivate::Null) {
-            // Changing the selected page
-            const int offset = getNewPageOffset(m_pageCurrentlyGrabbed, direction);
-            const ThumbnailWidget *newThumb = getThumbnailbyOffset(m_pageCurrentlyGrabbed, offset);
-            if (!newThumb) {
-                return;
-            }
-            int newPageOn = newThumb->pageNumber();
-            if (newPageOn == m_pageCurrentlyGrabbed || newPageOn < 0 || newPageOn >= (int)m_document->pages()) {
-                return;
-            }
-            Okular::DocumentViewport vp = m_document->viewport();
-            const float origNormalX = vp.rePos.normalizedX;
-            const float origNormalY = vp.rePos.normalizedY;
-            vp = Okular::DocumentViewport(newPageOn);
-            vp.rePos.normalizedX = origNormalX;
-            vp.rePos.normalizedY = origNormalY;
-            if (direction == ThumbnailListPrivate::Up) {
-                vp.rePos.normalizedY = 1.0;
-                if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::FacingFirstCentered && !newPageOn) {
-                    if (m_pageCurrentlyGrabbed == 1) {
-                        vp.rePos.normalizedX = origNormalX - 0.5;
-                    } else {
-                        vp.rePos.normalizedX = origNormalX + 0.5;
-                    }
-                    if (vp.rePos.normalizedX < 0.0) {
-                        vp.rePos.normalizedX = 0.0;
-                    } else if (vp.rePos.normalizedX > 1.0) {
-                        vp.rePos.normalizedX = 1.0;
-                    }
-                }
-            } else if (direction == ThumbnailListPrivate::Down) {
-                vp.rePos.normalizedY = 0.0;
-                if (Okular::Settings::viewMode() == Okular::Settings::EnumViewMode::FacingFirstCentered && !m_pageCurrentlyGrabbed) {
-                    if (origNormalX < 0.5) {
-                        vp = Okular::DocumentViewport(--newPageOn);
-                        vp.rePos.normalizedX = origNormalX + 0.5;
-                    } else {
-                        vp.rePos.normalizedX = origNormalX - 0.5;
-                    }
-                    if (vp.rePos.normalizedX < 0.0) {
-                        vp.rePos.normalizedX = 0.0;
-                    } else if (vp.rePos.normalizedX > 1.0) {
-                        vp.rePos.normalizedX = 1.0;
-                    }
-                }
-            } else if (Okular::Settings::viewMode() != Okular::Settings::EnumViewMode::Single) {
-                if (direction == ThumbnailListPrivate::Left) {
-                    vp.rePos.normalizedX = 1.0;
-                } else {
-                    vp.rePos.normalizedX = 0.0;
-                }
-            }
-            vp.rePos.pos = Okular::DocumentViewport::Center;
-            vp.rePos.enabled = true;
-            m_document->setViewport(vp);
-            m_mouseGrabPos.setX(0);
-            m_mouseGrabPos.setY(0);
-            m_pageCurrentlyGrabbed = newPageOn;
-            m_mouseGrabItem = getPageByNumber(m_pageCurrentlyGrabbed);
-        }
-
-        // Wrap mouse cursor
-        if (Okular::Settings::dragBeyondScreenEdges() && !CursorWrapHelper::wrapCursor(mousePos, Qt::TopEdge | Qt::BottomEdge).isNull()) {
-            m_mouseGrabPos.setX(0);
-            m_mouseGrabPos.setY(0);
-        }
-    } else {
-        setCursor(Qt::ClosedHandCursor);
-        m_mouseGrabPos = e->pos();
-    }
-}
-
-void ThumbnailListPrivate::wheelEvent(QWheelEvent *e)
-{
-    const ThumbnailWidget *item = itemFor(e->position().toPoint());
-    if (!item) { // wheeling on the spacing between items
-        e->ignore();
-        return;
-    }
-
-    const QRect r = item->visibleRect();
-    const int margin = ThumbnailWidget::margin();
-
-    Qt::Orientation orientation {qAbs(e->angleDelta().x()) > qAbs(e->angleDelta().y()) ? Qt::Horizontal : Qt::Vertical};
-
-    if (r.contains(e->position().toPoint() - QPoint(margin / 2, margin / 2)) && orientation == Qt::Vertical && e->modifiers() == Qt::ControlModifier) {
-        m_document->setZoom(e->angleDelta().y());
-    } else {
-        e->ignore();
+    // moving before the page has been picked up is neither a click nor a drag
+    if (m_pressedPage >= 0 && (e->buttons() & Qt::LeftButton) && (e->pos() - m_pressPos).manhattanLength() > QApplication::startDragDistance()) {
+        m_longPressTimer->stop();
+        m_pressedPage = -1;
     }
 }
 
 void ThumbnailListPrivate::contextMenuEvent(QContextMenuEvent *e)
 {
+    // never let the event bubble up to the parents
+    e->accept();
+
     const ThumbnailWidget *item = itemFor(e->pos());
     if (!item) {
-        e->ignore();
         return;
     }
+
+    cancelDrag();
 
     if (!m_document->canModifyPages()) {
         // pages cannot be edited in this document: only the generic page menu
@@ -1148,41 +1196,20 @@ void ThumbnailListPrivate::contextMenuEvent(QContextMenuEvent *e)
     const Okular::Page *clickedPagePtr = item->page();
     const int pageCount = static_cast<int>(m_document->pages());
 
-    // the menu acts on the selection; a page outside of it selects only itself
-    if (!m_selectedPageNumbers.contains(clickedPage)) {
-        selectOnly(clickedPage);
-    }
-    const QList<int> selectedPages = q->selectedPageNumbers();
-
     QMenu menu;
-    if (selectedPages.size() > 1) {
-        QAction *deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")),
-                                               i18np("Delete %1 page", "Delete %1 pages", selectedPages.size()),
-                                               [this, selectedPages]() { Q_EMIT q->pagesDeleted(selectedPages); });
-        deleteAction->setEnabled(selectedPages.size() < pageCount);
+    if (m_selectMode) {
+        const QList<int> selectedPages = q->selectedPageNumbers();
+        QAction *deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")), i18np("Delete %1 selected page", "Delete %1 selected pages", selectedPages.size()), [this, selectedPages]() { Q_EMIT q->pagesDeleted(selectedPages); });
+        deleteAction->setEnabled(!selectedPages.isEmpty() && selectedPages.size() < pageCount);
+        menu.addAction(QIcon::fromTheme(QStringLiteral("dialog-ok-apply")), i18n("Done selecting"), [this]() { setSelectMode(false); });
     } else {
-        QAction *deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")),
-                                               i18n("Delete this page"),
-                                               [this, clickedPage]() { Q_EMIT q->pagesDeleted(QList<int>() << clickedPage); });
+        QAction *deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")), i18n("Delete this page"), [this, clickedPage]() { Q_EMIT q->pagesDeleted(QList<int>() << clickedPage); });
         deleteAction->setEnabled(pageCount > 1);
-        menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add page before"), [this, clickedPage]() { Q_EMIT q->pageAddedBefore(clickedPage); });
-        menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add page after"), [this, clickedPage]() { Q_EMIT q->pageAddedAfter(clickedPage); });
+        menu.addAction(QIcon::fromTheme(QStringLiteral("edit-select")), i18n("Select"), [this, clickedPage]() {
+            setSelectMode(true);
+            toggleSelected(clickedPage);
+        });
     }
-    const QSizeF referenceSize = unrotatedPageSize(m_document, clickedPagePtr);
-    menu.addAction(QIcon::fromTheme(QStringLiteral("document-new")), i18n("Add page…"), [this, referenceSize]() {
-        Okular::NewPageDialog dialog(q, referenceSize);
-        if (dialog.exec() == QDialog::Accepted) {
-            Q_EMIT q->pageAdded(dialog.data());
-        }
-    });
-    if (selectedPages.size() == 1) {
-        QMenu *moveMenu = menu.addMenu(QIcon::fromTheme(QStringLiteral("transform-move")), i18n("Move page"));
-        moveMenu->addAction(QIcon::fromTheme(QStringLiteral("go-top")), i18n("To the beginning"), [this, clickedPage]() { Q_EMIT q->pagesReordered(clickedPage, 0); })->setEnabled(clickedPage > 0);
-        moveMenu->addAction(QIcon::fromTheme(QStringLiteral("go-up")), i18n("Up"), [this, clickedPage]() { Q_EMIT q->pagesReordered(clickedPage, clickedPage - 1); })->setEnabled(clickedPage > 0);
-        moveMenu->addAction(QIcon::fromTheme(QStringLiteral("go-down")), i18n("Down"), [this, clickedPage]() { Q_EMIT q->pagesReordered(clickedPage, clickedPage + 1); })->setEnabled(clickedPage < pageCount - 1);
-        moveMenu->addAction(QIcon::fromTheme(QStringLiteral("go-bottom")), i18n("To the end"), [this, clickedPage, pageCount]() { Q_EMIT q->pagesReordered(clickedPage, pageCount - 1); })->setEnabled(clickedPage < pageCount - 1);
-    }
-    menu.addAction(QIcon::fromTheme(QStringLiteral("edit-select-all")), i18n("Select all"), [this, pageCount]() { selectRange(0, pageCount - 1); });
 
     // let the owner add the generic page actions (bookmarks, fit width, ...)
     Q_EMIT q->menuRequested(&menu, clickedPagePtr, e->globalPos());
@@ -1239,11 +1266,23 @@ void ThumbnailWidget::paint(QPainter &p, const QRect _clipRect)
             PagePainter::paintPageOnPainter(&p, m_page, m_parent->q, flags, m_pixmapWidth, m_pixmapHeight, clipRect);
         }
 
-        if (!m_visibleRect.isNull()) {
+        // in selection mode every page has a check box at its bottom right corner
+        if (m_parent->m_selectMode) {
+            const QRect box(m_pixmapWidth - 26, m_pixmapHeight - 26, 22, 22);
             p.save();
-            p.setPen(QColor(255, 255, 0, 200));
-            p.setBrush(QColor(0, 0, 0, 100));
-            p.drawRect(m_visibleRect.geometry(m_pixmapWidth, m_pixmapHeight).adjusted(0, 0, -1, -1));
+            p.setRenderHint(QPainter::Antialiasing);
+            p.setPen(QPen(m_pageSelected ? highlightColor : QColor(110, 110, 110), 2));
+            p.setBrush(m_pageSelected ? highlightColor : QColor(255, 255, 255, 225));
+            p.drawRoundedRect(box, 4, 4);
+            if (m_pageSelected) {
+                QPainterPath tick;
+                tick.moveTo(box.left() + 5, box.center().y() + 1);
+                tick.lineTo(box.left() + 9, box.bottom() - 6);
+                tick.lineTo(box.right() - 5, box.top() + 6);
+                p.setPen(QPen(pal.color(QPalette::Active, QPalette::HighlightedText), 2.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+                p.setBrush(Qt::NoBrush);
+                p.drawPath(tick);
+            }
             p.restore();
         }
 

@@ -65,6 +65,9 @@ protected:
     // catch the viewport event and filter them if necessary
     bool viewportEvent(QEvent *) override;
 
+    // keeps the selection bar at the bottom
+    void resizeEvent(QResizeEvent *event) override;
+
 Q_SIGNALS:
     void rightClick(const Okular::Page *, const QPoint);
     // emitted while the page menu is built, so that the owner can append its own actions
@@ -73,11 +76,14 @@ Q_SIGNALS:
     void pageAddedBefore(int pageNumber);
     void pageAddedAfter(int pageNumber);
     void pageAdded(const Okular::NewPageDialog::NewPageData &data);
-    void pagesReordered(int fromIndex, int toIndex);
+    // the pages (0-based numbers) have been dropped so that the first of them is at toIndex once moved
+    void pagesReordered(const QList<int> &pageNumbers, int toIndex);
+    // a thumbnail has been clicked
+    void pageActivated(int pageNumber);
 
 public:
+    // the pages that are ticked while in selection mode, in ascending order
     QList<int> selectedPageNumbers() const;
-    void setMultiSelect(bool enabled);
 
 private:
     friend class ThumbnailListPrivate;

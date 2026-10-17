@@ -373,6 +373,12 @@ public:
     bool movePage(int from, int to);
 
     /**
+     * Moves all the pages in @p indices (0-based) as a block, keeping their relative order, so that the first of
+     * them ends up at index @p to of the resulting document (0 <= to <= pages() - indices.size()).
+     */
+    bool movePages(const QList<int> &indices, int to);
+
+    /**
      * Returns the url of the currently opened document.
      */
     QUrl currentDocument() const;

@@ -896,6 +896,7 @@ Part::Part(QObject *parent, const QVariantList &args)
     connect(m_thumbnailList.data(), &ThumbnailList::pageAddedAfter, this, &Part::slotInsertPageAfter);
     connect(m_thumbnailList.data(), &ThumbnailList::pageAdded, this, &Part::slotAddPage);
     connect(m_thumbnailList.data(), &ThumbnailList::pagesReordered, this, &Part::slotReorderPages);
+    connect(m_thumbnailList.data(), &ThumbnailList::pageActivated, this, &Part::slotThumbnailPageActivated);
     m_sidebar->addItem(thumbsBox, QIcon::fromTheme(QStringLiteral("view-preview")), i18n("Thumbnails"));
 
     m_sidebar->setCurrentItem(thumbsBox);
@@ -4536,8 +4537,13 @@ bool Part::eventFilter(QObject *watched, QEvent *event)
         }
         break; // never consume
     case QEvent::ContextMenu: {
+        // context menu events also reach the other widgets this part filters (page view, main window...),
+        // for example when they bubble up from a child that ignored them: only menus are handled here
+        QMenu *menu = qobject_cast<QMenu *>(watched);
+        if (!menu) {
+            break;
+        }
         QContextMenuEvent *e = static_cast<QContextMenuEvent *>(event);
-        QMenu *menu = static_cast<QMenu *>(watched);
 
         QScopedPointer<QMenu> ctxMenu(new QMenu);
 
@@ -4735,12 +4741,18 @@ void Part::slotAddPage(const NewPageDialog::NewPageData &data)
     insertBlankPages(static_cast<int>(m_document->pages()), data);
 }
 
-void Part::slotReorderPages(int fromIndex, int toIndex)
+void Part::slotReorderPages(const QList<int> &pageNumbers, int toIndex)
 {
     if (!m_document || !m_document->canModifyPages()) {
         return;
     }
-    m_document->movePage(fromIndex, toIndex);
+    m_document->movePages(pageNumbers, toIndex);
+}
+
+void Part::slotThumbnailPageActivated(int pageNumber)
+{
+    // a click on a thumbnail shows that page, fitted to the width of the view
+    m_pageView->fitPageWidth(pageNumber);
 }
 
 void Part::slotThumbnailMenu(QMenu *menu, const Okular::Page *page, const QPoint &globalPos)
