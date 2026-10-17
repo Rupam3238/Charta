@@ -28,3 +28,6 @@
 
 /* Defines whether we are building with dbus enabled */
 #cmakedefine01 HAVE_DBUS
+
+/* Defined if QPDF is available, to save added, removed and reordered pages */
+#cmakedefine01 HAVE_QPDF

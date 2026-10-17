@@ -215,6 +215,60 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules)
 
 find_package(ZLIB REQUIRED)
 
+# QPDF is used to write added, removed and reordered pages when saving a PDF
+find_package(qpdf CONFIG QUIET)
+if (TARGET qpdf::libqpdf)
+    set(QPDF_LINK_TARGET qpdf::libqpdf)
+else()
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(QPDF QUIET IMPORTED_TARGET libqpdf)
+    endif()
+    if (TARGET PkgConfig::QPDF)
+        set(QPDF_LINK_TARGET PkgConfig::QPDF)
+    endif()
+endif()
+
+if (NOT QPDF_LINK_TARGET)
+    include(FetchContent)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
+    set(BUILD_DOC OFF CACHE BOOL "" FORCE)
+    set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(BUILD_FUZZ_TARGETS OFF CACHE BOOL "" FORCE)
+    set(INSTALL_CMAKE_PACKAGE OFF CACHE BOOL "" FORCE)
+    set(REQUIRE_CRYPTO_GNUTLS OFF CACHE BOOL "" FORCE)
+    set(REQUIRE_CRYPTO_OPENSSL OFF CACHE BOOL "" FORCE)
+    set(USE_IMPL_CRYPTO_OPENSSL OFF CACHE BOOL "" FORCE)
+    set(USE_IMPL_CRYPTO_GNUTLS OFF CACHE BOOL "" FORCE)
+    set(USE_IMPL_CRYPTO_NATIVE ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        qpdf
+        GIT_REPOSITORY https://github.com/qpdf/qpdf.git
+        GIT_TAG v11.9.1
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_GetProperties(qpdf)
+    if (NOT qpdf_POPULATED)
+        FetchContent_Populate(qpdf)
+        add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR} EXCLUDE_FROM_ALL)
+    endif()
+    if (TARGET libqpdf_object)
+        target_compile_options(libqpdf_object PRIVATE -fexceptions -w)
+    endif()
+    if (TARGET libqpdf)
+        target_compile_options(libqpdf PRIVATE -fexceptions -w)
+        set(QPDF_LINK_TARGET libqpdf)
+    endif()
+endif()
+
+if (QPDF_LINK_TARGET)
+    set(HAVE_QPDF 1)
+    message(STATUS "QPDF found (${QPDF_LINK_TARGET}): saving PDFs with added, removed or reordered pages is supported")
+else()
+    message(WARNING "QPDF NOT found: saving PDFs with added, removed or reordered pages will use fallback tools (pdfseparate/pdfunite).")
+endif()
+
 find_package(Poppler "24.08.0" COMPONENTS Qt6)
 set_okular_optional_package_properties(Poppler PROPERTIES
         PURPOSE "Support for PDF files in Charta.")

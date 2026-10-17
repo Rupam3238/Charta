@@ -14,6 +14,7 @@
 namespace Okular
 {
 class AnnotationProxy;
+class Page;
 
 /**
  * @short Abstract interface for saving
@@ -70,6 +71,33 @@ public:
      * Save to the specified @p fileName with the specified @p options.
      */
     virtual bool save(const QString &fileName, SaveOptions options, QString *errorText) = 0;
+
+    /**
+     * Describes a page of the document as it has to be written by applyPageLayout().
+     */
+    struct PageLayoutEntry {
+        int sourceNumber;  ///< index of the page in the file loaded by the generator, -1 for a blank page
+        double width;      ///< size in points, not rotated (only used for blank pages)
+        double height;     ///< size in points, not rotated (only used for blank pages)
+        QColor background; ///< background color (only used for blank pages)
+        const Page *page = nullptr; ///< pointer to Okular page
+    };
+
+    /**
+     * Rewrites the file @p fileName (that has just been written by save()) so that its pages are the ones in
+     * @p pages, in that order: pages of the original file that are not listed are dropped, entries with a
+     * negative sourceNumber become new blank pages.
+     * Generators that cannot add, remove or reorder pages keep the default, that fails.
+     */
+    virtual bool applyPageLayout(const QString &fileName, const QList<PageLayoutEntry> &pages, QString *errorText)
+    {
+        Q_UNUSED(fileName)
+        Q_UNUSED(pages)
+        if (errorText) {
+            *errorText = QStringLiteral("This format cannot save added, removed or reordered pages.");
+        }
+        return false;
+    }
 
     /**
      * Returns the annotation proxy. Generators can return NULL if native

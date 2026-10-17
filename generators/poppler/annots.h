@@ -21,6 +21,7 @@
 #include "core/annotations.h"
 
 extern Okular::Annotation *createAnnotationFromPopplerAnnotation(Poppler::Annotation *popplerAnnotation, const Poppler::Page &popplerPage, bool *doDelete);
+extern Poppler::Annotation *createPopplerAnnotationFromOkularAnnotation(const Okular::Annotation *okl_ann, const Poppler::Page *page, Poppler::Document *doc);
 
 class PopplerAnnotationProxy : public Okular::AnnotationProxy, public Okular::AnnotationOrderProxy
 {

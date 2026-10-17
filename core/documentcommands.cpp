@@ -768,4 +768,17 @@ bool PageStructureCommand::refreshInternalPageReferences(const QList<Okular::Pag
     return true;
 }
 
+bool PageStructureCommand::hasDeletedOriginalPages() const
+{
+    const QList<Okular::Page *> &from = m_applied ? m_before : m_after;
+    const QList<Okular::Page *> &to = m_applied ? m_after : m_before;
+    const QSet<const Okular::Page *> toSet(to.cbegin(), to.cend());
+    for (const Okular::Page *p : from) {
+        if (p->sourceNumber() >= 0 && !toSet.contains(p)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }

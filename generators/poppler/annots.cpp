@@ -742,50 +742,44 @@ static Poppler::Annotation *createPopplerAnnotationFromOkularAnnotation(const Ok
 
     return pCaretAnnotation;
 }
-void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int page)
+Poppler::Annotation *createPopplerAnnotationFromOkularAnnotation(const Okular::Annotation *okl_ann, const Poppler::Page *page, Poppler::Document *doc)
 {
-    QMutexLocker ml(mutex);
-
-    std::unique_ptr<Poppler::Page> ppl_page = ppl_doc->page(page);
-
-    // Create poppler annotation
     Poppler::Annotation *ppl_ann = nullptr;
     switch (okl_ann->subType()) {
     case Okular::Annotation::AText:
-        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::TextAnnotation *>(okl_ann));
+        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<const Okular::TextAnnotation *>(okl_ann));
         break;
     case Okular::Annotation::ALine:
-        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::LineAnnotation *>(okl_ann));
+        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<const Okular::LineAnnotation *>(okl_ann));
         break;
     case Okular::Annotation::AGeom:
-        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::GeomAnnotation *>(okl_ann));
+        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<const Okular::GeomAnnotation *>(okl_ann));
         break;
     case Okular::Annotation::AHighlight:
-        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::HighlightAnnotation *>(okl_ann));
+        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<const Okular::HighlightAnnotation *>(okl_ann));
         break;
     case Okular::Annotation::AStamp: {
         bool wasDenyWriteEnabled = okl_ann->flags() & Okular::Annotation::DenyWrite;
 
         if (wasDenyWriteEnabled) {
-            okl_ann->setFlags(okl_ann->flags() & ~Okular::Annotation::DenyWrite);
+            const_cast<Okular::Annotation *>(okl_ann)->setFlags(okl_ann->flags() & ~Okular::Annotation::DenyWrite);
         }
 
-        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::StampAnnotation *>(okl_ann), ppl_page.get());
+        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<const Okular::StampAnnotation *>(okl_ann), page);
         if (wasDenyWriteEnabled) {
-            okl_ann->setFlags(okl_ann->flags() | Okular::Annotation::DenyWrite);
+            const_cast<Okular::Annotation *>(okl_ann)->setFlags(okl_ann->flags() | Okular::Annotation::DenyWrite);
         }
     } break;
     case Okular::Annotation::AInk:
-        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::InkAnnotation *>(okl_ann), ppl_page.get());
+        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<const Okular::InkAnnotation *>(okl_ann), page);
         break;
     case Okular::Annotation::ACaret:
-        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<Okular::CaretAnnotation *>(okl_ann));
+        ppl_ann = createPopplerAnnotationFromOkularAnnotation(static_cast<const Okular::CaretAnnotation *>(okl_ann));
         break;
 #if HAVE_NEW_SIGNATURE_API
     case Okular::Annotation::AWidget: {
-        if (auto signatureAnnt = dynamic_cast<Okular::SignatureAnnotation *>(okl_ann)) {
-            signatureAnnt->setPage(page);
-            ppl_ann = createPopplerAnnotationFromOkularAnnotation(signatureAnnt, ppl_doc).release();
+        if (auto signatureAnnt = dynamic_cast<const Okular::SignatureAnnotation *>(okl_ann)) {
+            ppl_ann = createPopplerAnnotationFromOkularAnnotation(const_cast<Okular::SignatureAnnotation *>(signatureAnnt), doc).release();
         } else {
             qWarning() << "Unsupported annotation type" << okl_ann->subType();
         }
@@ -796,6 +790,33 @@ void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int pag
 
     default:
         qWarning() << "Unsupported annotation type" << okl_ann->subType();
+        return nullptr;
+    }
+
+    if (ppl_ann && ppl_ann->uniqueName().isEmpty()) {
+        ppl_ann->setUniqueName(okl_ann->uniqueName());
+    }
+
+    return ppl_ann;
+}
+
+void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int page)
+{
+    QMutexLocker ml(mutex);
+
+    std::unique_ptr<Poppler::Page> ppl_page = ppl_doc->page(page);
+
+#if HAVE_NEW_SIGNATURE_API
+    if (okl_ann->subType() == Okular::Annotation::AWidget) {
+        if (auto signatureAnnt = dynamic_cast<Okular::SignatureAnnotation *>(okl_ann)) {
+            signatureAnnt->setPage(page);
+        }
+    }
+#endif
+
+    // Create poppler annotation
+    Poppler::Annotation *ppl_ann = createPopplerAnnotationFromOkularAnnotation(okl_ann, ppl_page.get(), ppl_doc);
+    if (!ppl_ann) {
         return;
     }
 

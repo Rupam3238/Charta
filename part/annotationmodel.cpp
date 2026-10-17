@@ -113,29 +113,45 @@ AnnotationModelPrivate::~AnnotationModelPrivate()
     delete root;
 }
 
-static void updateAnnotationPointer(AnnItem *item, const QList<Okular::Page *> &pages)
+// Returns false if an annotation could not be found again
+static bool updateAnnotationPointer(AnnItem *item, const QList<Okular::Page *> &pages)
 {
+    bool ok = true;
     if (item->annotation) {
-        item->annotation = pages[item->page]->annotation(item->annotation->uniqueName());
-        if (!item->annotation) {
-            qWarning() << "Lost annotation on document save, something went wrong";
+        Okular::Annotation *found = nullptr;
+        if (item->page >= 0 && item->page < pages.size()) {
+            found = pages[item->page]->annotation(item->annotation->uniqueName());
         }
+        item->annotation = found;
+        ok = found != nullptr;
     }
 
     for (AnnItem *child : std::as_const(item->children)) {
-        updateAnnotationPointer(child, pages);
+        ok = updateAnnotationPointer(child, pages) && ok;
     }
+    return ok;
 }
 
 void AnnotationModelPrivate::notifySetup(const QList<Okular::Page *> &pages, int setupFlags)
 {
-    if (!(setupFlags & Okular::DocumentObserver::DocumentChanged)) {
+    // The tree is keyed by page index: when pages are inserted, removed or moved it has to be built again
+    const bool pagesChanged = setupFlags & (Okular::DocumentObserver::PagesInserted | Okular::DocumentObserver::PagesRemoved | Okular::DocumentObserver::PagesMoved);
+
+    if (!(setupFlags & Okular::DocumentObserver::DocumentChanged) && !pagesChanged) {
         if (setupFlags & Okular::DocumentObserver::UrlChanged) {
             // Here with UrlChanged and no document changed it means we
             // need to update all the Annotation* otherwise
             // they still point to the old document ones, luckily the old ones are still
             // around so we can look for the new ones using unique ids, etc
-            updateAnnotationPointer(root, pages);
+            if (!updateAnnotationPointer(root, pages)) {
+                // the file has a different page layout or lost annotations (for example the ones of a page
+                // that was added since the document was opened): show what the document has now
+                q->beginResetModel();
+                qDeleteAll(root->children);
+                root->children.clear();
+                rebuildTree(pages);
+                q->endResetModel();
+            }
         }
         return;
     }

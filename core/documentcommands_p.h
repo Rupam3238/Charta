@@ -272,6 +272,8 @@ public:
 
     bool refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector) override;
 
+    bool hasDeletedOriginalPages() const;
+
 private:
     Okular::DocumentPrivate *m_docPriv;
     QList<Okular::Page *> m_before;

@@ -2455,6 +2455,7 @@ void DocumentPrivate::applyPageOrder(const QList<Page *> &newOrder)
     }
     m_pagesVector = newOrder;
     renumberPages();
+    m_pageStructureModified = true;
 
     endPageStructureChange(oldToNew, bookmarked, setupFlag);
 
@@ -5692,6 +5693,22 @@ bool Document::swapBackingFile(const QString &newFileName, const QUrl &url)
                 return false;
             }
 
+            // Page edits (insert / delete / move) that deleted original pages cannot be refreshed: those pages
+            // are no longer in the file. Reorders and insertions survive as the pages are still present in the file.
+            bool hasDeletedOriginalPages = false;
+            for (int i = 0; i < d->m_undoStack->count(); ++i) {
+                if (const PageStructureCommand *psc = dynamic_cast<const PageStructureCommand *>(d->m_undoStack->command(i))) {
+                    if (psc->hasDeletedOriginalPages()) {
+                        hasDeletedOriginalPages = true;
+                        break;
+                    }
+                }
+            }
+            if (hasDeletedOriginalPages) {
+                d->m_undoStack->clear();
+            }
+            d->m_pageStructureModified = false;
+
             // Update the undo stack contents
             const auto refreshUndoCommand = [&newPagesVector](auto &&self, QUndoCommand *undoCommand) -> bool {
                 if (OkularUndoCommand *okularCommand = dynamic_cast<OkularUndoCommand *>(undoCommand)) {
@@ -5899,7 +5916,23 @@ bool Document::saveChanges(const QString &fileName, QString *errorText)
         processDocumentAction(action, SaveDocumentStart);
     }
 
-    const bool success = saveIface->save(fileName, SaveInterface::SaveChanges, errorText);
+    bool success = saveIface->save(fileName, SaveInterface::SaveChanges, errorText);
+    if (success && d->m_pageStructureModified) {
+        // the generator wrote the pages of the original file: put them in the order of the document
+        QList<SaveInterface::PageLayoutEntry> layout;
+        layout.reserve(d->m_pagesVector.size());
+        const bool swapped = static_cast<int>(d->m_rotation) % 2 != 0;
+        for (const Page *page : std::as_const(d->m_pagesVector)) {
+            SaveInterface::PageLayoutEntry entry;
+            entry.sourceNumber = page->sourceNumber();
+            entry.width = swapped ? page->height() : page->width();
+            entry.height = swapped ? page->width() : page->height();
+            entry.background = page->blankColor();
+            entry.page = page;
+            layout.append(entry);
+        }
+        success = saveIface->applyPageLayout(fileName, layout, errorText);
+    }
     if (success) {
         if (const Okular::Action *action = d->m_generator->additionalDocumentAction(SaveDocumentFinish)) {
             processDocumentAction(action, SaveDocumentFinish);

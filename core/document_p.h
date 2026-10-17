@@ -347,6 +347,8 @@ public:
     QSet<int> m_annotationPagesPendingPixmapRefresh;
 
     QUndoStack *m_undoStack;
+    // set when pages have been added, removed or moved since the document was opened or last saved
+    bool m_pageStructureModified = false;
     QDomNode m_prevPropsOfAnnotBeingModified;
 
     // Since 0.21, we no longer support saving annotations and form data in

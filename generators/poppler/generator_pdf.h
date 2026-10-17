@@ -100,6 +100,7 @@ public:
     // [INHERITED] save interface
     bool supportsOption(SaveOption) const override;
     bool save(const QString &fileName, SaveOptions options, QString *errorText) override;
+    bool applyPageLayout(const QString &fileName, const QList<PageLayoutEntry> &pages, QString *errorText) override;
     Okular::AnnotationProxy *annotationProxy() const override;
 
     bool canSign() const override;

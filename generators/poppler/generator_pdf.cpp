@@ -10,11 +10,32 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include <config-okular.h>
+
+#if HAVE_QPDF
+#include <qpdf/QPDF.hh>
+#include <qpdf/QPDFObjectHandle.hh>
+#include <qpdf/QPDFOutlineDocumentHelper.hh>
+#include <qpdf/QPDFOutlineObjectHelper.hh>
+#include <qpdf/QPDFPageDocumentHelper.hh>
+#include <qpdf/QPDFPageObjectHelper.hh>
+#include <qpdf/QPDFWriter.hh>
+#endif
+
 #include <memory>
 
 #include "generator_pdf.h"
 
 // qt/kde includes
+#include <QDir>
+#include <QEventLoop>
+#include <QPageSize>
+#include <QPainter>
+#include <QPdfWriter>
+#include <QProcess>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QTimer>
 #include <QCheckBox>
 #include <QColor>
 #include <QComboBox>
@@ -2145,6 +2166,329 @@ bool PDFGenerator::save(const QString &fileName, SaveOptions options, QString *e
 
     return true;
 }
+
+static bool writeBlankPageAnnotations(const QString &pdfPath, const QList<Okular::SaveInterface::PageLayoutEntry> &pages, QString *errorText)
+{
+    bool hasBlankAnnotations = false;
+    for (const Okular::SaveInterface::PageLayoutEntry &entry : pages) {
+        if (entry.sourceNumber < 0 && entry.page && !entry.page->annotations().isEmpty()) {
+            hasBlankAnnotations = true;
+            break;
+        }
+    }
+    if (!hasBlankAnnotations) {
+        return true;
+    }
+
+    const std::unique_ptr<Poppler::Document> stagedDoc(Poppler::Document::load(pdfPath));
+    if (!stagedDoc || stagedDoc->isLocked()) {
+        if (errorText) {
+            *errorText = i18n("Could not open rearranged PDF to write annotations.");
+        }
+        return false;
+    }
+
+    for (int i = 0; i < pages.size(); ++i) {
+        const Okular::SaveInterface::PageLayoutEntry &entry = pages.at(i);
+        if (entry.sourceNumber < 0 && entry.page && !entry.page->annotations().isEmpty()) {
+            std::unique_ptr<Poppler::Page> ppl_page = stagedDoc->page(i);
+            if (!ppl_page) {
+                continue;
+            }
+            for (const Okular::Annotation *okl_ann : entry.page->annotations()) {
+                Poppler::Annotation *ppl_ann = createPopplerAnnotationFromOkularAnnotation(okl_ann, ppl_page.get(), stagedDoc.get());
+                if (ppl_ann) {
+                    ppl_page->addAnnotation(ppl_ann);
+                }
+            }
+        }
+    }
+
+    const QString annotTemp = pdfPath + QStringLiteral(".ann.tmp");
+    std::unique_ptr<Poppler::PDFConverter> converter = stagedDoc->pdfConverter();
+    converter->setOutputFileName(annotTemp);
+    converter->setPDFOptions(converter->pdfOptions() | Poppler::PDFConverter::WithChanges);
+    if (!converter->convert()) {
+        QFile::remove(annotTemp);
+        if (errorText) {
+            *errorText = i18n("Could not save annotations on blank pages.");
+        }
+        return false;
+    }
+
+    if (!QFile::remove(pdfPath) || !QFile::rename(annotTemp, pdfPath)) {
+        QFile::remove(annotTemp);
+        if (errorText) {
+            *errorText = i18n("Could not finalize PDF with annotations.");
+        }
+        return false;
+    }
+
+    return true;
+}
+
+#if HAVE_QPDF
+bool PDFGenerator::applyPageLayout(const QString &fileName, const QList<PageLayoutEntry> &pages, QString *errorText)
+{
+    const QString tempName = fileName + QStringLiteral(".pages.tmp");
+    try {
+        QPDF pdf;
+        pdf.processFile(QFile::encodeName(fileName).constData());
+        pdf.pushInheritedAttributesToPage();
+
+        QPDFPageDocumentHelper helper(pdf);
+        const std::vector<QPDFPageObjectHelper> original = helper.getAllPages();
+
+        // the new page list, built before touching the page tree
+        std::vector<QPDFPageObjectHelper> wanted;
+        wanted.reserve(pages.size());
+        bool identity = original.size() == static_cast<size_t>(pages.size());
+        for (int i = 0; i < pages.size(); ++i) {
+            const PageLayoutEntry &entry = pages.at(i);
+            identity = identity && entry.sourceNumber == i;
+            if (entry.sourceNumber >= 0) {
+                if (static_cast<size_t>(entry.sourceNumber) >= original.size()) {
+                    if (errorText) {
+                        *errorText = i18n("A page of the document is not in the file that was written.");
+                    }
+                    return false;
+                }
+                wanted.push_back(original[entry.sourceNumber]);
+            } else {
+                const QString w = QString::number(entry.width, 'f', 3);
+                const QString h = QString::number(entry.height, 'f', 3);
+                QColor color = entry.background.isValid() ? entry.background : QColor(Qt::white);
+                const QString content = QStringLiteral("%1 %2 %3 rg 0 0 %4 %5 re f\n").arg(color.redF(), 0, 'f', 4).arg(color.greenF(), 0, 'f', 4).arg(color.blueF(), 0, 'f', 4).arg(w, h);
+                QPDFObjectHandle page = pdf.makeIndirectObject(QPDFObjectHandle::parse(QStringLiteral("<< /Type /Page /MediaBox [0 0 %1 %2] /Resources << >> >>").arg(w, h).toStdString()));
+                page.replaceKey("/Contents", QPDFObjectHandle::newStream(&pdf, content.toStdString()));
+                wanted.push_back(QPDFPageObjectHelper(page));
+            }
+        }
+        if (identity) {
+            return true;
+        }
+
+        // Remap outlines pointing to deleted pages so bookmarks do not dangle
+        std::map<QPDFObjGen, QPDFObjectHandle> deletedPageReplacements;
+        for (size_t origIdx = 0; origIdx < original.size(); ++origIdx) {
+            bool kept = false;
+            for (const PageLayoutEntry &entry : pages) {
+                if (entry.sourceNumber == static_cast<int>(origIdx)) {
+                    kept = true;
+                    break;
+                }
+            }
+            if (!kept) {
+                // Find replacement: closest remaining page
+                QPDFObjectHandle replacement;
+                for (size_t nextIdx = origIdx + 1; nextIdx < original.size() && replacement.isNull(); ++nextIdx) {
+                    for (const PageLayoutEntry &entry : pages) {
+                        if (entry.sourceNumber == static_cast<int>(nextIdx)) {
+                            replacement = original[nextIdx].getObjectHandle();
+                            break;
+                        }
+                    }
+                }
+                if (replacement.isNull()) {
+                    for (int prevIdx = static_cast<int>(origIdx) - 1; prevIdx >= 0 && replacement.isNull(); --prevIdx) {
+                        for (const PageLayoutEntry &entry : pages) {
+                            if (entry.sourceNumber == prevIdx) {
+                                replacement = original[prevIdx].getObjectHandle();
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (replacement.isNull() && !wanted.empty()) {
+                    replacement = wanted.front().getObjectHandle();
+                }
+                if (!replacement.isNull()) {
+                    deletedPageReplacements[original[origIdx].getObjectHandle().getObjGen()] = replacement;
+                }
+            }
+        }
+
+        if (!deletedPageReplacements.empty()) {
+            try {
+                QPDFOutlineDocumentHelper outlineHelper(pdf);
+                if (outlineHelper.hasOutlines()) {
+                    for (const auto &pair : deletedPageReplacements) {
+                        std::vector<QPDFOutlineObjectHelper> deadOutlines = outlineHelper.getOutlinesForPage(pair.first);
+                        for (auto &outline : deadOutlines) {
+                            QPDFObjectHandle dest = outline.getDest();
+                            if (dest.isArray() && dest.getArrayNItems() > 0) {
+                                dest.setArrayItem(0, pair.second);
+                            }
+                            QPDFObjectHandle a = outline.getObjectHandle().getKey("/A");
+                            if (a.isDictionary() && a.getKey("/S").getName() == "/GoTo") {
+                                QPDFObjectHandle d = a.getKey("/D");
+                                if (d.isArray() && d.getArrayNItems() > 0) {
+                                    d.setArrayItem(0, pair.second);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (...) {
+                // Outline remapping failure should not prevent saving
+            }
+        }
+
+        for (const QPDFPageObjectHelper &page : original) {
+            helper.removePage(page);
+        }
+        for (const QPDFPageObjectHelper &page : wanted) {
+            helper.addPage(page, false);
+        }
+
+        {
+            QPDFWriter writer(pdf, QFile::encodeName(tempName).constData());
+            writer.setStreamDataMode(qpdf_s_preserve);
+            writer.setObjectStreamMode(qpdf_o_preserve);
+            writer.write();
+        }
+    } catch (const std::exception &e) {
+        QFile::remove(tempName);
+        if (errorText) {
+            *errorText = i18n("Could not rearrange the pages of the PDF: %1", QString::fromUtf8(e.what()));
+        }
+        return false;
+    }
+
+    if (!writeBlankPageAnnotations(tempName, pages, errorText)) {
+        QFile::remove(tempName);
+        return false;
+    }
+
+    // qpdf reads lazily from the input, so it was not possible to write over it directly
+    if (!QFile::remove(fileName) || !QFile::rename(tempName, fileName)) {
+        QFile::remove(tempName);
+        if (errorText) {
+            *errorText = i18n("Could not replace the staged PDF with the one with the new page order.");
+        }
+        return false;
+    }
+    return true;
+}
+#else
+// Without QPDF the pages are split and joined again with the pdfseparate / pdfunite tools that come with poppler
+// (poppler-utils), and the new blank pages are written by Qt.
+bool PDFGenerator::applyPageLayout(const QString &fileName, const QList<PageLayoutEntry> &pages, QString *errorText)
+{
+    auto fail = [errorText](const QString &text) {
+        if (errorText) {
+            *errorText = text;
+        }
+        return false;
+    };
+
+    // Runs a tool without blocking the interface and without it being able to wait for input; its output (standard
+    // output and error) is returned in @p output
+    auto runTool = [](const QString &program, const QStringList &arguments, QString *output) {
+        QProcess process;
+        process.setProcessChannelMode(QProcess::MergedChannels);
+        process.setStandardInputFile(QProcess::nullDevice());
+
+        QEventLoop loop;
+        QTimer timeout;
+        timeout.setSingleShot(true);
+        QObject::connect(&process, &QProcess::finished, &loop, &QEventLoop::quit);
+        QObject::connect(&process, &QProcess::errorOccurred, &loop, &QEventLoop::quit);
+        QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+
+        process.start(program, arguments);
+        timeout.start(120000);
+        if (process.state() != QProcess::NotRunning) {
+            loop.exec(QEventLoop::ExcludeUserInputEvents);
+        }
+
+        bool ok = false;
+        if (process.state() != QProcess::NotRunning) {
+            *output = QStringLiteral("timed out");
+            process.kill();
+            process.waitForFinished(5000);
+        } else {
+            *output = QString::fromLocal8Bit(process.readAll());
+            if (process.error() == QProcess::FailedToStart) {
+                *output = process.errorString();
+            }
+            ok = process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+        }
+        if (!ok) {
+            qWarning() << "PDFGenerator::applyPageLayout:" << program << arguments << "failed:" << *output;
+        }
+        return ok;
+    };
+
+    const QString separate = QStandardPaths::findExecutable(QStringLiteral("pdfseparate"));
+    const QString unite = QStandardPaths::findExecutable(QStringLiteral("pdfunite"));
+    if (separate.isEmpty() || unite.isEmpty()) {
+        return fail(i18n("Saving added, removed or reordered pages needs the pdfseparate and pdfunite tools (package poppler-utils) or a build with the QPDF library (libqpdf-dev)."));
+    }
+
+    QTemporaryDir dir;
+    if (!dir.isValid()) {
+        return fail(i18n("Could not create a temporary folder to rearrange the pages."));
+    }
+    const QString base = dir.path();
+
+    // 1. one file per page of the file that was written
+    QString toolOutput;
+    if (!runTool(separate, {fileName, base + QStringLiteral("/src-%d.pdf")}, &toolOutput)) {
+        return fail(i18n("pdfseparate failed: %1", toolOutput));
+    }
+    const int sourceCount = QDir(base).entryList({QStringLiteral("src-*.pdf")}, QDir::Files).size();
+
+    bool identity = sourceCount == pages.size();
+    for (int i = 0; i < pages.size(); ++i) {
+        identity = identity && pages.at(i).sourceNumber == i;
+    }
+    if (identity) {
+        return true;
+    }
+
+    // 2. the files to join, in the new order
+    QStringList inputs;
+    for (int i = 0; i < pages.size(); ++i) {
+        const PageLayoutEntry &entry = pages.at(i);
+        if (entry.sourceNumber >= 0) {
+            const QString source = base + QStringLiteral("/src-%1.pdf").arg(entry.sourceNumber + 1);
+            if (!QFile::exists(source)) {
+                return fail(i18n("A page of the document is not in the file that was written."));
+            }
+            inputs << source;
+        } else {
+            const QString blank = base + QStringLiteral("/blank-%1.pdf").arg(i);
+            QPdfWriter writer(blank);
+            writer.setPageSize(QPageSize(QSizeF(entry.width, entry.height), QPageSize::Point));
+            writer.setPageMargins(QMarginsF(0, 0, 0, 0));
+            QPainter painter;
+            if (!painter.begin(&writer)) {
+                return fail(i18n("Could not create a blank page."));
+            }
+            painter.fillRect(QRect(0, 0, writer.width(), writer.height()), entry.background.isValid() ? entry.background : QColor(Qt::white));
+            painter.end();
+            inputs << blank;
+        }
+    }
+
+    // 3. join them
+    const QString merged = base + QStringLiteral("/merged.pdf");
+    if (!runTool(unite, inputs + QStringList(merged), &toolOutput)) {
+        return fail(i18n("pdfunite failed: %1", toolOutput));
+    }
+
+    if (!writeBlankPageAnnotations(merged, pages, errorText)) {
+        return false;
+    }
+
+    // 4. replace the staged file
+    if (!QFile::remove(fileName) || !QFile::copy(merged, fileName)) {
+        return fail(i18n("Could not replace the staged PDF with the one with the new page order."));
+    }
+    return true;
+}
+#endif
 
 Okular::AnnotationProxy *PDFGenerator::annotationProxy() const
 {
