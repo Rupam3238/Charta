@@ -4699,9 +4699,20 @@ void Part::insertBlankPages(int index, const NewPageDialog::NewPageData &data)
     }
 }
 
+// The size in points of a page as it is when the document is not rotated; invalid if there is no such page
+static QSizeF unrotatedPageSize(const Okular::Document *document, int pageNumber)
+{
+    const Okular::Page *page = (pageNumber >= 0 && pageNumber < static_cast<int>(document->pages())) ? document->page(pageNumber) : nullptr;
+    if (!page) {
+        return QSizeF();
+    }
+    const bool swapped = static_cast<int>(document->rotation()) % 2 != 0;
+    return swapped ? QSizeF(page->height(), page->width()) : QSizeF(page->width(), page->height());
+}
+
 void Part::slotInsertPageBefore(int pageNumber)
 {
-    NewPageDialog dialog(widget());
+    NewPageDialog dialog(widget(), unrotatedPageSize(m_document, pageNumber));
     if (dialog.exec() == QDialog::Accepted) {
         insertBlankPages(pageNumber, dialog.data());
     }
@@ -4709,7 +4720,7 @@ void Part::slotInsertPageBefore(int pageNumber)
 
 void Part::slotInsertPageAfter(int pageNumber)
 {
-    NewPageDialog dialog(widget());
+    NewPageDialog dialog(widget(), unrotatedPageSize(m_document, pageNumber));
     if (dialog.exec() == QDialog::Accepted) {
         insertBlankPages(pageNumber + 1, dialog.data());
     }

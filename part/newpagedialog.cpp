@@ -7,60 +7,60 @@
 #include "newpagedialog.h"
 
 // qt/kde includes
-#include <QLabel>
-#include <QGridLayout>
-#include <QSpinBox>
-#include <QDoubleSpinBox>
-#include <QPushButton>
-#include <QDialogButtonBox>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGroupBox>
 #include <QColorDialog>
+#include <QComboBox>
+#include <QDialogButtonBox>
+#include <QDoubleSpinBox>
+#include <QGridLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QRadioButton>
+#include <QSpinBox>
+#include <QVBoxLayout>
+#include <QVariant>
 #include <KLocalizedString>
 
+#include <cmath>
 #include <utility>
-
-// local includes
-#include "settings.h"
 
 namespace Okular
 {
 
+namespace
+{
+bool nearlyEqual(double a, double b)
+{
+    return std::abs(a - b) < 0.5;
+}
+}
+
 class NewPageDialog::Private
 {
 public:
-    Private()
-        : widthSpinBox(nullptr)
-        , heightSpinBox(nullptr)
-        , colorButton(nullptr)
-        , orientationButton(nullptr)
-        , countSpinBox(nullptr)
-    {
-        width = 595.0;  // A4 width in points
-        height = 842.0; // A4 height in points
-        backgroundColor = Qt::white;
-        count = 1;
-    }
+    QComboBox *presetCombo = nullptr;
+    QDoubleSpinBox *widthSpinBox = nullptr;
+    QDoubleSpinBox *heightSpinBox = nullptr;
+    QRadioButton *portraitRadio = nullptr;
+    QRadioButton *landscapeRadio = nullptr;
+    QPushButton *colorButton = nullptr;
+    QSpinBox *countSpinBox = nullptr;
 
-    QDoubleSpinBox *widthSpinBox;
-    QDoubleSpinBox *heightSpinBox;
-    QPushButton *colorButton;
-    QPushButton *orientationButton;
-    QSpinBox *countSpinBox;
-
-    double width;
-    double height;
-    QColor backgroundColor;
-    int count;
+    QColor backgroundColor = Qt::white;
+    bool hasReference = false;
+    // set while the controls are changed by the code, to ignore their signals
+    bool updating = false;
 };
 
-NewPageDialog::NewPageDialog(QWidget *parent)
+NewPageDialog::NewPageDialog(QWidget *parent, const QSizeF &referenceSize)
     : QDialog(parent)
     , d(new Private)
 {
     setWindowTitle(i18n("Add New Page"));
     setModal(true);
+
+    d->hasReference = referenceSize.isValid() && referenceSize.width() >= 10.0 && referenceSize.height() >= 10.0;
 
     auto *mainLayout = new QVBoxLayout(this);
 
@@ -68,52 +68,61 @@ NewPageDialog::NewPageDialog(QWidget *parent)
     auto *sizeGroup = new QGroupBox(i18n("Page Size"), this);
     auto *sizeLayout = new QGridLayout(sizeGroup);
 
-    sizeLayout->addWidget(new QLabel(i18n("Width (pt):"), this), 0, 0);
-    d->widthSpinBox = new QDoubleSpinBox(this);
-    d->widthSpinBox->setRange(10.0, 2000.0);
-    d->widthSpinBox->setSingleStep(10.0);
-    d->widthSpinBox->setValue(595.0); // A4 width
-    sizeLayout->addWidget(d->widthSpinBox, 0, 1);
+    sizeLayout->addWidget(new QLabel(i18n("Format:"), sizeGroup), 0, 0);
+    d->presetCombo = new QComboBox(sizeGroup);
+    if (d->hasReference) {
+        d->presetCombo->addItem(i18n("Same as the current page"), QVariant::fromValue(referenceSize));
+    }
+    // presets are stored in portrait orientation, in points
+    d->presetCombo->addItem(i18n("A4 (210 × 297 mm)"), QVariant::fromValue(QSizeF(595.0, 842.0)));
+    d->presetCombo->addItem(i18n("A3 (297 × 420 mm)"), QVariant::fromValue(QSizeF(842.0, 1191.0)));
+    d->presetCombo->addItem(i18n("A5 (148 × 210 mm)"), QVariant::fromValue(QSizeF(420.0, 595.0)));
+    d->presetCombo->addItem(i18n("Letter (8.5 × 11 in)"), QVariant::fromValue(QSizeF(612.0, 792.0)));
+    d->presetCombo->addItem(i18n("Legal (8.5 × 14 in)"), QVariant::fromValue(QSizeF(612.0, 1008.0)));
+    d->presetCombo->addItem(i18n("Custom"), QVariant::fromValue(QSizeF()));
+    sizeLayout->addWidget(d->presetCombo, 0, 1);
 
-    sizeLayout->addWidget(new QLabel(i18n("Height (pt):"), this), 1, 0);
-    d->heightSpinBox = new QDoubleSpinBox(this);
-    d->heightSpinBox->setRange(10.0, 2000.0);
+    sizeLayout->addWidget(new QLabel(i18n("Width (pt):"), sizeGroup), 1, 0);
+    d->widthSpinBox = new QDoubleSpinBox(sizeGroup);
+    d->widthSpinBox->setRange(10.0, 5000.0);
+    d->widthSpinBox->setSingleStep(10.0);
+    d->widthSpinBox->setDecimals(1);
+    sizeLayout->addWidget(d->widthSpinBox, 1, 1);
+
+    sizeLayout->addWidget(new QLabel(i18n("Height (pt):"), sizeGroup), 2, 0);
+    d->heightSpinBox = new QDoubleSpinBox(sizeGroup);
+    d->heightSpinBox->setRange(10.0, 5000.0);
     d->heightSpinBox->setSingleStep(10.0);
-    d->heightSpinBox->setValue(842.0); // A4 height
-    sizeLayout->addWidget(d->heightSpinBox, 1, 1);
+    d->heightSpinBox->setDecimals(1);
+    sizeLayout->addWidget(d->heightSpinBox, 2, 1);
+
+    sizeLayout->addWidget(new QLabel(i18n("Orientation:"), sizeGroup), 3, 0);
+    auto *orientationLayout = new QHBoxLayout();
+    d->portraitRadio = new QRadioButton(i18n("Portrait"), sizeGroup);
+    d->landscapeRadio = new QRadioButton(i18n("Landscape"), sizeGroup);
+    orientationLayout->addWidget(d->portraitRadio);
+    orientationLayout->addWidget(d->landscapeRadio);
+    orientationLayout->addStretch();
+    sizeLayout->addLayout(orientationLayout, 3, 1);
 
     mainLayout->addWidget(sizeGroup);
 
     // Appearance group
     auto *appearanceGroup = new QGroupBox(i18n("Appearance"), this);
-    auto *appearanceLayout = new QVBoxLayout(appearanceGroup);
-
-    // Background color
-    auto *colorLayout = new QHBoxLayout();
-    colorLayout->addWidget(new QLabel(i18n("Background Color:"), this));
-    d->colorButton = new QPushButton(this);
+    auto *colorLayout = new QHBoxLayout(appearanceGroup);
+    colorLayout->addWidget(new QLabel(i18n("Background color:"), appearanceGroup));
+    d->colorButton = new QPushButton(appearanceGroup);
     d->colorButton->setFixedSize(24, 24);
     updateColorButton();
     colorLayout->addWidget(d->colorButton);
     colorLayout->addStretch();
-    appearanceLayout->addLayout(colorLayout);
-
-    // Orientation toggle
-    auto *orientationLayout = new QHBoxLayout();
-    orientationLayout->addWidget(new QLabel(i18n("Orientation:"), this));
-    d->orientationButton = new QPushButton(this);
-    d->orientationButton->setText(i18n("Portrait"));
-    orientationLayout->addWidget(d->orientationButton);
-    orientationLayout->addStretch();
-    appearanceLayout->addLayout(orientationLayout);
-
     mainLayout->addWidget(appearanceGroup);
 
     // Page count
     auto *countGroup = new QGroupBox(i18n("Page Count"), this);
     auto *countLayout = new QHBoxLayout(countGroup);
-    countLayout->addWidget(new QLabel(i18n("Number of pages:"), this));
-    d->countSpinBox = new QSpinBox(this);
+    countLayout->addWidget(new QLabel(i18n("Number of pages:"), countGroup));
+    d->countSpinBox = new QSpinBox(countGroup);
     d->countSpinBox->setRange(1, 100);
     d->countSpinBox->setValue(1);
     countLayout->addWidget(d->countSpinBox);
@@ -124,33 +133,39 @@ NewPageDialog::NewPageDialog(QWidget *parent)
     auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     mainLayout->addWidget(buttonBox);
 
+    // Initial size: the reference page, or A4 portrait
+    d->portraitRadio->setChecked(true);
+    applyPreset(0); // index 0 is the reference page if there is one, A4 otherwise
+
     // Connections
-    connect(d->widthSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, [this](double value) { d->width = value; });
-    connect(d->heightSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, [this](double value) { d->height = value; });
+    connect(d->presetCombo, &QComboBox::activated, this, [this](int index) { applyPreset(index); });
+    connect(d->widthSpinBox, &QDoubleSpinBox::valueChanged, this, [this]() {
+        if (!d->updating) {
+            syncControlsFromSize();
+        }
+    });
+    connect(d->heightSpinBox, &QDoubleSpinBox::valueChanged, this, [this]() {
+        if (!d->updating) {
+            syncControlsFromSize();
+        }
+    });
+    connect(d->portraitRadio, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked && !d->updating) {
+            applyOrientation(false);
+        }
+    });
+    connect(d->landscapeRadio, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked && !d->updating) {
+            applyOrientation(true);
+        }
+    });
     connect(d->colorButton, &QPushButton::clicked, this, [this]() {
-        QColor color = QColorDialog::getColor(d->backgroundColor, this);
+        const QColor color = QColorDialog::getColor(d->backgroundColor, this);
         if (color.isValid()) {
             d->backgroundColor = color;
             updateColorButton();
         }
     });
-    connect(d->orientationButton, &QPushButton::clicked, this, [this]() {
-        if (d->orientationButton->text() == i18n("Portrait")) {
-            d->orientationButton->setText(i18n("Landscape"));
-            std::swap(d->width, d->height);
-            d->widthSpinBox->setValue(d->width);
-            d->heightSpinBox->setValue(d->height);
-        } else {
-            d->orientationButton->setText(i18n("Portrait"));
-            std::swap(d->width, d->height);
-            d->widthSpinBox->setValue(d->width);
-            d->heightSpinBox->setValue(d->height);
-        }
-    });
-    connect(d->countSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, [this](int value) { d->count = value; });
 
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -161,20 +176,90 @@ NewPageDialog::~NewPageDialog()
     delete d;
 }
 
+void NewPageDialog::applyPreset(int index)
+{
+    const QSizeF size = d->presetCombo->itemData(index).toSizeF();
+    if (!size.isValid()) {
+        return; // "Custom": keep what the user typed
+    }
+
+    double width = size.width();
+    double height = size.height();
+    const bool isReference = d->hasReference && index == 0;
+    if (!isReference) {
+        // the standard formats follow the chosen orientation
+        const bool wantLandscape = d->landscapeRadio->isChecked();
+        if (wantLandscape != (width > height)) {
+            std::swap(width, height);
+        }
+    }
+
+    d->updating = true;
+    d->presetCombo->setCurrentIndex(index);
+    d->widthSpinBox->setValue(width);
+    d->heightSpinBox->setValue(height);
+    (width > height ? d->landscapeRadio : d->portraitRadio)->setChecked(true);
+    d->updating = false;
+}
+
+void NewPageDialog::applyOrientation(bool landscape)
+{
+    double width = d->widthSpinBox->value();
+    double height = d->heightSpinBox->value();
+    if (landscape != (width > height)) {
+        std::swap(width, height);
+    }
+
+    d->updating = true;
+    d->widthSpinBox->setValue(width);
+    d->heightSpinBox->setValue(height);
+    d->updating = false;
+    syncControlsFromSize();
+}
+
+// Called when the width or the height have been edited: updates the orientation and the format shown
+void NewPageDialog::syncControlsFromSize()
+{
+    const double width = d->widthSpinBox->value();
+    const double height = d->heightSpinBox->value();
+
+    int match = d->presetCombo->count() - 1; // "Custom"
+    for (int i = 0; i < d->presetCombo->count() - 1; ++i) {
+        const QSizeF size = d->presetCombo->itemData(i).toSizeF();
+        if ((nearlyEqual(size.width(), width) && nearlyEqual(size.height(), height)) || (!(d->hasReference && i == 0) && nearlyEqual(size.width(), height) && nearlyEqual(size.height(), width))) {
+            match = i;
+            break;
+        }
+    }
+
+    d->updating = true;
+    d->presetCombo->setCurrentIndex(match);
+    (width > height ? d->landscapeRadio : d->portraitRadio)->setChecked(true);
+    d->updating = false;
+}
+
 void NewPageDialog::updateColorButton()
 {
-    QString css = QStringLiteral("background-color: %1; border: 1px solid black;")
-                      .arg(d->backgroundColor.name());
+    const QString css = QStringLiteral("background-color: %1; border: 1px solid black;").arg(d->backgroundColor.name());
     d->colorButton->setStyleSheet(css);
+}
+
+void NewPageDialog::accept()
+{
+    // take into account a value that has been typed but not committed yet
+    d->widthSpinBox->interpretText();
+    d->heightSpinBox->interpretText();
+    d->countSpinBox->interpretText();
+    QDialog::accept();
 }
 
 NewPageDialog::NewPageData NewPageDialog::data() const
 {
     NewPageData data;
-    data.width = d->width;
-    data.height = d->height;
+    data.width = d->widthSpinBox->value();
+    data.height = d->heightSpinBox->value();
     data.backgroundColor = d->backgroundColor;
-    data.count = d->count;
+    data.count = d->countSpinBox->value();
     return data;
 }
 

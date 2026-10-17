@@ -268,6 +268,13 @@ ThumbnailWidget *ThumbnailListPrivate::itemFor(const QPoint p) const
     return nullptr;
 }
 
+// The size of the page in points, as it is when the document is not rotated
+static QSizeF unrotatedPageSize(const Okular::Document *document, const Okular::Page *page)
+{
+    const bool swapped = static_cast<int>(document->rotation()) % 2 != 0;
+    return swapped ? QSizeF(page->height(), page->width()) : QSizeF(page->width(), page->height());
+}
+
 void ThumbnailListPrivate::updateSelectionHighlights()
 {
     for (ThumbnailWidget *thumb : std::as_const(m_thumbnails)) {
@@ -638,6 +645,16 @@ void ThumbnailList::keyPressEvent(QKeyEvent *keyEvent)
         return;
     }
 
+    if ((keyEvent->modifiers() & Qt::AltModifier) && (keyEvent->key() == Qt::Key_Up || keyEvent->key() == Qt::Key_Down) && d->m_document->canModifyPages() && d->m_selectedPageNumbers.size() == 1) {
+        const int page = *d->m_selectedPageNumbers.constBegin();
+        const int target = keyEvent->key() == Qt::Key_Up ? page - 1 : page + 1;
+        if (target >= 0 && target < static_cast<int>(d->m_document->pages())) {
+            Q_EMIT pagesReordered(page, target);
+            d->selectOnly(target);
+        }
+        return;
+    }
+
     if (keyEvent->key() == Qt::Key_Delete && d->m_document->canModifyPages() && !d->m_selectedPageNumbers.isEmpty()) {
         Q_EMIT pagesDeleted(selectedPageNumbers());
         return;
@@ -895,8 +912,13 @@ void ThumbnailListPrivate::mousePressEvent(QMouseEvent *e)
     const int margin = ThumbnailWidget::margin();
     const QPoint p = e->pos() - item->pos();
 
-    if (e->button() != Qt::RightButton && r.contains(p - QPoint(margin / 2, margin / 2))) {
-        // the part of the thumbnail that is shown in the page view can be dragged to scroll it
+    // The part of the thumbnail that is shown in the page view can be dragged to scroll it. When it covers
+    // most of the thumbnail (whole page visible, as for the current page in "fit page" mode) there is nothing
+    // to scroll, so the drag moves the page instead, like it does with Alt pressed.
+    const QRect thumbRect = item->rect();
+    const bool visibleRectIsMostOfThumbnail = r.width() * r.height() * 10 >= thumbRect.width() * thumbRect.height() * 7;
+    const bool forceMove = e->modifiers() & Qt::AltModifier;
+    if (e->button() != Qt::RightButton && !forceMove && !visibleRectIsMostOfThumbnail && r.contains(p - QPoint(margin / 2, margin / 2))) {
         m_mouseGrabItem = item;
         m_pageCurrentlyGrabbed = item->pageNumber();
     } else if (m_multiSelect && e->button() == Qt::LeftButton) {
@@ -979,6 +1001,16 @@ void ThumbnailListPrivate::mouseMoveEvent(QMouseEvent *e)
         }
         m_reordering = true;
         setCursor(Qt::ClosedHandCursor);
+
+        // scroll the list when the page is dragged near its top or bottom edge
+        QScrollBar *scrollBar = q->verticalScrollBar();
+        const int viewportY = q->viewport()->mapFromGlobal(e->globalPosition().toPoint()).y();
+        const int edge = 30;
+        if (viewportY < edge) {
+            scrollBar->setValue(scrollBar->value() - scrollBar->singleStep());
+        } else if (viewportY > q->viewport()->height() - edge) {
+            scrollBar->setValue(scrollBar->value() + scrollBar->singleStep());
+        }
 
         const ThumbnailWidget *target = itemFor(e->pos());
         if (target && target->pageNumber() != m_dragFromIndex) {
@@ -1125,7 +1157,7 @@ void ThumbnailListPrivate::contextMenuEvent(QContextMenuEvent *e)
     QMenu menu;
     if (selectedPages.size() > 1) {
         QAction *deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")),
-                                               i18np("Delete %1 page", "Delete %1 pages", selectedPages.size(), selectedPages.size()),
+                                               i18np("Delete %1 page", "Delete %1 pages", selectedPages.size()),
                                                [this, selectedPages]() { Q_EMIT q->pagesDeleted(selectedPages); });
         deleteAction->setEnabled(selectedPages.size() < pageCount);
     } else {
@@ -1136,12 +1168,20 @@ void ThumbnailListPrivate::contextMenuEvent(QContextMenuEvent *e)
         menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add page before"), [this, clickedPage]() { Q_EMIT q->pageAddedBefore(clickedPage); });
         menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add page after"), [this, clickedPage]() { Q_EMIT q->pageAddedAfter(clickedPage); });
     }
-    menu.addAction(QIcon::fromTheme(QStringLiteral("document-new")), i18n("Add page…"), [this]() {
-        Okular::NewPageDialog dialog(q);
+    const QSizeF referenceSize = unrotatedPageSize(m_document, clickedPagePtr);
+    menu.addAction(QIcon::fromTheme(QStringLiteral("document-new")), i18n("Add page…"), [this, referenceSize]() {
+        Okular::NewPageDialog dialog(q, referenceSize);
         if (dialog.exec() == QDialog::Accepted) {
             Q_EMIT q->pageAdded(dialog.data());
         }
     });
+    if (selectedPages.size() == 1) {
+        QMenu *moveMenu = menu.addMenu(QIcon::fromTheme(QStringLiteral("transform-move")), i18n("Move page"));
+        moveMenu->addAction(QIcon::fromTheme(QStringLiteral("go-top")), i18n("To the beginning"), [this, clickedPage]() { Q_EMIT q->pagesReordered(clickedPage, 0); })->setEnabled(clickedPage > 0);
+        moveMenu->addAction(QIcon::fromTheme(QStringLiteral("go-up")), i18n("Up"), [this, clickedPage]() { Q_EMIT q->pagesReordered(clickedPage, clickedPage - 1); })->setEnabled(clickedPage > 0);
+        moveMenu->addAction(QIcon::fromTheme(QStringLiteral("go-down")), i18n("Down"), [this, clickedPage]() { Q_EMIT q->pagesReordered(clickedPage, clickedPage + 1); })->setEnabled(clickedPage < pageCount - 1);
+        moveMenu->addAction(QIcon::fromTheme(QStringLiteral("go-bottom")), i18n("To the end"), [this, clickedPage, pageCount]() { Q_EMIT q->pagesReordered(clickedPage, pageCount - 1); })->setEnabled(clickedPage < pageCount - 1);
+    }
     menu.addAction(QIcon::fromTheme(QStringLiteral("edit-select-all")), i18n("Select all"), [this, pageCount]() { selectRange(0, pageCount - 1); });
 
     // let the owner add the generic page actions (bookmarks, fit width, ...)
