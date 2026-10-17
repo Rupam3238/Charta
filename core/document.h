@@ -214,7 +214,7 @@ public:
     };
 
     /// @since 24.12
-    static const uint InvalidPage = static_cast<uint>(-1);
+    static constexpr int InvalidPage = -1;
 
     /**
      * Opens the document.
@@ -329,45 +329,48 @@ public:
     uint pages() const;
 
     /**
-     * Inserts a page at the specified position.
-     * @param position The position at which to insert the page (0-based index)
-     * @param page The page to insert (ownership is transferred to the document)
-     * @return The actual position where the page was inserted, or InvalidPage on failure
-     * @since 24.12
+     * Returns whether pages can be added, removed and reordered in the loaded document.
+     * This is currently only supported for PDF documents.
      */
-    uint insertPage(uint position, Okular::Page *page);
+    bool canModifyPages() const;
 
     /**
-     * Appends a page to the end of the document.
-     * @param page The page to append (ownership is transferred to the document)
-     * @return The position where the page was inserted, or InvalidPage on failure
-     * @since 24.12
-     */
-    uint appendPage(Okular::Page *page);
-
-    /**
-     * Removes the page at the specified position.
-     * @param position The position of the page to remove (0-based index)
-     * @return true if the page was successfully removed, false otherwise
-     * @since 24.12
-     */
-    bool removePage(uint position);
-
-    /**
-     * Moves a page from one position to another.
-     * @param fromPosition The current position of the page (0-based index)
-     * @param toPosition The new position for the page (0-based index)
-     * @return true if the page was successfully moved, false otherwise
-     * @since 24.12
-     */
-    bool movePage(uint fromPosition, uint toPosition);
-
-    /**
-     * Returns the list of all pages in the document.
-     * @return A list containing all pages in the document
-     * @since 24.12
+     * Returns all the pages of the document, in display order.
      */
     QList<Okular::Page *> allPages() const;
+
+    /**
+     * Inserts @p page at position @p index (0-based, 0 <= index <= pages()).
+     * The document takes ownership of the page. Returns false (and deletes nothing)
+     * if the page could not be inserted.
+     */
+    bool insertPage(int index, Okular::Page *page);
+
+    /**
+     * Inserts all the @p pages starting at position @p index with a single update of the observers.
+     * The document takes ownership of the pages.
+     */
+    bool insertPages(int index, const QList<Okular::Page *> &pages);
+
+    /**
+     * Appends @p page at the end of the document. See insertPage().
+     */
+    bool appendPage(Okular::Page *page);
+
+    /**
+     * Removes the page at @p index (0-based). The last remaining page cannot be removed.
+     */
+    bool removePage(int index);
+
+    /**
+     * Removes all the pages in @p indices (0-based) at once. At least one page has to remain.
+     */
+    bool removePages(const QList<int> &indices);
+
+    /**
+     * Moves the page at index @p from so that it ends up at index @p to (both 0-based).
+     */
+    bool movePage(int from, int to);
 
     /**
      * Returns the url of the currently opened document.

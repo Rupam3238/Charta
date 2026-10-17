@@ -7,18 +7,15 @@
 #ifndef _OKULAR_THUMBNAILLIST_H_
 #define _OKULAR_THUMBNAILLIST_H_
 
+#include <QList>
+#include <QPoint>
 #include <QScrollArea>
 #include <QToolBar>
 
 #include "core/observer.h"
+#include "newpagedialog.h"
 
-struct NewPageData {
-    double width;
-    double height;
-    QColor backgroundColor;
-    int count;
-};
-
+class QMenu;
 class ThumbnailListPrivate;
 
 namespace Okular
@@ -70,10 +67,12 @@ protected:
 
 Q_SIGNALS:
     void rightClick(const Okular::Page *, const QPoint);
+    // emitted while the page menu is built, so that the owner can append its own actions
+    void menuRequested(QMenu *menu, const Okular::Page *page, const QPoint &globalPos);
     void pagesDeleted(const QList<int> &pageNumbers);
     void pageAddedBefore(int pageNumber);
     void pageAddedAfter(int pageNumber);
-    void pageAdded(const NewPageData &data);
+    void pageAdded(const Okular::NewPageDialog::NewPageData &data);
     void pagesReordered(int fromIndex, int toIndex);
 
 public:

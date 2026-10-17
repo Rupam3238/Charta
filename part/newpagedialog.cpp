@@ -8,6 +8,7 @@
 
 // qt/kde includes
 #include <QLabel>
+#include <QGridLayout>
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>
@@ -17,6 +18,8 @@
 #include <QGroupBox>
 #include <QColorDialog>
 #include <KLocalizedString>
+
+#include <utility>
 
 // local includes
 #include "settings.h"
