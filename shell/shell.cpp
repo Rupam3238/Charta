@@ -216,6 +216,7 @@ Shell::Shell(const QString &serializedOptions)
         m_welcomeScreen = new WelcomeScreen(this);
         connect(m_welcomeScreen, &WelcomeScreen::openClicked, this, &Shell::fileOpen);
         connect(m_welcomeScreen, &WelcomeScreen::createClicked, this, &Shell::createNewDocument);
+        connect(m_welcomeScreen, &WelcomeScreen::builderClicked, this, &Shell::openDocumentBuilder);
         connect(m_welcomeScreen, &WelcomeScreen::recentItemClicked, this, [this](const QUrl &url) { openUrl(url); });
         connect(m_welcomeScreen, &WelcomeScreen::forgetRecentItem, this, &Shell::forgetRecentItem);
         m_centralStackedWidget->addWidget(m_welcomeScreen);
@@ -579,6 +580,14 @@ void Shell::setupActions()
 {
     KStandardAction::open(this, SLOT(fileOpen()), actionCollection());
     KStandardAction::openNew(this, SLOT(createNewDocument()), actionCollection());
+
+    QAction *builderAction = actionCollection()->addAction(QStringLiteral("file_document_builder"));
+    builderAction->setText(i18n("Document &Builder…"));
+    builderAction->setIcon(QIcon::fromTheme(QStringLiteral("document-edit")));
+    builderAction->setWhatsThis(i18n("Assemble a new document from pages of other documents."));
+    actionCollection()->setDefaultShortcut(builderAction, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_B));
+    connect(builderAction, &QAction::triggered, this, &Shell::openDocumentBuilder);
+
     m_recent = KStandardAction::openRecent(this, SLOT(openUrl(QUrl)), actionCollection());
     m_recent->setToolBarMode(KRecentFilesAction::MenuMode);
     connect(m_recent, &QAction::triggered, this, &Shell::showOpenRecentMenu);
@@ -790,6 +799,10 @@ void Shell::setCaption(const QString &caption)
     if (activeTab != -1) {
         KParts::ReadWritePart *const activePart = m_tabs[activeTab].part;
         QString tabCaption = activePart->url().fileName();
+        if (tabCaption.isEmpty() && m_tabs[activeTab].builderVisible) {
+            // A blank builder has no URL; give the tab something to say.
+            tabCaption = i18n("Document Builder");
+        }
         if (activePart->isModified()) {
             modified = true;
             if (!tabCaption.isEmpty()) {
@@ -900,6 +913,12 @@ void Shell::setActiveTab(int tab)
         m_showSidebarAction->disconnect(m_sidebar);
     }
 
+    // Leaving a tab that was showing the Document Builder gives the sidebar back, so that
+    // isSidebarVisible below describes the tab we are entering and not the builder state.
+    if (m_activeTab >= 0 && m_activeTab < m_tabs.size() && m_activeTab != tab && m_tabs[m_activeTab].builderVisible) {
+        m_sidebar->setVisible(m_sidebarWasVisibleBeforeBuilder);
+    }
+
     m_tabWidget->setCurrentIndex(tab);
 
     // NOTE : createGUI(...) breaks the visibility of the sidebar, so we need
@@ -926,8 +945,31 @@ void Shell::setActiveTab(int tab)
     m_showSidebarAction->setChecked(m_sidebar->isVisibleTo(this));
     connect(m_showSidebarAction, &QAction::triggered, m_sidebar, &Sidebar::setVisible);
 
+    m_activeTab = tab;
+
+    // A tab left in the Document Builder keeps the sidebar out of the way.
+    updateSidebarForActiveTab();
+
     m_printAction->setEnabled(m_tabs[tab].printEnabled);
     m_closeAction->setEnabled(m_tabs[tab].closeEnabled);
+}
+
+void Shell::updateSidebarForActiveTab()
+{
+    if (!m_showSidebarAction || !m_sidebar) {
+        return;
+    }
+
+    const bool builderIsUp = m_activeTab >= 0 && m_activeTab < m_tabs.size() && m_tabs[m_activeTab].builderVisible;
+    if (!builderIsUp) {
+        m_showSidebarAction->setEnabled(true);
+        m_showSidebarAction->setChecked(m_sidebar->isVisibleTo(this));
+        return;
+    }
+
+    m_showSidebarAction->setEnabled(false);
+    m_sidebar->setVisible(false);
+    m_showSidebarAction->setChecked(false);
 }
 
 void Shell::closeTab(int tab)
@@ -1063,12 +1105,21 @@ void Shell::connectPart(const KParts::ReadWritePart *part)
     connect(part, SIGNAL(fitWindowToPage(QSize,QSize)), this, SLOT(slotFitWindowToPage(QSize,QSize)));
     const bool newDocOk = connect(part, SIGNAL(requestOpenNewUntitledDocument(QString)), this, SLOT(openNewUntitledDocument(QString)));
     const bool recentOk = connect(part, SIGNAL(requestAddRecentFile(QString)), this, SLOT(addRecentFile(QString)));
+    const bool exportedOk = connect(part, SIGNAL(openExportedDocument(QString)), this, SLOT(openExportedDocument(QString)));
+    const bool builderOk = connect(part, SIGNAL(requestDocumentBuilderVisibilityChanged(bool)), this, SLOT(setDocumentBuilderVisible(bool)));
+    const bool builderCloseOk = connect(part, SIGNAL(requestCloseEmptyDocumentBuilder()), this, SLOT(closeEmptyDocumentBuilder()));
     // clang-format on
     // String-based connects fail silently on a typo: assert in debug builds
     Q_ASSERT(newDocOk);
     Q_ASSERT(recentOk);
+    Q_ASSERT(exportedOk);
+    Q_ASSERT(builderOk);
+    Q_ASSERT(builderCloseOk);
     Q_UNUSED(newDocOk)
     Q_UNUSED(recentOk)
+    Q_UNUSED(exportedOk)
+    Q_UNUSED(builderOk)
+    Q_UNUSED(builderCloseOk)
     // NOLINTEND(clazy-old-style-connect);
 }
 
@@ -1099,10 +1150,86 @@ void Shell::openNewUntitledDocument(const QString &path)
     openUrl(QUrl::fromLocalFile(path));
 }
 
+void Shell::openDocumentBuilder()
+{
+    // The builder lives in the part (it is loaded as a plugin), so ask the active part to show it.
+    // The invocation is by name because the shell must not link against the part.
+    const int activeTab = m_tabWidget->currentIndex();
+    if (activeTab < 0 || activeTab >= m_tabs.size() || !m_tabs[activeTab].part) {
+        return;
+    }
+    KParts::ReadWritePart *const part = m_tabs[activeTab].part;
+    if (part->metaObject()->indexOfMethod("slotOpenDocumentBuilder()") < 0) {
+        return;
+    }
+
+    // Only switch off the welcome screen once the part confirmed it took the request.
+    const bool ok = QMetaObject::invokeMethod(part, "slotOpenDocumentBuilder");
+    if (!ok) {
+        return;
+    }
+    bool visible = false;
+    QMetaObject::invokeMethod(part, "isDocumentBuilderVisible", Q_RETURN_ARG(bool, visible));
+    if (!visible) {
+        return;
+    }
+
+    // A document that never had a URL (welcomed blank builder) would otherwise leave the tab blank.
+    if (part->url().isEmpty()) {
+        m_tabWidget->setTabText(activeTab, i18n("Document Builder"));
+    }
+
+    hideWelcomeScreen();
+}
+
+void Shell::setDocumentBuilderVisible(bool visible)
+{
+    if (!m_showSidebarAction || !m_sidebar) {
+        return;
+    }
+
+    const int tab = findTabIndex(sender());
+    if (tab >= 0) {
+        m_tabs[tab].builderVisible = visible;
+    }
+
+    // Only the active tab drives the real chrome; the others just remember the state.
+    if (tab >= 0 && tab != m_activeTab) {
+        return;
+    }
+
+    if (visible) {
+        m_sidebarWasVisibleBeforeBuilder = m_sidebar->isVisible();
+        updateSidebarForActiveTab();
+        m_showSidebarAction->setChecked(false);
+    } else {
+        m_showSidebarAction->setEnabled(true);
+        m_sidebar->setVisible(m_sidebarWasVisibleBeforeBuilder);
+        m_showSidebarAction->setChecked(m_sidebarWasVisibleBeforeBuilder);
+    }
+}
+
+void Shell::closeEmptyDocumentBuilder()
+{
+    const int tab = findTabIndex(sender());
+    if (tab < 0) {
+        return;
+    }
+
+    // Closing the last tab shows the welcome screen again; closeTab() already handles that.
+    closeTab(tab);
+}
+
 void Shell::addRecentFile(const QString &path)
 {
     m_recent->addUrl(QUrl::fromLocalFile(path));
     refreshRecentsOnWelcomeScreen();
+}
+
+void Shell::openExportedDocument(const QString &path)
+{
+    // openUrl() switches to the tab if the document is already open, otherwise opens a new one.
+    openUrl(QUrl::fromLocalFile(path));
 }
 
 void Shell::setPrintEnabled(bool enabled)

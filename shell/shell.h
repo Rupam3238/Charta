@@ -109,6 +109,16 @@ private Q_SLOTS:
     void openNewUntitledDocument(const QString &path);
     void addRecentFile(const QString &path);
 
+    /** Opens a document the Document Builder just exported. */
+    void openExportedDocument(const QString &path);
+
+    /** Shows the Document Builder page in the active tab (File -> Document Builder). */
+    void openDocumentBuilder();
+    /** Syncs the sidebar with the part's Document Builder page. */
+    void setDocumentBuilderVisible(bool visible);
+    /** Back on an empty builder: closes that tab (and shows the welcome screen if it was the last). */
+    void closeEmptyDocumentBuilder();
+
     void slotUpdateFullScreen();
     void slotShowMenubar();
 
@@ -164,6 +174,8 @@ private:
     int findTabIndex(QObject *sender) const;
     int findTabIndex(const QUrl &url) const;
     void readRecentFilesSettings();
+    /// Points the sidebar dock at the active tab's builder state (hidden while the builder is up).
+    void updateSidebarForActiveTab();
 
 private:
     void reloadAllXML();
@@ -193,11 +205,13 @@ private:
             : part(p)
             , printEnabled(false)
             , closeEnabled(false)
+            , builderVisible(false)
         {
         }
         KParts::ReadWritePart *part;
         bool printEnabled;
         bool closeEnabled;
+        bool builderVisible;
     };
     QList<TabState> m_tabs;
     QList<QUrl> m_closedTabUrls;
@@ -206,6 +220,10 @@ private:
     QAction *m_undoCloseTab;
     QAction *m_showSidebarAction = nullptr;
     QAction *m_lockSidebarAction = nullptr;
+
+    // Sidebar state to restore when leaving the Document Builder page
+    bool m_sidebarWasVisibleBeforeBuilder = false;
+    int m_activeTab = 0;
 
     bool m_isValid;
 };

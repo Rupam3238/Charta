@@ -68,6 +68,9 @@ protected:
     // keeps the selection bar at the bottom
     void resizeEvent(QResizeEvent *event) override;
 
+    // the panel was opened (or the sidebar switched to it): ask for the visible previews
+    void showEvent(QShowEvent *event) override;
+
 Q_SIGNALS:
     void rightClick(const Okular::Page *, const QPoint);
     // emitted while the page menu is built, so that the owner can append its own actions

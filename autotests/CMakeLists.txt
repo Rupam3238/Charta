@@ -43,6 +43,16 @@ if(Poppler_Qt6_FOUND)
             LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
         )
         target_link_libraries(untitleddocumenttest Poppler::Qt6)
+
+        ecm_add_test(documentbuildermodeltest.cpp
+            TEST_NAME "documentbuildermodeltest"
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
+        )
+
+        ecm_add_test(documentbuilderparttest.cpp
+            TEST_NAME "documentbuilderparttest"
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
+        )
     endif()
 
     ecm_add_test(visibilitytest.cpp

@@ -115,6 +115,7 @@ WelcomeScreen::WelcomeScreen(QWidget *parent)
 
     connect(openButton, &QPushButton::clicked, this, &WelcomeScreen::openClicked);
     connect(createButton, &QPushButton::clicked, this, &WelcomeScreen::createClicked);
+    connect(builderButton, &QPushButton::clicked, this, &WelcomeScreen::builderClicked);
 
     recentsListView->setContextMenuPolicy(Qt::DefaultContextMenu);
     recentsListView->setModel(m_recentsModel);

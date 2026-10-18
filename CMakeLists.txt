@@ -662,6 +662,12 @@ if(BUILD_DESKTOP)
     part/signingcertificatelistmodel.cpp
     part/newpagedialog.cpp
     part/blankpageswriter.cpp
+    part/documentbuildersource.cpp
+    part/documentbuildermodel.cpp
+    part/documentbuilderexport.cpp
+    part/documentbuilder.cpp
+    part/pagerangeinputdialog.cpp
+    part/imagepagesettingsdialog.cpp
     part/part.qrc
   )
   ki18n_wrap_ui(okularpart_SRCS part/selectcertificatedialog.ui)
@@ -703,6 +709,20 @@ endif()
 
 if (KF6Purpose_FOUND)
     target_link_libraries(okularpart KF6::PurposeWidgets)
+endif()
+
+if (HAVE_QPDF)
+    # The Document Builder reads page metadata from imported PDFs and writes the composed document,
+    # both with QPDF. The very same static libqpdf.a is already linked into every generator plugin;
+    # hiding its symbols here keeps the two copies from interposing on each other. --exclude-libs is
+    # an ELF linker option, so it is applied on ELF platforms only.
+    target_link_libraries(okularpart ${QPDF_LINK_TARGET})
+    target_compile_options(okularpart PRIVATE -fexceptions)
+    # QPDF's headers throw, so make the intent explicit for the export translation unit as well.
+    set_source_files_properties(part/documentbuilderexport.cpp PROPERTIES COMPILE_OPTIONS "-fexceptions")
+    if (UNIX AND NOT APPLE)
+        target_link_options(okularpart PRIVATE "LINKER:--exclude-libs,libqpdf.a")
+    endif()
 endif()
 
 set_target_properties(okularpart PROPERTIES PREFIX "")

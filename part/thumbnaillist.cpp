@@ -652,6 +652,15 @@ void ThumbnailList::resizeEvent(QResizeEvent *event)
     d->layoutSelectionBar();
 }
 
+void ThumbnailList::showEvent(QShowEvent *event)
+{
+    QScrollArea::showEvent(event);
+    // A document is usually opened before (or while) the main window appears, so notifySetup()'s
+    // request fires while this panel is still hidden. Ask again now that the panel is on screen and
+    // the viewport has a real size, instead of waiting for the user to scroll.
+    d->delayedRequestVisiblePixmaps(0);
+}
+
 ThumbnailList::~ThumbnailList()
 {
     d->m_document->removeObserver(this);
@@ -1000,16 +1009,29 @@ void ThumbnailListPrivate::viewportResizeEvent(QResizeEvent *e)
 // BEGIN internal SLOTS
 void ThumbnailListPrivate::slotRequestVisiblePixmaps()
 {
-    // if an update is already scheduled or the widget is hidden, don't proceed
-    if ((m_delayTimer && m_delayTimer->isActive()) || q->isHidden()) {
+    // if an update is already scheduled, don't proceed
+    if (m_delayTimer && m_delayTimer->isActive()) {
         return;
     }
+
+    // Deliberately no q->isHidden() check: a document is usually opened before (or while) the main
+    // window appears, and the panel is not on screen yet at that point. Dropping the request there
+    // left every preview blank until the user scrolled. The panel geometry is still valid while
+    // hidden (the sidebar assigns it), so the pages around the visible area can be rendered in the
+    // background and are ready by the time the panel is opened.
+    const QRect rawViewportRect = q->viewport()->rect();
+    if (rawViewportRect.width() < 1 || rawViewportRect.height() < 1) {
+        return;
+    }
+
+    // Ask for a bit more than one screen, so a small scroll does not flash blank previews.
+    const int prefetch = rawViewportRect.height() / 2;
+    const QRect viewportRect = rawViewportRect.translated(q->horizontalScrollBar()->value(), q->verticalScrollBar()->value()).adjusted(0, -prefetch, 0, prefetch);
 
     // scroll from the top to the last visible thumbnail
     m_visibleThumbnails.clear();
     QList<Okular::PixmapRequest *> requestedPixmaps;
     QList<ThumbnailWidget *>::const_iterator tIt = m_thumbnails.constBegin(), tEnd = m_thumbnails.constEnd();
-    const QRect viewportRect = q->viewport()->rect().translated(q->horizontalScrollBar()->value(), q->verticalScrollBar()->value());
     for (; tIt != tEnd; ++tIt) {
         ThumbnailWidget *t = *tIt;
         const QRect thumbRect = t->rect();

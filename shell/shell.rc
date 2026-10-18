@@ -7,6 +7,7 @@
    <DefineGroup append="save_merge" name="file_save" />
    <DefineGroup append="print_merge" name="file_print" />
    <Action name="file_new" append="open_merge" />
+   <Action name="file_document_builder" append="open_merge" />
    <Action name="undo-close-tab" append="open_merge" />
   </Menu>
   <!--Menu name="view" >

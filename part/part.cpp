@@ -143,11 +143,13 @@
 #include "sidebar.h"
 #include "signaturepanel.h"
 #include "thumbnaillist.h"
+#include "documentbuilder.h"
 #include "newpagedialog.h"
 #include "toc.h"
 
 #include <memory>
 #include <type_traits>
+#include <utility>
 
 namespace
 {
@@ -191,6 +193,7 @@ public:
         buttonLayout->addWidget(createButton(QStringLiteral("system-search"), i18n("Search"), QStringLiteral("optionsSearchButton"), true), 0, Qt::AlignHCenter);
         buttonLayout->addWidget(createButton(QStringLiteral("deep-history"), i18n("Annotation History"), QStringLiteral("optionsHistoryButton"), true), 0, Qt::AlignHCenter);
         buttonLayout->addWidget(createButton(QStringLiteral("bookmarks"), i18n("Bookmarks"), QStringLiteral("optionsBookmarksButton"), true), 0, Qt::AlignHCenter);
+        buttonLayout->addWidget(createButton(QStringLiteral("document-edit"), i18n("Document Builder"), QStringLiteral("optionsBuilderButton"), false), 0, Qt::AlignHCenter);
         buttonLayout->addStretch(1);
 
         auto *separator = new QFrame(this);
@@ -1004,12 +1007,25 @@ Part::Part(QObject *parent, const QVariantList &args)
     connect(m_document, &Document::notice, this, &Part::noticeMessage);
     connect(m_document, &Document::sourceReferenceActivated, this, &Part::slotHandleActivatedSourceReference);
     connect(m_pageView.data(), &PageView::fitWindowToPage, this, &Part::fitWindowToPage);
-    rightLayout->addWidget(pageViewContainer, 1);
+
+    // The document view and the Document Builder share the right-hand side of the window.
+    m_mainStack = new QStackedWidget(rightContainer);
+    m_mainStack->setObjectName(QStringLiteral("mainStack"));
+    m_mainStack->addWidget(pageViewContainer);
+    m_documentBuilder = new DocumentBuilderWidget(m_mainStack);
+    connect(m_documentBuilder.data(), &DocumentBuilderWidget::closeRequested, this, &Part::slotCloseDocumentBuilder);
+    connect(m_documentBuilder.data(), &DocumentBuilderWidget::openExportedDocument, this, &Part::openExportedDocument);
+    connect(m_documentBuilder.data(), &DocumentBuilderWidget::addRecentFile, this, &Part::requestAddRecentFile);
+    m_mainStack->addWidget(m_documentBuilder);
+    rightLayout->addWidget(m_mainStack, 1);
+
     m_layers->setPageView(m_pageView);
     m_signaturePanel->setPageView(m_pageView);
     m_findBar = new FindBar(m_document, rightContainer);
+    m_findBar->setObjectName(QStringLiteral("findBar"));
     rightLayout->addWidget(m_findBar);
     m_bottomBar = new QWidget(rightContainer);
+    m_bottomBar->setObjectName(QStringLiteral("bottomBar"));
     QHBoxLayout *bottomBarLayout = new QHBoxLayout(m_bottomBar);
     m_pageSizeLabel = new PageSizeLabel(m_bottomBar, m_document);
     bottomBarLayout->setContentsMargins(0, 0, 0, 0);
@@ -1323,6 +1339,12 @@ void Part::setupViewerActions()
     if (optionsBar && !pageViewContainer->findChild<QObject *>(QStringLiteral("optionsPanelHost"), Qt::FindDirectChildrenOnly)) {
         auto *optionsPanelHost = new OptionsPanelHost(pageViewContainer, optionsBar, m_document, m_thumbnailList, m_searchWidget, m_reviewsWidget, prefs);
         optionsPanelHost->setObjectName(QStringLiteral("optionsPanelHost"));
+    }
+    if (optionsBar) {
+        m_builderButton = optionsBar->findChild<QToolButton *>(QStringLiteral("optionsBuilderButton"));
+        if (m_builderButton) {
+            connect(m_builderButton.data(), &QToolButton::clicked, this, &Part::slotOpenDocumentBuilder);
+        }
     }
 }
 
@@ -2308,6 +2330,10 @@ bool Part::openUrl(const QUrl &_url, bool swapInsteadOfOpening)
      * to read it */
     m_swapInsteadOfOpening = swapInsteadOfOpening;
 
+    // Leaving the Document Builder before a document is opened keeps the builder page from being
+    // shown over unrelated content (closeUrl() below resets it).
+    setDocumentBuilderVisible(false);
+
     // The subsequent call to closeUrl clears the arguments.
     // We want to save them and restore them later.
     const KParts::OpenUrlArguments args = arguments();
@@ -2456,6 +2482,13 @@ bool Part::closeUrl(bool promptToSave)
         // If we're swapping the backing file, we don't want to close the
         // current one when openUrl() calls us internally
         return true; // pretend it worked
+    }
+
+    // The builder belongs to the document that is going away: leave its page and drop its contents,
+    // so the next document starts from a fresh (and freshly seeded) builder.
+    setDocumentBuilderVisible(false);
+    if (m_documentBuilder) {
+        m_documentBuilder->reset();
     }
 
     m_document->setHistoryClean(true);
@@ -4897,6 +4930,107 @@ void Part::slotCreateNewDocument()
     }
 
     Q_EMIT requestOpenNewUntitledDocument(path);
+}
+
+void Part::setDocumentBuilderVisible(bool visible)
+{
+    if (!m_mainStack || !m_documentBuilder) {
+        return;
+    }
+
+    if (visible) {
+        if (m_mainStack->currentWidget() == m_documentBuilder) {
+            return;
+        }
+
+        // The find bar, the bottom bar and the message widgets are siblings of the stack: hide them
+        // while the builder is up and put them back exactly as they were when it is left.
+        m_builderSavedChrome.clear();
+        const QList<QWidget *> chrome = {
+            m_findBar,
+            m_bottomBar,
+            m_migrationMessage,
+            m_topMessage,
+            m_formsMessage,
+            m_infoMessage,
+            m_printMightDifferMessage,
+            m_signatureMessage,
+#if HAVE_NEW_SIGNATURE_API
+            m_signatureInProgressMessage,
+#endif
+        };
+        for (QWidget *widget : chrome) {
+            if (widget) {
+                m_builderSavedChrome.append(qMakePair(QPointer<QWidget>(widget), widget->isVisible()));
+                widget->setVisible(false);
+            }
+        }
+
+        m_mainStack->setCurrentWidget(m_documentBuilder);
+        m_documentBuilderVisible = true;
+        Q_EMIT requestDocumentBuilderVisibilityChanged(true);
+    } else {
+        if (m_mainStack->currentWidget() != m_documentBuilder) {
+            return;
+        }
+
+        m_mainStack->setCurrentWidget(m_mainStack->widget(0));
+        for (const auto &saved : std::as_const(m_builderSavedChrome)) {
+            if (saved.first) {
+                saved.first->setVisible(saved.second);
+            }
+        }
+        m_builderSavedChrome.clear();
+        m_documentBuilderVisible = false;
+        Q_EMIT requestDocumentBuilderVisibilityChanged(false);
+    }
+}
+
+void Part::slotOpenDocumentBuilder()
+{
+    if (!m_documentBuilder) {
+        return;
+    }
+
+    // Seed the builder with the document that is on screen, once. A part that has no document open
+    // (the shell's empty first tab) simply starts with an empty builder.
+    //
+    // Seeding reads the file the document was loaded from. Unsaved edits of the current document are
+    // therefore not part of the builder yet: snapshotting them through a non-mutating
+    // Document::saveChanges() is §1.6 of the plan and is still gated behind GATE 0.5b.
+    if (!m_documentBuilder->isSeeded() && m_document && m_document->isOpened()) {
+        const QUrl url = m_document->currentDocument();
+        if (url.isLocalFile()) {
+            m_documentBuilder->seedFromPdf(url.toLocalFile());
+        }
+    }
+
+    setDocumentBuilderVisible(true);
+}
+
+void Part::slotCloseDocumentBuilder()
+{
+    const bool wasEmpty = !m_documentBuilder || (m_documentBuilder->pageCount() == 0 && !(m_document && m_document->isOpened()));
+
+    setDocumentBuilderVisible(false);
+    if (m_pageView) {
+        m_pageView->setFocus();
+    }
+
+    // Back on a builder that holds nothing: the shell closes the tab instead of leaving an empty tab.
+    if (wasEmpty) {
+        Q_EMIT requestCloseEmptyDocumentBuilder();
+    }
+}
+
+bool Part::isDocumentBuilderVisible() const
+{
+    return m_documentBuilderVisible && m_mainStack && m_documentBuilder && m_mainStack->currentWidget() == m_documentBuilder;
+}
+
+int Part::documentBuilderPageCount() const
+{
+    return m_documentBuilder ? m_documentBuilder->pageCount() : 0;
 }
 
 void Part::slotReorderPages(const QList<int> &pageNumbers, int toIndex)

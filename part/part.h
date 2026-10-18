@@ -25,6 +25,7 @@
 #include <QIcon>
 #include <QElapsedTimer>
 #include <QList>
+#include <QPair>
 #include <QPointer>
 #include <QProcess>
 #include <QUrl>
@@ -47,6 +48,8 @@ class QAction;
 class QWidget;
 class QPrinter;
 class QMenu;
+class QStackedWidget;
+class QToolButton;
 
 class KConfigDialog;
 class KDirWatch;
@@ -78,6 +81,7 @@ class BookmarkList;
 class DrawingToolActions;
 class Layers;
 class SignaturePanel;
+class DocumentBuilderWidget;
 
 #if HAVE_PURPOSE
 namespace Purpose
@@ -217,6 +221,24 @@ Q_SIGNALS:
      */
     void requestAddRecentFile(const QString &path);
 
+    /**
+     * The Document Builder wrote \p path and the user asked to open it: the shell opens it like any
+     * other document (new tab, or the existing one).
+     */
+    void openExportedDocument(const QString &path);
+
+    /**
+     * The Document Builder page was shown (\p visible is true) or left. The shell uses this to hide
+     * the sidebar while the builder is up.
+     */
+    void requestDocumentBuilderVisibilityChanged(bool visible);
+
+    /**
+     * The user pressed Back on a builder that holds nothing (no document was open when it was
+     * entered): the shell closes the tab instead of leaving an empty tab behind.
+     */
+    void requestCloseEmptyDocumentBuilder();
+
 protected:
     // reimplemented from KParts::ReadWritePart
     bool openFile() override;
@@ -305,6 +327,30 @@ public Q_SLOTS:
      * pending state). Invoked by name from the shell.
      */
     void setUntitledDocument(const QString &tempPath);
+
+    /**
+     * Shows the Document Builder page. The first time it is entered the builder is seeded with the
+     * pages of the document that is currently open, if there is one. Invoked by name from the shell
+     * (File -> Document Builder, the welcome screen) and from the Options bar button.
+     */
+    Q_SCRIPTABLE void slotOpenDocumentBuilder();
+
+    /**
+     * Leaves the Document Builder page and goes back to the document view. On a builder that holds
+     * nothing this asks the shell to close the tab instead (requestCloseEmptyDocumentBuilder).
+     */
+    void slotCloseDocumentBuilder();
+
+    /**
+     * Whether the Document Builder page is currently shown. Informational, also used by the
+     * autotests and by the shell.
+     */
+    bool isDocumentBuilderVisible() const;
+
+    /**
+     * Number of pages currently held by the Document Builder. Informational, used by the autotests.
+     */
+    int documentBuilderPageCount() const;
 
     /**
      * Whether the document currently open has no location yet, that is its content only lives in a
@@ -421,6 +467,16 @@ private:
     QPointer<BookmarkList> m_bookmarkList;
     QPointer<Layers> m_layers;
     QPointer<SignaturePanel> m_signaturePanel;
+
+    // Right-hand side of the window: either the document view (index 0) or the Document Builder
+    // page (index 1). Everything that belongs to the document view (the options bar, the find bar,
+    // the bottom bar, the message widgets) is a sibling of the stack rather than of the stack's
+    // page, so its visibility has to be saved and restored explicitly.
+    QStackedWidget *m_mainStack = nullptr;
+    QPointer<DocumentBuilderWidget> m_documentBuilder;
+    QPointer<QToolButton> m_builderButton;
+    bool m_documentBuilderVisible = false;
+    QList<QPair<QPointer<QWidget>, bool>> m_builderSavedChrome;
 
     // document watcher (and reloader) variables
     KDirWatch *m_watcher;
@@ -540,6 +596,9 @@ private:
     int m_maxRecentItems;
 
     void insertBlankPages(int index, const NewPageDialog::NewPageData &data);
+
+    /** Shows or leaves the Document Builder page, saving/restoring the document-view chrome. */
+    void setDocumentBuilderVisible(bool visible);
 
 private Q_SLOTS:
     // Document builder: page management, all the page numbers are 0-based

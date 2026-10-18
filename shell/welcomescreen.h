@@ -30,6 +30,7 @@ public:
 Q_SIGNALS:
     void openClicked();
     void createClicked();
+    void builderClicked();
     void recentItemClicked(QUrl const &url);
     void forgetAllRecents();
     void forgetRecentItem(QUrl const &url);
