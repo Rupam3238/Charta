@@ -1016,6 +1016,7 @@ Part::Part(QObject *parent, const QVariantList &args)
     connect(m_documentBuilder.data(), &DocumentBuilderWidget::closeRequested, this, &Part::slotCloseDocumentBuilder);
     connect(m_documentBuilder.data(), &DocumentBuilderWidget::openExportedDocument, this, &Part::openExportedDocument);
     connect(m_documentBuilder.data(), &DocumentBuilderWidget::addRecentFile, this, &Part::requestAddRecentFile);
+    connect(m_documentBuilder.data(), &DocumentBuilderWidget::documentSaved, this, &Part::slotDocumentBuilderSaved);
     m_mainStack->addWidget(m_documentBuilder);
     rightLayout->addWidget(m_mainStack, 1);
 
@@ -2663,7 +2664,7 @@ void Part::slotFileDirty(const QString &path)
 }
 
 // Attempt to reload the document, one or more times, optionally from a different URL
-bool Part::slotAttemptReload(bool oneShot, const QUrl &newUrl)
+bool Part::slotAttemptReload(bool oneShot, const QUrl &newUrl, bool promptToSave)
 {
     // Skip reload when another reload is already in progress
     if (m_isReloading) {
@@ -2701,7 +2702,7 @@ bool Part::slotAttemptReload(bool oneShot, const QUrl &newUrl)
     }
 
     // close and (try to) reopen the document
-    if (!closeUrl()) {
+    if (!closeUrl(promptToSave)) {
         m_viewportDirty.pageNumber = -1;
 
         if (tocReloadPrepared) {
@@ -5000,8 +5001,16 @@ void Part::slotOpenDocumentBuilder()
     // Document::saveChanges() is §1.6 of the plan and is still gated behind GATE 0.5b.
     if (!m_documentBuilder->isSeeded() && m_document && m_document->isOpened()) {
         const QUrl url = m_document->currentDocument();
-        if (url.isLocalFile()) {
-            m_documentBuilder->seedFromPdf(url.toLocalFile());
+        if (url.isLocalFile() && m_documentBuilder->seedFromPdf(url.toLocalFile())) {
+            // Save writes back to the document this builder was opened from — but only for a real
+            // file. An untitled document's private temp file is owned by the shell and must never
+            // become a Save target. The canonical path keeps a symlinked document a symlink: the
+            // rename replaces the file it points at, not the link itself.
+            if (!m_untitledDocument) {
+                const QString local = url.toLocalFile();
+                const QString canonical = QFileInfo(local).canonicalFilePath();
+                m_documentBuilder->setSaveTarget(canonical.isEmpty() ? local : canonical);
+            }
         }
     }
 
@@ -5026,6 +5035,36 @@ void Part::slotCloseDocumentBuilder()
 bool Part::isDocumentBuilderVisible() const
 {
     return m_documentBuilderVisible && m_mainStack && m_documentBuilder && m_mainStack->currentWidget() == m_documentBuilder;
+}
+
+void Part::slotDocumentBuilderSaved(const QString &path)
+{
+    if (!m_documentBuilder) {
+        return;
+    }
+
+    // The file now holds exactly the pages the builder had. Its page numbers no longer describe the
+    // builder's entries, so the next visit seeds from the saved document instead of keeping stale
+    // references to the old content.
+    m_documentBuilder->reset();
+    setDocumentBuilderVisible(false);
+
+    if (!m_document || !m_document->isOpened()) {
+        return;
+    }
+
+    const QFileInfo saved(path);
+    const QString openPath = m_document->currentDocument().toLocalFile();
+    if (openPath.isEmpty() || saved.canonicalFilePath() != QFileInfo(openPath).canonicalFilePath()) {
+        return; // the open document is not the file that was just replaced
+    }
+
+    // No close prompt: the Save confirmation already said the document is replaced and unsaved
+    // changes are lost. If reopening fails, the new document is still complete on disk.
+    slotAttemptReload(false, QUrl(), /*promptToSave=*/false);
+    if (m_pageView) {
+        m_pageView->setFocus();
+    }
 }
 
 int Part::documentBuilderPageCount() const

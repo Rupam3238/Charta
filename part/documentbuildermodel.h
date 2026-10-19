@@ -131,6 +131,11 @@ public:
     /// which moveRows() cannot express.
     bool moveEntriesBefore(const QList<QUuid> &ids, int beforeRow);
 
+    /// Moves every selected entry one slot up (@p delta < 0) or down (@p delta > 0), swapping with
+    /// its unselected neighbour. A non-contiguous selection steps item by item instead of being
+    /// gathered into one block. Returns false when nothing could move.
+    bool moveEntriesByStep(const QList<QUuid> &ids, int delta);
+
     // --- Export description ---
     QList<DocumentBuilderExport::Page> pagesForExport(const QList<QUuid> &selection = QList<QUuid>()) const;
 
@@ -143,6 +148,9 @@ public:
     /// True when a preview is neither cached nor already being generated, i.e. when asking again
     /// would actually start work.
     bool needsThumbnailRequest(int row) const;
+    /// True while a preview for @p row is in flight. A cancelled request stops counting as pending
+    /// after a few seconds (see BuilderSource), so the view keeps re-checking the visible rows.
+    bool isThumbnailPending(int row) const;
     /// Requests previews for @p rows. @p background cards are queued behind the visible ones.
     void requestThumbnails(const QList<int> &rows, bool background = false);
 

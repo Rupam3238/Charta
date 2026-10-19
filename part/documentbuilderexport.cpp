@@ -237,7 +237,7 @@ bool outputConflictsWithAnySource(const QString &outputPath, const QList<QString
     return false;
 }
 
-bool exportPdf(const QList<Page> &pages, const QString &outputPath, QString *errorText)
+bool exportPdf(const QList<Page> &pages, const QString &outputPath, QString *errorText, bool allowSourceOverwrite)
 {
     const auto fail = [errorText](const QString &message) {
         if (errorText) {
@@ -276,7 +276,7 @@ bool exportPdf(const QList<Page> &pages, const QString &outputPath, QString *err
             return fail(i18n("The source file “%1” is missing, so nothing was written.",
                              QDir::toNativeSeparators(page.sourcePath.isEmpty() ? page.displayName : page.sourcePath)));
         }
-        if (page.kind == BuilderKind::PdfPage && outputConflictsWithSource(outputPath, page.sourcePath)) {
+        if (page.kind == BuilderKind::PdfPage && !allowSourceOverwrite && outputConflictsWithSource(outputPath, page.sourcePath)) {
             return fail(conflictReason(page.sourcePath));
         }
     }

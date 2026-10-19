@@ -14,7 +14,9 @@
         directory*, verified by reopening it, and only then `::rename`d over the destination. Any
         failure leaves the destination byte-identical, and the temp is always removed.
       * **User files are read-only** (§3.2 rule 1): a source is never opened for writing, and an output
-        that resolves to a source is refused before anything is created.
+        that resolves to a source is refused before anything is created. The only exception is the
+        builder's explicit Save-over-the-open-document action, which passes
+        `allowSourceOverwrite = true` and then reloads that document.
 */
 
 #ifndef DOCUMENTBUILDEREXPORT_H
@@ -73,7 +75,13 @@ OKULARPART_EXPORT bool canExport(QString *reason = nullptr);
 
 /// Writes @p pages, in the given order, to @p outputPath. Returns true on success; on failure
 /// @p errorText holds a translated, user-facing reason and the destination is left exactly as it was.
-OKULARPART_EXPORT bool exportPdf(const QList<Page> &pages, const QString &outputPath, QString *errorText = nullptr);
+///
+/// @p allowSourceOverwrite exists for exactly one caller: the builder's Save button, which replaces
+/// the document the builder was seeded from. It skips the "the output is one of the sources" refusal;
+/// the caller is responsible for warning the user and for reloading that document afterwards. The
+/// output is still written to a temp file and renamed into place, and all sources are only read
+/// before the rename, so a source is never observed half-written.
+OKULARPART_EXPORT bool exportPdf(const QList<Page> &pages, const QString &outputPath, QString *errorText = nullptr, bool allowSourceOverwrite = false);
 
 /// True when @p outputPath resolves to @p sourcePath. Compares canonical paths, and on POSIX the
 /// device/inode pair, so a symlink or a relative spelling of the same file is caught too.

@@ -340,6 +340,8 @@ public Q_SLOTS:
      * nothing this asks the shell to close the tab instead (requestCloseEmptyDocumentBuilder).
      */
     void slotCloseDocumentBuilder();
+    /// The builder replaced the open document in place; reload it (no prompt: Save already warned).
+    void slotDocumentBuilderSaved(const QString &path);
 
     /**
      * Whether the Document Builder page is currently shown. Informational, also used by the
@@ -358,7 +360,7 @@ public Q_SLOTS:
      */
     bool isUntitledDocument() const;
 
-    bool slotAttemptReload(bool oneShot = false, const QUrl &newUrl = QUrl());
+    bool slotAttemptReload(bool oneShot = false, const QUrl &newUrl = QUrl(), bool promptToSave = true);
     void psTransformEnded(int, QProcess::ExitStatus);
 
     void errorMessage(const QString &message, int duration = 0);

@@ -15,6 +15,7 @@
 #define DOCUMENTBUILDERSOURCE_H
 
 #include <QHash>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QList>
 #include <QObject>
@@ -103,10 +104,9 @@ public:
         return m_thumbnails.contains(page);
     }
     /// True while a request for @p page is in flight. Used so the view does not re-request it.
-    bool isThumbnailPending(int page) const
-    {
-        return m_pendingSizes.contains(page);
-    }
+    /// A request that the document cancelled never notifies, so an entry older than a few seconds is
+    /// reported as gone: the caller asks again instead of leaving the page blank forever.
+    bool isThumbnailPending(int page) const;
     QImage thumbnail(int page) const
     {
         return m_thumbnails.value(page);
@@ -118,7 +118,6 @@ public:
     void notifyViewportChanged(bool smoothMove) override;
     void notifyPageChanged(int page, int flags) override;
     void notifyPagePixmapChanged(int page, quint64 revision) override;
-    void notifyContentsCleared(int flags) override;
     void notifyCurrentPageChanged(int previous, int current) override;
     bool canUnloadPixmap(int page) const override;
 
@@ -146,6 +145,8 @@ private:
     QHash<int, QImage> m_thumbnails;
     QList<int> m_thumbnailOrder; ///< insertion order, oldest first, for the LRU cap
     QHash<int, QPair<QSize, qreal>> m_pendingSizes;
+    QHash<int, qint64> m_pendingSince; ///< m_clock value when each pending request was made
+    QElapsedTimer m_clock;
 
     Okular::Document *m_document = nullptr;
     bool m_openAttempted = false;

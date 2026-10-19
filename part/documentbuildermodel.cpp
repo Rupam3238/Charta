@@ -573,6 +573,19 @@ bool DocumentBuilderModel::needsThumbnailRequest(int row) const
     return !source->hasThumbnail(entry.sourcePage) && !source->isThumbnailPending(entry.sourcePage);
 }
 
+bool DocumentBuilderModel::isThumbnailPending(int row) const
+{
+    if (row < 0 || row >= m_entries.size()) {
+        return false;
+    }
+    const BuilderEntry &entry = m_entries.at(row);
+    if (entry.kind == BuilderKind::Image) {
+        return false; // image previews are produced synchronously in ensureThumbnail()
+    }
+    const BuilderSource *source = m_sources.value(entry.sourcePath, nullptr);
+    return source && source->isValid() && source->isThumbnailPending(entry.sourcePage);
+}
+
 void DocumentBuilderModel::requestThumbnails(const QList<int> &rows, bool background)
 {
     if (rows.isEmpty()) {
@@ -712,6 +725,47 @@ bool DocumentBuilderModel::moveEntriesBefore(const QList<QUuid> &ids, int before
         rest.insert(insertAt + i, moving.at(i));
     }
     m_entries = rest;
+    endResetModel();
+
+    Q_EMIT countsChanged();
+    return true;
+}
+
+bool DocumentBuilderModel::moveEntriesByStep(const QList<QUuid> &ids, int delta)
+{
+    if (ids.isEmpty() || delta == 0 || m_entries.size() < 2) {
+        return false;
+    }
+
+    const QSet<QUuid> wanted(ids.constBegin(), ids.constEnd());
+    QList<BuilderEntry> next = m_entries;
+    bool moved = false;
+
+    if (delta < 0) {
+        for (int row = 1; row < next.size(); ++row) {
+            if (wanted.contains(next.at(row).id) && !wanted.contains(next.at(row - 1).id)) {
+                next.swapItemsAt(row, row - 1);
+                moved = true;
+            }
+        }
+    } else {
+        // Walk backwards so a swap never moves the same entry twice in one pass.
+        for (int row = next.size() - 2; row >= 0; --row) {
+            if (wanted.contains(next.at(row).id) && !wanted.contains(next.at(row + 1).id)) {
+                next.swapItemsAt(row, row + 1);
+                moved = true;
+            }
+        }
+    }
+
+    if (!moved) {
+        return false;
+    }
+
+    // Same reasoning as moveEntriesBefore(): the caches are keyed by entry id, so a reset costs
+    // nothing but the view's reselect.
+    beginResetModel();
+    m_entries = next;
     endResetModel();
 
     Q_EMIT countsChanged();

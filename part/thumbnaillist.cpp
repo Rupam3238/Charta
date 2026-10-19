@@ -131,6 +131,10 @@ public:
     Okular::Document *m_document;
     ThumbnailWidget *m_selected;
     QTimer *m_delayTimer;
+    /// True once the previews of the current document have been asked for at least once. Used to
+    /// tell "the panel is being laid out for the first time" (request immediately) from "the user
+    /// is dragging the sidebar splitter" (wait, see viewportResizeEvent()).
+    bool m_requestedPixmaps;
     QPixmap m_bookmarkOverlay;
     QList<ThumbnailWidget *> m_thumbnails;
     QList<ThumbnailWidget *> m_visibleThumbnails;
@@ -299,6 +303,7 @@ ThumbnailListPrivate::ThumbnailListPrivate(ThumbnailList *qq, Okular::Document *
     , m_document(document)
     , m_selected(nullptr)
     , m_delayTimer(nullptr)
+    , m_requestedPixmaps(false)
     , m_vectorIndex(0)
     , m_selectMode(false)
     , m_selectionBar(nullptr)
@@ -697,6 +702,7 @@ void ThumbnailList::notifySetup(const QList<Okular::Page *> &pages, int setupFla
     d->m_thumbnails.clear();
     d->m_visibleThumbnails.clear();
     d->m_selected = nullptr;
+    d->m_requestedPixmaps = false;
 
     if (pages.count() < 1) {
         widget()->resize(0, 0);
@@ -969,8 +975,9 @@ void ThumbnailListPrivate::viewportResizeEvent(QResizeEvent *e)
     // if width changed resize all the Thumbnails, reposition them to the
     // right place and recalculate the contents area
     if (e->size().width() != e->oldSize().width()) {
-        // runs the timer avoiding a thumbnail regeneration by 'contentsMoving'
-        delayedRequestVisiblePixmaps(2000);
+        // First layout after the panel became visible: the user is opening the document, not dragging
+        // the splitter, so request the previews right away instead of waiting out the 2 s delay.
+        delayedRequestVisiblePixmaps(m_requestedPixmaps ? 2000 : 0);
 
         // resize and reposition items
         const int newWidth = q->viewport()->width();
@@ -1051,6 +1058,7 @@ void ThumbnailListPrivate::slotRequestVisiblePixmaps()
     if (!requestedPixmaps.isEmpty()) {
         m_document->requestPixmaps(requestedPixmaps);
     }
+    m_requestedPixmaps = true;
 }
 
 void ThumbnailListPrivate::slotDelayTimeout()

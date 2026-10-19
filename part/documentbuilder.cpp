@@ -9,7 +9,6 @@
 #include "documentbuildermodel.h"
 #include "documentbuildersource.h"
 #include "imagepagesettingsdialog.h"
-#include "pagerangeinputdialog.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -18,11 +17,11 @@
 #include <QCursor>
 #include <QDesktopServices>
 #include <QDir>
-#include <QDrag>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QEventLoop>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontMetrics>
@@ -31,6 +30,7 @@
 #include <QInputDialog>
 #include <QItemSelectionModel>
 #include <QKeyEvent>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -38,6 +38,7 @@
 #include <QMouseEvent>
 #include <QMimeData>
 #include <QPainter>
+#include <QPen>
 #include <QPointer>
 #include <QProgressDialog>
 #include <QResizeEvent>
@@ -80,8 +81,6 @@ constexpr qint64 kLargeImagePixels = 100LL * 1000 * 1000;
 // How many off-screen previews are handed to the document per event loop pass. Small enough that
 // scrolling and painting stay responsive, large enough that a normal document fills in a few passes.
 constexpr int kThumbnailFillBatch = 24;
-
-const char *const kEntryMimeType = "application/x-okular-document-builder-entry";
 
 /// The current page setup of an image entry, as the setup dialog wants it.
 ImagePageSettings entrySettings(const BuilderEntry &entry)
@@ -249,13 +248,14 @@ DocumentBuilderView::DocumentBuilderView(QWidget *parent)
     setSpacing(8);
     setSelectionMode(QAbstractItemView::ExtendedSelection);
     setEditTriggers(QAbstractItemView::NoEditTriggers);
-    setDragEnabled(true);
-    setAcceptDrops(true);
-    // The view draws its own insertion bar (dropIndicatorRect); Qt's icon-mode indicator would
-    // highlight the whole card instead.
+    // Reordering is hand-rolled (beginEntryDrag); Qt only handles drops of external files, so its
+    // own drag and the built-in drop indicator stay off.
+    setDragDropMode(QAbstractItemView::DropOnly);
     setDropIndicatorShown(false);
-    setDragDropMode(QAbstractItemView::InternalMove);
-    setDefaultDropAction(Qt::MoveAction);
+    setAcceptDrops(true);
+    m_dragScrollTimer = new QTimer(this);
+    m_dragScrollTimer->setInterval(30);
+    connect(m_dragScrollTimer, &QTimer::timeout, this, &DocumentBuilderView::autoScrollDuringDrag);
     setContextMenuPolicy(Qt::CustomContextMenu);
     setItemDelegate(new DocumentBuilderDelegate(this));
 
@@ -369,6 +369,7 @@ void DocumentBuilderView::scheduleThumbnailFill()
         m_fillTimer->setSingleShot(true);
         connect(m_fillTimer, &QTimer::timeout, this, &DocumentBuilderView::fillThumbnails);
     }
+    m_pendingAtLastFill = -1;
     m_fillTimer->start(0);
 }
 
@@ -386,11 +387,13 @@ void DocumentBuilderView::fillThumbnails()
     const QRect viewportRect = viewport()->rect();
     QList<int> visible;
     QList<int> background;
+    int needing = 0;
     bool more = false;
     for (int row = 0; row < listModel->pageCount(); ++row) {
         if (!listModel->needsThumbnailRequest(row)) {
             continue;
         }
+        ++needing;
         if (visualRect(listModel->index(row, 0)).intersects(viewportRect)) {
             visible.append(row);
         } else if (background.size() < kThumbnailFillBatch) {
@@ -406,8 +409,32 @@ void DocumentBuilderView::fillThumbnails()
     if (!background.isEmpty()) {
         listModel->requestThumbnails(background, true);
     }
-    if (more) {
-        scheduleThumbnailFill();
+
+    // Something visible is still being rendered: check back later. That is what recovers a request
+    // the document cancelled because a higher-priority one came in (a cancelled request never
+    // notifies), and it also stops once every visible card has its preview.
+    bool visiblePending = false;
+    for (int row = 0; row < listModel->pageCount(); ++row) {
+        if (!listModel->isThumbnailPending(row)) {
+            continue;
+        }
+        if (visualRect(listModel->index(row, 0)).intersects(viewportRect)) {
+            visiblePending = true;
+            break;
+        }
+    }
+    if (visiblePending) {
+        m_fillTimer->start(1000);
+        return;
+    }
+
+    if (more && (m_pendingAtLastFill < 0 || needing < m_pendingAtLastFill)) {
+        m_pendingAtLastFill = needing;
+        // Continue with the next batch, but re-arm the timer directly: scheduleThumbnailFill()
+        // resets the progress guard, which would turn a stalled pass into an endless loop.
+        m_fillTimer->start(0);
+    } else {
+        m_pendingAtLastFill = -1;
     }
 }
 
@@ -450,126 +477,49 @@ void DocumentBuilderView::selectEntryIds(const QList<QUuid> &ids)
         return;
     }
     selectionModel()->clearSelection();
+    bool haveCurrent = false;
     for (const QUuid &id : ids) {
         const int row = listModel->rowForId(id);
         if (row >= 0) {
-            selectionModel()->select(listModel->index(row, 0), QItemSelectionModel::Select);
+            const QModelIndex index = listModel->index(row, 0);
+            selectionModel()->select(index, QItemSelectionModel::Select);
+            if (!haveCurrent) {
+                // Keep keyboard navigation anchored on the moved block instead of the stale row.
+                selectionModel()->setCurrentIndex(index, QItemSelectionModel::NoUpdate);
+                haveCurrent = true;
+            }
         }
     }
 }
 
 void DocumentBuilderView::dragEnterEvent(QDragEnterEvent *event)
 {
-    if (event->mimeData()->hasFormat(QString::fromLatin1(kEntryMimeType))) {
-        m_dropRow = dropRowFor(event->position().toPoint());
-        event->setDropAction(Qt::MoveAction);
-        event->accept();
-        return;
-    }
+    // Only external files use Qt's drag and drop. Reordering a card is a manual drag (see
+    // beginEntryDrag()): Qt's icon-mode drag filter refuses drops onto another card, and a native
+    // drag never reaches this view as a drop target.
     if (event->mimeData()->hasUrls()) {
         event->acceptProposedAction();
         return;
     }
-    QListView::dragEnterEvent(event);
+    event->ignore();
 }
 
 void DocumentBuilderView::dragMoveEvent(QDragMoveEvent *event)
 {
-    if (event->mimeData()->hasFormat(QString::fromLatin1(kEntryMimeType))) {
-        // Qt's icon-mode drag filter only accepts a drop over a drop-enabled item or over empty
-        // space, which is why dragging one card onto another used to do nothing at all. The view
-        // owns the whole interaction now, so scroll near the edges and place the indicator.
-        const QPoint pos = event->position().toPoint();
-        const int margin = 28;
-        const int step = 16;
-        if (pos.y() < margin) {
-            verticalScrollBar()->setValue(verticalScrollBar()->value() - step);
-        } else if (pos.y() > viewport()->height() - margin) {
-            verticalScrollBar()->setValue(verticalScrollBar()->value() + step);
-        }
-
-        const int row = dropRowFor(pos);
-        if (row != m_dropRow) {
-            m_dropRow = row;
-            viewport()->update();
-        }
-        event->setDropAction(Qt::MoveAction);
-        event->accept();
-        return;
-    }
     if (event->mimeData()->hasUrls()) {
         event->acceptProposedAction();
         return;
     }
-    QListView::dragMoveEvent(event);
+    event->ignore();
 }
 
 void DocumentBuilderView::dragLeaveEvent(QDragLeaveEvent *event)
 {
-    if (m_dropRow >= 0) {
-        m_dropRow = -1;
-        viewport()->update();
-    }
-    QListView::dragLeaveEvent(event);
+    Q_UNUSED(event)
 }
 
 void DocumentBuilderView::dropEvent(QDropEvent *event)
 {
-    const QString mimeType = QString::fromLatin1(kEntryMimeType);
-    if (event->mimeData()->hasFormat(mimeType)) {
-        auto *listModel = qobject_cast<DocumentBuilderModel *>(model());
-        const int destination = m_dropRow >= 0 ? m_dropRow : dropRowFor(event->position().toPoint());
-        m_dropRow = -1;
-        viewport()->update();
-        if (!listModel) {
-            event->ignore();
-            return;
-        }
-
-        // Drag what the mime data says was picked up, not the current selection: selection is
-        // finalised on mouse release, which a drag never reaches.
-        QList<QUuid> ids;
-        const QByteArray payload = event->mimeData()->data(mimeType);
-        const QList<QByteArray> lines = payload.split('\n');
-        for (const QByteArray &line : lines) {
-            if (line.isEmpty()) {
-                continue;
-            }
-            const QUuid id = QUuid::fromString(QString::fromLatin1(line));
-            if (!id.isNull() && !ids.contains(id)) {
-                ids.append(id);
-            }
-        }
-        if (ids.isEmpty()) {
-            event->ignore();
-            return;
-        }
-
-        QList<int> rows;
-        rows.reserve(ids.size());
-        for (const QUuid &id : std::as_const(ids)) {
-            const int row = listModel->rowForId(id);
-            if (row >= 0) {
-                rows.append(row);
-            }
-        }
-        std::sort(rows.begin(), rows.end());
-
-        bool moved = false;
-        if (!rows.isEmpty() && rows.last() - rows.first() + 1 == rows.size()) {
-            moved = listModel->moveRows(QModelIndex(), rows.first(), rows.size(), QModelIndex(), destination);
-        } else {
-            // Scattered selection: moveRows() can only express one contiguous block.
-            moved = listModel->moveEntriesBefore(ids, destination);
-        }
-        if (moved) {
-            selectEntryIds(ids);
-        }
-        event->setDropAction(Qt::MoveAction);
-        event->accept();
-        return;
-    }
-
     if (event->mimeData()->hasUrls()) {
         QStringList paths;
         QStringList remote;
@@ -590,63 +540,152 @@ void DocumentBuilderView::dropEvent(QDropEvent *event)
         event->acceptProposedAction();
         return;
     }
-
-    QListView::dropEvent(event);
+    event->ignore();
 }
 
-void DocumentBuilderView::startDrag(Qt::DropActions supportedActions)
+void DocumentBuilderView::beginEntryDrag()
 {
-    Q_UNUSED(supportedActions)
     auto *listModel = qobject_cast<DocumentBuilderModel *>(model());
-    if (!listModel) {
+    if (!listModel || !acceptDrops() || m_pressedRow < 0 || m_pressedRow >= listModel->pageCount()) {
         return;
     }
-    const QList<int> rows = selectedEntryRows();
+
+    QList<int> rows = selectedEntryRows();
+    if (rows.isEmpty()) {
+        rows.append(m_pressedRow);
+    } else if (!rows.contains(m_pressedRow)) {
+        // Most likely Ctrl+clicking a selected card toggled it off: there is nothing to drag.
+        return;
+    } else {
+        // The ghost must be the card under the cursor, not the first of a scattered selection.
+        rows.removeOne(m_pressedRow);
+        rows.prepend(m_pressedRow);
+    }
+
+    m_dragIds.clear();
+    for (int row : std::as_const(rows)) {
+        m_dragIds.append(listModel->entryIdAt(row));
+    }
+    m_dragPixmap = dragPixmap(rows);
+    m_dragHotSpot = m_pressPos - visualRect(listModel->index(m_pressedRow, 0)).topLeft();
+    m_dragging = true;
+    m_dragPos = m_pressPos;
+    setCursor(Qt::ClosedHandCursor);
+    m_dragScrollTimer->start();
+    viewport()->update();
+}
+
+void DocumentBuilderView::updateEntryDrag(const QPoint &pos)
+{
+    m_dragPos = pos;
+    m_dropRow = dropRowFor(pos);
+    viewport()->update();
+}
+
+void DocumentBuilderView::cancelEntryDrag()
+{
+    m_dragScrollTimer->stop();
+    const bool wasDragging = m_dragging;
+    m_dragging = false;
+    m_pressedRow = -1;
+    m_dragIds.clear();
+    m_dragPixmap = QPixmap();
+    m_dragHotSpot = QPoint();
+    m_dropRow = -1;
+    if (wasDragging) {
+        unsetCursor();
+        viewport()->update();
+    }
+}
+
+void DocumentBuilderView::finishEntryDrag(bool drop)
+{
+    auto *listModel = qobject_cast<DocumentBuilderModel *>(model());
+    const QList<QUuid> ids = m_dragIds;
+    const int destination = m_dropRow;
+    cancelEntryDrag();
+    if (!drop || !listModel || ids.isEmpty() || destination < 0) {
+        return;
+    }
+
+    QList<int> rows;
+    rows.reserve(ids.size());
+    for (const QUuid &id : ids) {
+        const int row = listModel->rowForId(id);
+        if (row >= 0) {
+            rows.append(row);
+        }
+    }
+    std::sort(rows.begin(), rows.end());
     if (rows.isEmpty()) {
         return;
     }
 
-    QModelIndexList indexes;
-    indexes.reserve(rows.size());
-    for (int row : rows) {
-        indexes.append(listModel->index(row, 0));
+    bool moved = false;
+    if (rows.last() - rows.first() + 1 == rows.size()) {
+        moved = listModel->moveRows(QModelIndex(), rows.first(), rows.size(), QModelIndex(), destination);
+    } else {
+        // A scattered selection cannot be expressed with one moveRows().
+        moved = listModel->moveEntriesBefore(ids, destination);
     }
-    QMimeData *data = listModel->mimeData(indexes);
-    if (!data) {
+    if (moved) {
+        selectEntryIds(ids);
+    }
+}
+
+void DocumentBuilderView::autoScrollDuringDrag()
+{
+    if (!m_dragging) {
+        m_dragScrollTimer->stop();
         return;
     }
-
-    // Deliberately no QListView::startDrag(): the icon-mode implementation deletes the moved rows
-    // itself (clearOrRemove) unless its private bookkeeping saw the drop, and the view handles the
-    // move in dropEvent().
-    auto *drag = new QDrag(this);
-    drag->setMimeData(data);
-    const QPixmap pixmap = dragPixmap(rows);
-    if (!pixmap.isNull()) {
-        drag->setPixmap(pixmap);
-        drag->setHotSpot(QPoint(pixmap.width() / 2, qMin(12, pixmap.height() / 2)));
+    const int edge = 40;
+    const int maxStep = 26;
+    const int height = viewport()->height();
+    int delta = 0;
+    if (m_dragPos.y() < edge) {
+        delta = -qMax(2, (edge - m_dragPos.y()) * maxStep / edge);
+    } else if (m_dragPos.y() > height - edge) {
+        delta = qMax(2, (m_dragPos.y() - (height - edge)) * maxStep / edge);
     }
-    m_dropRow = -1;
-    drag->exec(Qt::MoveAction, Qt::MoveAction);
-    m_dropRow = -1;
-    viewport()->update();
+    if (delta == 0) {
+        return;
+    }
+    QScrollBar *bar = verticalScrollBar();
+    const int before = bar->value();
+    bar->setValue(before + delta);
+    if (bar->value() != before) {
+        // The grid scrolled under the motionless cursor: the drop position changed too.
+        updateEntryDrag(m_dragPos);
+    }
 }
 
 void DocumentBuilderView::paintEvent(QPaintEvent *event)
 {
     QListView::paintEvent(event);
-    if (m_dropRow < 0) {
-        return;
+
+    if (m_dropRow >= 0) {
+        const QRect bar = dropIndicatorRect();
+        if (!bar.isNull()) {
+            QPainter painter(viewport());
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(0x27, 0xbf, 0xd6));
+            painter.drawRoundedRect(bar, 1.5, 1.5);
+        }
     }
-    const QRect bar = dropIndicatorRect();
-    if (bar.isNull()) {
-        return;
+
+    if (m_dragging && !m_dragPixmap.isNull()) {
+        QPainter painter(viewport());
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        const QPoint topLeft = m_dragPos - m_dragHotSpot;
+        painter.setOpacity(0.85);
+        painter.drawPixmap(topLeft, m_dragPixmap);
+        painter.setOpacity(1.0);
+        painter.setPen(QPen(QColor(0x27, 0xbf, 0xd6), 1.5));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(QRect(topLeft, m_dragPixmap.size()).adjusted(0, 0, -1, -1), 6, 6);
     }
-    QPainter painter(viewport());
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(0x27, 0xbf, 0xd6));
-    painter.drawRoundedRect(bar, 1.5, 1.5);
 }
 
 int DocumentBuilderView::dropRowFor(const QPoint &pos) const
@@ -717,8 +756,55 @@ QPixmap DocumentBuilderView::dragPixmap(const QList<int> &rows) const
     return pixmap;
 }
 
+void DocumentBuilderView::mousePressEvent(QMouseEvent *event)
+{
+    m_pressedRow = -1;
+    if (event->button() == Qt::LeftButton) {
+        const QPoint pos = event->position().toPoint();
+        const QModelIndex index = indexAt(pos);
+        const auto *listModel = qobject_cast<const DocumentBuilderModel *>(model());
+        if (index.isValid() && listModel && !listModel->isAddTile(index.row())
+            && !DocumentBuilderDelegate::deleteBadgeRect(visualRect(index)).contains(pos)) {
+            m_pressedRow = index.row();
+            m_pressPos = pos;
+        }
+    }
+    QListView::mousePressEvent(event);
+}
+
+void DocumentBuilderView::mouseMoveEvent(QMouseEvent *event)
+{
+    if (m_dragging) {
+        updateEntryDrag(event->position().toPoint());
+        return;
+    }
+    if (m_pressedRow >= 0 && (event->buttons() & Qt::LeftButton)
+        && (event->position().toPoint() - m_pressPos).manhattanLength() > QApplication::startDragDistance()) {
+        beginEntryDrag();
+        if (m_dragging) {
+            updateEntryDrag(event->position().toPoint());
+            return;
+        }
+        m_pressedRow = -1;
+    }
+    QListView::mouseMoveEvent(event);
+}
+
 void DocumentBuilderView::mouseReleaseEvent(QMouseEvent *event)
 {
+    if (m_dragging) {
+        const QPoint pos = event->position().toPoint();
+        if (viewport()->rect().contains(pos)) {
+            m_dropRow = dropRowFor(pos);
+            finishEntryDrag(true);
+        } else {
+            // Released over the toolbar, the sidebar or outside the window: no reorder.
+            finishEntryDrag(false);
+        }
+        return;
+    }
+    m_pressedRow = -1;
+
     const QModelIndex index = indexAt(event->position().toPoint());
     const auto *listModel = qobject_cast<DocumentBuilderModel *>(model());
     if (index.isValid() && listModel && event->button() == Qt::LeftButton) {
@@ -737,6 +823,11 @@ void DocumentBuilderView::mouseReleaseEvent(QMouseEvent *event)
 
 void DocumentBuilderView::keyPressEvent(QKeyEvent *event)
 {
+    if (m_dragging && event->key() == Qt::Key_Escape) {
+        finishEntryDrag(false);
+        return;
+    }
+
     if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
         const QList<int> rows = selectedEntryRows();
         if (!rows.isEmpty()) {
@@ -745,7 +836,16 @@ void DocumentBuilderView::keyPressEvent(QKeyEvent *event)
         }
     }
 
-    // Enter/Space on the add tile opens the Add menu, matching the mouse behaviour (§7.7).
+    // Alt+Up / Alt+Down move the selection itself, so reordering works without a mouse (§10.1).
+    if ((event->key() == Qt::Key_Up || event->key() == Qt::Key_Down) && (event->modifiers() & Qt::AltModifier)) {
+        const QList<int> rows = selectedEntryRows();
+        if (!rows.isEmpty()) {
+            Q_EMIT moveSelectionRequested(event->key() == Qt::Key_Up ? -1 : 1);
+            return;
+        }
+    }
+
+    // Enter/Space on the add tile opens the file dialog, matching the mouse behaviour (§10.2).
     const QModelIndex current = currentIndex();
     if (current.isValid() && (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter || event->key() == Qt::Key_Space)) {
         const auto *listModel = qobject_cast<const DocumentBuilderModel *>(model());
@@ -825,7 +925,7 @@ void DocumentBuilderWidget::buildUi()
     m_addButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     m_addButton->setObjectName(QStringLiteral("documentBuilderAddButton"));
     m_addButton->setAccessibleName(i18n("Add files to the document being built"));
-    connect(m_addButton, &QToolButton::clicked, this, [this] { showAddMenu(m_addButton->mapToGlobal(m_addButton->rect().bottomLeft())); });
+    connect(m_addButton, &QToolButton::clicked, this, &DocumentBuilderWidget::addFilesViaDialog);
     toolbarLayout->addWidget(m_addButton);
 
     m_clearButton = new QToolButton(toolbar);
@@ -856,6 +956,16 @@ void DocumentBuilderWidget::buildUi()
     m_configureButton->setToolTip(i18n("Change how the pages are shown"));
     connect(m_configureButton, &QToolButton::clicked, this, [this] { showConfigureMenu(m_configureButton->mapToGlobal(m_configureButton->rect().bottomLeft())); });
     toolbarLayout->addWidget(m_configureButton);
+
+    m_saveButton = new QToolButton(toolbar);
+    m_saveButton->setText(i18n("Save"));
+    m_saveButton->setIcon(QIcon::fromTheme(QStringLiteral("document-save")));
+    m_saveButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_saveButton->setObjectName(QStringLiteral("documentBuilderSaveButton"));
+    m_saveButton->setAccessibleName(i18n("Save the built pages to the open document"));
+    m_saveButton->setEnabled(false);
+    connect(m_saveButton, &QToolButton::clicked, this, &DocumentBuilderWidget::saveToTarget);
+    toolbarLayout->addWidget(m_saveButton);
 
     m_exportButton = new QToolButton(toolbar);
     m_exportButton->setText(i18n("Export"));
@@ -897,6 +1007,7 @@ void DocumentBuilderWidget::buildUi()
 
     connect(m_view, &DocumentBuilderView::addTileActivated, this, &DocumentBuilderWidget::handleAddTile);
     connect(m_view, &DocumentBuilderView::deleteRequested, this, &DocumentBuilderWidget::deleteRows);
+    connect(m_view, &DocumentBuilderView::moveSelectionRequested, this, &DocumentBuilderWidget::moveSelectionBy);
     connect(m_view, &DocumentBuilderView::contextMenuRequested, this, &DocumentBuilderWidget::showContextMenu);
     connect(m_view, &DocumentBuilderView::filesDropped, this, &DocumentBuilderWidget::addFiles);
     connect(m_view, &DocumentBuilderView::remoteFilesDropped, this, [this](const QStringList &urls) {
@@ -923,7 +1034,7 @@ void DocumentBuilderWidget::updateSelectionActions()
     }
 }
 
-QString DocumentBuilderWidget::imageFileFilter()
+QStringList DocumentBuilderWidget::supportedImagePatterns()
 {
     // Advertise exactly what the installed Qt image plugins can read. If there is no image plugin
     // (or no SVG plugin), those formats are simply not offered.
@@ -934,6 +1045,12 @@ QString DocumentBuilderWidget::imageFileFilter()
     }
     patterns.removeDuplicates();
     patterns.sort();
+    return patterns;
+}
+
+QString DocumentBuilderWidget::imageFileFilter()
+{
+    const QStringList patterns = supportedImagePatterns();
 
     QString filter;
     if (!patterns.isEmpty()) {
@@ -943,114 +1060,27 @@ QString DocumentBuilderWidget::imageFileFilter()
     return filter;
 }
 
-void DocumentBuilderWidget::showAddMenu(const QPoint &globalPos)
+void DocumentBuilderWidget::addFilesViaDialog()
 {
-    QMenu menu(this);
-    QAction *pdfAction = menu.addAction(QIcon::fromTheme(QStringLiteral("application-pdf")), i18n("Add PDF files…"));
-    QAction *rangeAction = menu.addAction(QIcon::fromTheme(QStringLiteral("view-list-details")), i18n("Add pages from PDF…"));
-    QAction *imageAction = menu.addAction(QIcon::fromTheme(QStringLiteral("image-x-generic")), i18n("Add images…"));
+    // One entry point for everything (§10.2): the user does not have to classify a file first, the
+    // model decides from the file itself whether it is a document or an image.
+    const QStringList images = supportedImagePatterns();
+    const QString imagePatterns = images.join(QLatin1Char(' '));
 
-    QAction *chosen = menu.exec(globalPos);
-    if (chosen == pdfAction) {
-        addPdfFilesViaDialog();
-    } else if (chosen == rangeAction) {
-        addPdfPagesViaDialog();
-    } else if (chosen == imageAction) {
-        addImagesViaDialog();
+    QStringList filters;
+    if (!images.isEmpty()) {
+        filters.append(i18n("Documents and images (*.pdf %1)", imagePatterns));
     }
-}
+    filters.append(i18n("PDF documents (*.pdf)"));
+    if (!images.isEmpty()) {
+        filters.append(i18n("Images (%1)", imagePatterns));
+    }
+    filters.append(i18n("All files (*)"));
 
-void DocumentBuilderWidget::addPdfFilesViaDialog()
-{
-    const QString filter = i18n("PDF documents (*.pdf);;All files (*)");
-    const QStringList paths = QFileDialog::getOpenFileNames(this, i18n("Add PDF Files"), QString(), filter);
+    const QStringList paths = QFileDialog::getOpenFileNames(this, i18n("Add Files"), QString(), filters.join(QLatin1String(";;")));
     if (!paths.isEmpty()) {
         addFiles(paths);
     }
-}
-
-void DocumentBuilderWidget::addPdfPagesViaDialog()
-{
-    const QString path = QFileDialog::getOpenFileName(this, i18n("Add Pages from PDF"), QString(), i18n("PDF documents (*.pdf);;All files (*)"));
-    if (path.isEmpty()) {
-        return;
-    }
-
-    // The reader prompt has to say how many pages there are to choose from, so read the metadata
-    // once here (through a throwaway source) before showing the dialog.
-    const QFileInfo info(path);
-    const QString canonical = info.canonicalFilePath().isEmpty() ? info.absoluteFilePath() : info.canonicalFilePath();
-    BuilderSource probe(canonical);
-    QString error;
-    if (!probe.loadMetadata(&error)) {
-        QMessageBox::warning(this, i18n("Document Builder"), error.isEmpty() ? i18n("“%1” could not be read.", info.fileName()) : error);
-        return;
-    }
-
-    PageRangeInputDialog dialog(probe.pageCount(), this);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
-    const QList<int> chosen = dialog.selectedPages();
-    if (chosen.isEmpty()) {
-        return;
-    }
-
-    QString addError;
-    if (m_model->addPdfPages(path, chosen, &addError) < 0 && !addError.isEmpty()) {
-        QMessageBox::warning(this, i18n("Document Builder"), addError);
-    } else {
-        showExportLimitationsWarning();
-    }
-    updateCountLabel();
-}
-
-void DocumentBuilderWidget::addImagesViaDialog()
-{
-    const QStringList paths = QFileDialog::getOpenFileNames(this, i18n("Add Images"), QString(), imageFileFilter());
-    if (paths.isEmpty()) {
-        return;
-    }
-
-    QStringList errors;
-    int added = 0;
-    for (const QString &path : paths) {
-        QString error;
-        if (m_model->addImage(path, &error) < 0) {
-            if (!error.isEmpty()) {
-                errors.append(error);
-            }
-        } else {
-            ++added;
-        }
-    }
-
-    // One dialog for the whole batch of freshly added images (4.2); cancelling keeps the defaults.
-    if (added > 0) {
-        QList<QUuid> newIds;
-        for (int row = m_model->pageCount() - added; row < m_model->pageCount(); ++row) {
-            newIds.append(m_model->entryIdAt(row));
-        }
-        const BuilderEntry *first = m_model->entryAt(m_model->pageCount() - added);
-        if (first) {
-            ImagePageSettingsDialog dialog(entrySettings(*first), imageSizeForPath(first->sourcePath), this);
-            if (dialog.exec() == QDialog::Accepted) {
-                m_model->setImageSettings(newIds, dialog.settings());
-            }
-        }
-        for (const QUuid &id : std::as_const(newIds)) {
-            const int row = m_model->rowForId(id);
-            const BuilderEntry *entry = row >= 0 ? m_model->entryAt(row) : nullptr;
-            if (entry) {
-                maybeWarnAboutLargeImage(entry->sourcePath);
-            }
-        }
-    }
-
-    if (!errors.isEmpty()) {
-        QMessageBox::warning(this, i18n("Document Builder"), errors.join(QLatin1Char('\n')));
-    }
-    updateCountLabel();
 }
 
 void DocumentBuilderWidget::editImagePageSettings()
@@ -1074,7 +1104,7 @@ void DocumentBuilderWidget::editImagePageSettings()
 
 void DocumentBuilderWidget::handleAddTile()
 {
-    showAddMenu(QCursor::pos());
+    addFilesViaDialog();
 }
 
 void DocumentBuilderWidget::addFiles(const QStringList &paths)
@@ -1082,6 +1112,17 @@ void DocumentBuilderWidget::addFiles(const QStringList &paths)
     if (paths.isEmpty()) {
         return;
     }
+
+    // The file itself decides how it is handled, not the menu entry the user picked (§10.2). The
+    // suffix is the common case; a PDF that was renamed or has no extension still starts with
+    // "%PDF-" within the first 1024 bytes (ISO 32000 allows leading bytes).
+    const auto looksLikePdf = [](const QString &path) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            return false;
+        }
+        return file.read(1024).contains(QByteArrayLiteral("%PDF-"));
+    };
 
     // Importing several files (or one big PDF) reads page metadata and starts rendering thumbnails,
     // which can take a moment: show that the builder is busy instead of looking frozen (§2.7).
@@ -1120,7 +1161,7 @@ void DocumentBuilderWidget::addFiles(const QStringList &paths)
         }
 
         const QString suffix = info.suffix().toLower();
-        if (suffix == QLatin1String("pdf")) {
+        if (suffix == QLatin1String("pdf") || looksLikePdf(path)) {
             QString error;
             int added = m_model->addPdf(path, &error);
             if (added < 0) {
@@ -1144,9 +1185,7 @@ void DocumentBuilderWidget::addFiles(const QStringList &paths)
                     added = m_model->addPdfWithPassword(path, password, &error);
                 }
             }
-            if (added >= 0) {
-                showExportLimitationsWarning();
-            } else if (!error.isEmpty()) {
+            if (added < 0 && !error.isEmpty()) {
                 errors.append(error);
             }
         } else {
@@ -1212,25 +1251,61 @@ void DocumentBuilderWidget::clearWithConfirmation()
     }
 }
 
+// True when the selection is exactly the first `rows.size()` pages (nothing to gain from "Move to
+// Start"), or exactly the last ones. A scattered selection that happens to include row 0 is not a
+// prefix: the rest still has to be gathered.
+static bool isSelectionPrefix(const QList<int> &rows)
+{
+    for (int i = 0; i < rows.size(); ++i) {
+        if (rows.at(i) != i) {
+            return false;
+        }
+    }
+    return !rows.isEmpty();
+}
+
+static bool isSelectionSuffix(const QList<int> &rows, int pageCount)
+{
+    const int offset = pageCount - rows.size();
+    for (int i = 0; i < rows.size(); ++i) {
+        if (rows.at(i) != offset + i) {
+            return false;
+        }
+    }
+    return !rows.isEmpty();
+}
+
 void DocumentBuilderWidget::showContextMenu(const QPoint &globalPos)
 {
     const QList<int> rows = m_view->selectedEntryRows();
     const QList<QUuid> ids = m_view->selectedEntryIds();
     const bool hasImages = m_model->selectionHasImages(ids);
+    const int pageCount = m_model->pageCount();
+    const bool isPrefix = isSelectionPrefix(rows);
+    const bool isSuffix = isSelectionSuffix(rows, pageCount);
 
     QMenu menu(this);
-    QAction *addPdfAction = menu.addAction(QIcon::fromTheme(QStringLiteral("application-pdf")), i18n("Add PDF files…"));
-    QAction *addRangeAction = menu.addAction(QIcon::fromTheme(QStringLiteral("view-list-details")), i18n("Add pages from PDF…"));
-    QAction *addImageAction = menu.addAction(QIcon::fromTheme(QStringLiteral("image-x-generic")), i18n("Add images…"));
+    QAction *addAction = menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add Files…"));
     QAction *deleteAction = nullptr;
+    QAction *upAction = nullptr;
+    QAction *downAction = nullptr;
     QAction *toStartAction = nullptr;
     QAction *toEndAction = nullptr;
     QAction *setupAction = nullptr;
     if (!rows.isEmpty()) {
         menu.addSeparator();
         deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")), i18np("Remove page", "Remove %1 pages", rows.size()));
+        menu.addSeparator();
+        upAction = menu.addAction(QIcon::fromTheme(QStringLiteral("go-up")), i18n("Move Up"));
+        upAction->setShortcut(QKeySequence(QStringLiteral("Alt+Up")));
+        upAction->setEnabled(rows.first() > 0);
+        downAction = menu.addAction(QIcon::fromTheme(QStringLiteral("go-down")), i18n("Move Down"));
+        downAction->setShortcut(QKeySequence(QStringLiteral("Alt+Down")));
+        downAction->setEnabled(rows.last() < pageCount - 1);
         toStartAction = menu.addAction(QIcon::fromTheme(QStringLiteral("go-first")), i18n("Move to Start"));
+        toStartAction->setEnabled(!isPrefix);
         toEndAction = menu.addAction(QIcon::fromTheme(QStringLiteral("go-last")), i18n("Move to End"));
+        toEndAction->setEnabled(!isSuffix);
         if (hasImages) {
             menu.addSeparator();
             setupAction = menu.addAction(QIcon::fromTheme(QStringLiteral("image-x-generic")), i18n("Page Setup…"));
@@ -1240,14 +1315,14 @@ void DocumentBuilderWidget::showContextMenu(const QPoint &globalPos)
     QAction *selectAllAction = menu.addAction(i18n("Select All"));
 
     QAction *chosen = menu.exec(globalPos);
-    if (chosen == addPdfAction) {
-        addPdfFilesViaDialog();
-    } else if (chosen == addRangeAction) {
-        addPdfPagesViaDialog();
-    } else if (chosen == addImageAction) {
-        addImagesViaDialog();
+    if (chosen == addAction) {
+        addFilesViaDialog();
     } else if (chosen && chosen == deleteAction) {
         deleteRows(rows);
+    } else if (chosen == upAction) {
+        moveSelectionBy(-1);
+    } else if (chosen == downAction) {
+        moveSelectionBy(1);
     } else if (chosen == toStartAction) {
         moveSelectionToStart();
     } else if (chosen == toEndAction) {
@@ -1260,28 +1335,51 @@ void DocumentBuilderWidget::showContextMenu(const QPoint &globalPos)
     updateSelectionActions();
 }
 
+void DocumentBuilderWidget::moveSelectionBy(int delta)
+{
+    const QList<int> rows = m_view->selectedEntryRows();
+    const int pageCount = m_model->pageCount();
+    if (rows.isEmpty() || pageCount == 0 || delta == 0) {
+        return;
+    }
+    if ((delta < 0 && rows.first() == 0) || (delta > 0 && rows.last() >= pageCount - 1)) {
+        return; // already at the edge
+    }
+
+    const QList<QUuid> ids = m_view->selectedEntryIds();
+    if (m_model->moveEntriesByStep(ids, delta < 0 ? -1 : 1)) {
+        m_view->selectEntryIds(ids);
+        m_view->setFocus();
+    }
+}
+
 void DocumentBuilderWidget::moveSelectionToStart()
 {
     const QList<int> rows = m_view->selectedEntryRows();
-    if (rows.isEmpty() || m_model->pageCount() == 0) {
+    if (rows.isEmpty() || m_model->pageCount() == 0 || isSelectionPrefix(rows)) {
         return;
     }
+    // moveEntriesBefore() handles a scattered selection correctly; moveRows() would sweep the
+    // unselected pages in between along with the selection.
     const QList<QUuid> ids = m_view->selectedEntryIds();
-    if (m_model->moveRows(QModelIndex(), rows.first(), rows.size(), QModelIndex(), 0)) {
+    if (m_model->moveEntriesBefore(ids, 0)) {
         m_view->selectEntryIds(ids);
+        m_view->setFocus();
     }
 }
 
 void DocumentBuilderWidget::moveSelectionToEnd()
 {
     const QList<int> rows = m_view->selectedEntryRows();
-    if (rows.isEmpty() || m_model->pageCount() == 0) {
+    const int pageCount = m_model->pageCount();
+    if (rows.isEmpty() || pageCount == 0 || isSelectionSuffix(rows, pageCount)) {
         return;
     }
     const QList<QUuid> ids = m_view->selectedEntryIds();
-    // Destination is in pre-move coordinates; pageCount() puts the block right before the add tile.
-    if (m_model->moveRows(QModelIndex(), rows.first(), rows.size(), QModelIndex(), m_model->pageCount())) {
+    // pageCount() is one past the last page, so the selection lands right before the add tile.
+    if (m_model->moveEntriesBefore(ids, pageCount)) {
         m_view->selectEntryIds(ids);
+        m_view->setFocus();
     }
 }
 
@@ -1297,12 +1395,78 @@ void DocumentBuilderWidget::exportSelectedPages()
     exportPages(m_view->selectedEntryIds());
 }
 
+void DocumentBuilderWidget::saveToTarget()
+{
+    if (m_exporting || m_saveTarget.isEmpty() || m_model->pageCount() == 0) {
+        return;
+    }
+
+    QString reason;
+    if (!DocumentBuilderExport::canExport(&reason)) {
+        KMessageBox::error(this, reason, i18n("Save Not Available"));
+        return;
+    }
+
+    const QList<DocumentBuilderExport::Page> pages = m_model->pagesForExport(QList<QUuid>());
+    if (pages.isEmpty()) {
+        return;
+    }
+    if (!confirmSourceChanges()) {
+        return;
+    }
+
+    // Save is the one action that deliberately replaces one of its own sources, so it gets its own
+    // confirmation that says exactly what is replaced and what is lost (§10.3).
+    const auto answer = KMessageBox::warningContinueCancel(
+        this,
+        i18n("This replaces “%1” with the %2 pages in the builder.\n\nThe document is reloaded afterwards and the builder closes. Unsaved changes to the open document are lost.",
+             QFileInfo(m_saveTarget).fileName(),
+             m_model->pageCount()),
+        i18n("Save to Document"),
+        KGuiItem(i18n("Replace Document"), QStringLiteral("document-save")),
+        KStandardGuiItem::cancel());
+    if (answer != KMessageBox::Continue) {
+        return;
+    }
+
+    QString error;
+    bool ok = false;
+    {
+        // Same non-cancelable busy state as Export: the writer runs on this thread.
+        setExportBusy(true);
+        const auto restore = qScopeGuard([this] { setExportBusy(false); });
+        ok = DocumentBuilderExport::exportPdf(pages, m_saveTarget, &error, /*allowSourceOverwrite=*/true);
+    }
+
+    if (!ok) {
+        KMessageBox::error(this, error.isEmpty() ? i18n("The document could not be saved.") : error, i18n("Save Failed"));
+        return;
+    }
+
+    // The part reloads the replaced document; the builder cannot keep referring to page numbers of
+    // a file whose contents it just changed.
+    Q_EMIT documentSaved(m_saveTarget);
+}
+
 void DocumentBuilderWidget::updateExportActions()
 {
     QString reason;
     const bool available = DocumentBuilderExport::canExport(&reason);
     const bool hasPages = m_model->pageCount() > 0;
 
+    // Save only exists when the builder was opened from a real local PDF, and only then does it
+    // write in place (§10.3). Export is always available for every other destination.
+    if (m_saveButton) {
+        m_saveButton->setVisible(!m_saveTarget.isEmpty());
+        m_saveButton->setEnabled(available && hasPages && !m_exporting && !m_saveTarget.isEmpty());
+        if (!available) {
+            m_saveButton->setToolTip(reason);
+        } else if (!hasPages) {
+            m_saveButton->setToolTip(i18n("Add pages before saving."));
+        } else if (!m_saveTarget.isEmpty()) {
+            m_saveButton->setToolTip(i18n("Replace “%1” with the built pages.", QFileInfo(m_saveTarget).fileName()));
+        }
+    }
     if (m_exportButton) {
         m_exportButton->setEnabled(available && hasPages && !m_exporting);
         if (!available) {
@@ -1452,9 +1616,12 @@ void DocumentBuilderWidget::setExportBusy(bool busy)
 
     if (busy) {
         QApplication::setOverrideCursor(Qt::WaitCursor);
-        m_view->setDragEnabled(false);
+        // Reordering is a manual drag, so acceptDrops() doubles as its busy switch.
         m_view->setAcceptDrops(false);
         m_addButton->setEnabled(false);
+        if (m_saveButton) {
+            m_saveButton->setEnabled(false);
+        }
 
         m_exportProgress = new QProgressDialog(i18n("Exporting the document…"), QString(), 0, 0, this);
         m_exportProgress->setWindowTitle(i18n("Export"));
@@ -1473,7 +1640,6 @@ void DocumentBuilderWidget::setExportBusy(bool busy)
             m_exportProgress->deleteLater();
             m_exportProgress.clear();
         }
-        m_view->setDragEnabled(true);
         m_view->setAcceptDrops(true);
         m_addButton->setEnabled(true);
         QApplication::restoreOverrideCursor();
@@ -1575,19 +1741,6 @@ void DocumentBuilderWidget::showConfigureMenu(const QPoint &globalPos)
     applySettings();
 }
 
-void DocumentBuilderWidget::showExportLimitationsWarning()
-{
-    if (m_limitationsWarningShown || !m_messageWidget) {
-        return;
-    }
-    m_limitationsWarningShown = true;
-    m_messageWidget->setMessageType(KMessageWidget::Warning);
-    m_messageWidget->setText(i18n("Only page content is copied. Outlines, form fields, page labels, signatures, attachments, "
-                                  "document metadata and encryption are not carried over. Links on a page may survive but can "
-                                  "point to pages that are not in this document."));
-    m_messageWidget->animatedShow();
-}
-
 void DocumentBuilderWidget::maybeWarnAboutLargeImage(const QString &path)
 {
     if (m_largeImageWarningShown || !m_messageWidget) {
@@ -1614,31 +1767,32 @@ void DocumentBuilderWidget::updateCountLabel()
     Q_EMIT pageCountChanged(count);
 }
 
-void DocumentBuilderWidget::seedFromPdf(const QString &path)
+bool DocumentBuilderWidget::seedFromPdf(const QString &path)
 {
-    seedFromPages(path, QList<int>());
+    return seedFromPages(path, QList<int>());
 }
 
-void DocumentBuilderWidget::seedFromPages(const QString &path, const QList<int> &pages)
+bool DocumentBuilderWidget::seedFromPages(const QString &path, const QList<int> &pages)
 {
     if (m_seeded) {
-        return;
+        return false;
     }
     m_seeded = true;
 
     const QFileInfo info(path);
 
     QString error;
-    if (m_model->addPdf(path, &error, pages) >= 0) {
+    const bool seeded = m_model->addPdf(path, &error, pages) >= 0;
+    if (seeded) {
         // Only a document that actually seeded the builder gets named; a non-PDF stays an empty
         // builder with the generic hint.
         m_baseName = info.completeBaseName();
         if (m_fileLabel) {
             m_fileLabel->setText(i18n("from “%1”", info.fileName()));
         }
-        showExportLimitationsWarning();
     }
     updateCountLabel();
+    return seeded;
 }
 
 bool DocumentBuilderWidget::isSeeded() const
@@ -1649,6 +1803,17 @@ bool DocumentBuilderWidget::isSeeded() const
 int DocumentBuilderWidget::pageCount() const
 {
     return m_model->pageCount();
+}
+
+void DocumentBuilderWidget::setSaveTarget(const QString &path)
+{
+    m_saveTarget = path;
+    updateExportActions();
+}
+
+QString DocumentBuilderWidget::saveTargetPath() const
+{
+    return m_saveTarget;
 }
 
 QList<QUuid> DocumentBuilderWidget::selectedEntryIds() const
@@ -1668,7 +1833,9 @@ void DocumentBuilderWidget::reset()
     clear();
     m_seeded = false;
     m_baseName.clear();
+    m_saveTarget.clear();
     if (m_fileLabel) {
         m_fileLabel->setText(QString());
     }
+    updateExportActions();
 }

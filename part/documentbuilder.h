@@ -107,8 +107,9 @@ protected:
     void dragMoveEvent(QDragMoveEvent *event) override;
     void dragLeaveEvent(QDragLeaveEvent *event) override;
     void dropEvent(QDropEvent *event) override;
-    void startDrag(Qt::DropActions supportedActions) override;
     void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
@@ -117,6 +118,8 @@ protected:
 Q_SIGNALS:
     void addTileActivated();
     void deleteRequested(const QList<int> &rows);
+    /// Alt+Up / Alt+Down: move the selected entries one slot up or down.
+    void moveSelectionRequested(int delta);
     void contextMenuRequested(const QPoint &globalPos);
     void filesDropped(const QStringList &paths);
     /// URLs that are not local files were dropped; the widget explains why they are ignored.
@@ -125,6 +128,15 @@ Q_SIGNALS:
 private:
     void updateGridSize();
     void fillThumbnails();
+    /// Starts the hand-rolled card drag once the mouse has moved past the drag distance.
+    void beginEntryDrag();
+    /// Follows the cursor and keeps the insertion bar under it.
+    void updateEntryDrag(const QPoint &pos);
+    /// Ends the drag, applying the reorder when @p drop is true.
+    void finishEntryDrag(bool drop);
+    void cancelEntryDrag();
+    void autoScrollDuringDrag();
+
     /// Insertion row for a drop at @p pos: the card it lands before, in reading order.
     int dropRowFor(const QPoint &pos) const;
     /// Thin bar drawn between two cards to show where the drop goes.
@@ -135,7 +147,22 @@ private:
     qreal m_tileScale = 1.0;
     bool m_inGridUpdate = false;
     QTimer *m_fillTimer = nullptr;
+    /// Rows that still needed a preview at the start of the previous fill pass. Used to stop the
+    /// self-rescheduling chain when a pass no longer makes progress (e.g. an unreadable image).
+    int m_pendingAtLastFill = -1;
     int m_dropRow = -1;
+
+    // Reordering is a manual drag rather than Qt's drag and drop: the icon-mode implementation
+    // filters out drops onto another card, and a native drag does not reliably come back to the
+    // same view as its target. The Pages panel uses the same approach.
+    int m_pressedRow = -1;
+    bool m_dragging = false;
+    QPoint m_pressPos;
+    QPoint m_dragPos;
+    QList<QUuid> m_dragIds;
+    QPixmap m_dragPixmap;
+    QPoint m_dragHotSpot;
+    QTimer *m_dragScrollTimer = nullptr;
 };
 
 class OKULARPART_EXPORT DocumentBuilderWidget : public QWidget
@@ -148,10 +175,16 @@ public:
 
     DocumentBuilderModel *model() const;
 
-    /// Seeds the builder with a whole PDF the first time it is entered.
-    void seedFromPdf(const QString &path);
-    /// Seeds the builder with the given pages of a PDF.
-    void seedFromPages(const QString &path, const QList<int> &pages);
+    /// Seeds the builder with a whole PDF the first time it is entered. Returns true when the file
+    /// actually added pages (a non-PDF leaves the builder empty and returns false).
+    bool seedFromPdf(const QString &path);
+    /// Seeds the builder with the given pages of a PDF. Returns true when pages were added.
+    bool seedFromPages(const QString &path, const QList<int> &pages);
+
+    /// Enables the Save button: the file the builder was seeded from, which Save replaces in place.
+    /// Only a real local document gets a target (never an untitled document).
+    void setSaveTarget(const QString &path);
+    QString saveTargetPath() const;
 
     bool isSeeded() const;
     int pageCount() const;
@@ -182,6 +215,8 @@ Q_SIGNALS:
     void openExportedDocument(const QString &path);
     /// A file was written and belongs in the shell's recent-files list.
     void addRecentFile(const QString &path);
+    /// The builder replaced @p path in place (the Save button). The part reloads that document.
+    void documentSaved(const QString &path);
 
 private:
     void buildUi();
@@ -189,22 +224,25 @@ private:
     void deleteRows(const QList<int> &rows);
     void updateCountLabel();
     void showContextMenu(const QPoint &globalPos);
-    void showAddMenu(const QPoint &globalPos);
+    void addFilesViaDialog();
     void clearWithConfirmation();
     void updateSelectionActions();
+    void moveSelectionBy(int delta);
     void moveSelectionToStart();
     void moveSelectionToEnd();
 
+    /// Image file patterns the installed Qt image plugins can read (lower-case, sorted).
+    static QStringList supportedImagePatterns();
+
     // --- Phase 4: images and page ranges ---
-    void addPdfFilesViaDialog();
-    void addPdfPagesViaDialog();
-    void addImagesViaDialog();
     void editImagePageSettings();
 
     // --- Phase 5b: export ---
     void exportPages(const QList<QUuid> &selection);
     void exportAllPages();
     void exportSelectedPages();
+    /// Phase 10: replaces the document the builder was seeded from, in place.
+    void saveToTarget();
     void updateExportActions();
     bool confirmSourceChanges();
     QString suggestedExportPath() const;
@@ -214,7 +252,6 @@ private:
     // --- Phase 7: configuration and warnings ---
     void showConfigureMenu(const QPoint &globalPos);
     void applySettings();
-    void showExportLimitationsWarning();
     void maybeWarnAboutLargeImage(const QString &path);
 
     DocumentBuilderModel *m_model = nullptr;
@@ -226,6 +263,7 @@ private:
     QToolButton *m_clearButton = nullptr;
     QToolButton *m_removeButton = nullptr;
     QToolButton *m_exportButton = nullptr;
+    QToolButton *m_saveButton = nullptr;
     QToolButton *m_configureButton = nullptr;
     QMenu *m_exportMenu = nullptr;
     QAction *m_exportAllAction = nullptr;
@@ -235,7 +273,8 @@ private:
     bool m_exporting = false;
     bool m_seeded = false;
     QString m_baseName;
-    bool m_limitationsWarningShown = false;
+    /// The local document this builder was seeded from; the Save button writes it in place.
+    QString m_saveTarget;
     bool m_largeImageWarningShown = false;
 };
 

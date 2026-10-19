@@ -34,12 +34,17 @@ namespace
 // Upper bound on cached thumbnails per source, oldest evicted first. A 1000 page document must not
 // keep 1000 full-size images alive just because the user scrolled through the grid once.
 constexpr int kThumbnailCacheCap = 128;
+// A thumbnail request the document cancelled (because a higher-priority request pre-empted it) never
+// notifies. Treating such a pending entry as gone after this long is what lets the grid ask again
+// instead of showing a permanently blank card.
+constexpr qint64 kPendingTimeoutMs = 5000;
 }
 
 BuilderSource::BuilderSource(const QString &canonicalPath, QObject *parent)
     : QObject(parent)
     , m_path(canonicalPath)
 {
+    m_clock.start();
 }
 
 BuilderSource::~BuilderSource()
@@ -254,14 +259,16 @@ void BuilderSource::requestThumbnails(const QList<QPair<int, QSize>> &pages, qre
             // The document still has the pixmap from an earlier request: no notification will come,
             // so draw it right away.
             m_pendingSizes.insert(number, qMakePair(logicalSize, dpr));
+            m_pendingSince.insert(number, m_clock.elapsed());
             ready.append(number);
             continue;
         }
-        if (pending != m_pendingSizes.constEnd() && pending->first == logicalSize) {
+        if (pending != m_pendingSizes.constEnd() && pending->first == logicalSize && isThumbnailPending(number)) {
             continue; // already in flight at exactly this size
         }
 
         m_pendingSizes.insert(number, qMakePair(logicalSize, dpr));
+        m_pendingSince.insert(number, m_clock.elapsed());
         requests.append(new Okular::PixmapRequest(this, number, logicalSize.width(), logicalSize.height(), dpr, priority, Okular::PixmapRequest::Asynchronous));
     }
 
@@ -285,6 +292,7 @@ void BuilderSource::renderThumbnail(int page)
     const QSize logicalSize = it->first;
     const qreal dpr = it->second;
     m_pendingSizes.erase(m_pendingSizes.find(page));
+    m_pendingSince.remove(page);
 
     const Okular::Page *okularPage = m_document ? m_document->page(page) : nullptr;
     if (!okularPage || logicalSize.isEmpty()) {
@@ -316,6 +324,16 @@ void BuilderSource::clearCache()
     m_thumbnails.clear();
     m_thumbnailOrder.clear();
     m_pendingSizes.clear();
+    m_pendingSince.clear();
+}
+
+bool BuilderSource::isThumbnailPending(int page) const
+{
+    const auto it = m_pendingSince.constFind(page);
+    if (it == m_pendingSince.constEnd()) {
+        return false;
+    }
+    return m_clock.elapsed() - it.value() < kPendingTimeoutMs;
 }
 
 void BuilderSource::notifySetup(const QList<Okular::Page *> &pages, int setupFlags)
@@ -341,28 +359,6 @@ void BuilderSource::notifyPagePixmapChanged(int page, quint64 revision)
     Q_UNUSED(revision)
     if (m_pendingSizes.contains(page)) {
         renderThumbnail(page);
-    }
-}
-
-void BuilderSource::notifyContentsCleared(int flags)
-{
-    if (!(flags & Okular::DocumentObserver::Pixmap)) {
-        return;
-    }
-    // A request that was cancelled never sends a notification, so its page would stay in
-    // m_pendingSizes forever and never be drawn. Forget it and tell the model, which repaints the
-    // row; the repaint asks for the thumbnail again.
-    QList<int> dropped;
-    for (auto it = m_pendingSizes.begin(); it != m_pendingSizes.end();) {
-        if (m_thumbnails.contains(it.key())) {
-            ++it;
-        } else {
-            dropped.append(it.key());
-            it = m_pendingSizes.erase(it);
-        }
-    }
-    for (int page : std::as_const(dropped)) {
-        Q_EMIT thumbnailReady(page);
     }
 }
 
