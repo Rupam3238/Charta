@@ -14,11 +14,16 @@
 #include <QIcon>
 #include <QImageReader>
 #include <QPainter>
+#include <QPolygonF>
 #include <QStandardPaths>
 #include <QSvgRenderer>
+#include <QTransform>
+#include <QtMath>
 
 // DBL_MAX
 #include <float.h>
+
+#include <algorithm>
 
 // local includes
 #include "action.h"
@@ -95,6 +100,99 @@ static double strokeDistance(double distance, double penWidth)
     return fmax(distance - pow(penWidth, 2), 0);
 }
 
+static double normalizedFrameAngle(double angle)
+{
+    if (!std::isfinite(angle)) {
+        return 0.0;
+    }
+    angle = std::fmod(angle, 2.0 * M_PI);
+    if (angle < 0.0) {
+        angle += 2.0 * M_PI;
+    }
+    return angle;
+}
+
+static QPointF rotateVectorClockwise(const QPointF &vector, double angle)
+{
+    const double c = std::cos(angle);
+    const double s = std::sin(angle);
+    return QPointF(vector.x() * c - vector.y() * s, vector.x() * s + vector.y() * c);
+}
+
+static QPointF frameLocalToPage(const AnnotationFrame &frame, double localX, double localY, double pageWidth, double pageHeight)
+{
+    const QPointF center(frame.center.x * pageWidth, frame.center.y * pageHeight);
+    const QPointF rotated = rotateVectorClockwise(QPointF(localX, localY), frame.rotation);
+    return center + rotated;
+}
+
+static QPolygonF frameCornersPagePoints(const AnnotationFrame &frame, double pageWidth, double pageHeight)
+{
+    const double width = frame.size.width() * pageWidth;
+    const double height = frame.size.height() * pageHeight;
+    QPolygonF corners;
+    corners.reserve(4);
+    corners.append(frameLocalToPage(frame, -width / 2.0, -height / 2.0, pageWidth, pageHeight));
+    corners.append(frameLocalToPage(frame, width / 2.0, -height / 2.0, pageWidth, pageHeight));
+    corners.append(frameLocalToPage(frame, width / 2.0, height / 2.0, pageWidth, pageHeight));
+    corners.append(frameLocalToPage(frame, -width / 2.0, height / 2.0, pageWidth, pageHeight));
+    return corners;
+}
+
+static NormalizedPoint mapPointBetweenFrames(const NormalizedPoint &point, const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame, double pageWidth, double pageHeight)
+{
+    const QPointF oldCenter(oldFrame.center.x * pageWidth, oldFrame.center.y * pageHeight);
+    const QPointF newCenter(newFrame.center.x * pageWidth, newFrame.center.y * pageHeight);
+    const QPointF pagePoint(point.x * pageWidth, point.y * pageHeight);
+    QPointF local = pagePoint - oldCenter;
+    local = rotateVectorClockwise(local, -oldFrame.rotation);
+
+    const double oldWidth = oldFrame.size.width() * pageWidth;
+    const double oldHeight = oldFrame.size.height() * pageHeight;
+    const double newWidth = newFrame.size.width() * pageWidth;
+    const double newHeight = newFrame.size.height() * pageHeight;
+    if (oldWidth > 1e-12) {
+        local.setX(local.x() * (newWidth / oldWidth));
+    }
+    if (oldHeight > 1e-12) {
+        local.setY(local.y() * (newHeight / oldHeight));
+    }
+
+    local = rotateVectorClockwise(local, newFrame.rotation);
+    const QPointF result = newCenter + local;
+    return NormalizedPoint(result.x() / pageWidth, result.y() / pageHeight);
+}
+
+static void rotateNormalizedPoint(NormalizedPoint &point, double angle, const NormalizedPoint &center, double pageWidth, double pageHeight)
+{
+    const QPointF centerPoint(center.x * pageWidth, center.y * pageHeight);
+    const QPointF pointPage(point.x * pageWidth, point.y * pageHeight);
+    const QPointF rotated = centerPoint + rotateVectorClockwise(pointPage - centerPoint, angle);
+    point.x = rotated.x() / pageWidth;
+    point.y = rotated.y() / pageHeight;
+}
+
+static void scaleLinePoints(QList<NormalizedPoint> &points, const NormalizedRect &oldBoundary, const NormalizedRect &newBoundary)
+{
+    const double oldWidth = oldBoundary.right - oldBoundary.left;
+    const double oldHeight = oldBoundary.bottom - oldBoundary.top;
+    const double newWidth = newBoundary.right - newBoundary.left;
+    const double newHeight = newBoundary.bottom - newBoundary.top;
+
+    for (NormalizedPoint &point : points) {
+        if (oldWidth > 1e-12) {
+            point.x = newBoundary.left + (point.x - oldBoundary.left) * (newWidth / oldWidth);
+        } else {
+            point.x = newBoundary.left + newWidth / 2.0;
+        }
+        if (oldHeight > 1e-12) {
+            point.y = newBoundary.top + (point.y - oldBoundary.top) * (newHeight / oldHeight);
+        } else {
+            point.y = newBoundary.top + newHeight / 2.0;
+        }
+    }
+}
+
 // BEGIN AnnotationUtils implementation
 Annotation *AnnotationUtils::createAnnotation(const QDomElement &annElement)
 {
@@ -160,7 +258,19 @@ QDomElement AnnotationUtils::findChildElement(const QDomNode &parentNode, const 
 
 QRect AnnotationUtils::annotationGeometry(const Annotation *annotation, double scaleX, double scaleY)
 {
-    const QRect rect = annotation->transformedBoundingRectangle().geometry((int)scaleX, (int)scaleY);
+    const AnnotationFrame frame = annotation->frame();
+    QRect rect;
+    if (qFuzzyIsNull(frame.rotation)) {
+        rect = annotation->transformedBoundingRectangle().geometry((int)scaleX, (int)scaleY);
+    } else {
+        const QRectF outlineBounds = annotationOutline(annotation, scaleX, scaleY).boundingRect();
+        const int left = static_cast<int>(outlineBounds.left());
+        const int top = static_cast<int>(outlineBounds.top());
+        const int right = static_cast<int>(outlineBounds.right());
+        const int bottom = static_cast<int>(outlineBounds.bottom());
+        rect = QRect(left, top, right - left + 1, bottom - top + 1);
+    }
+
     if (annotation->subType() == Annotation::AText && (static_cast<const TextAnnotation *>(annotation)->textType() == TextAnnotation::Linked)) {
         // To be honest i have no clue of why the 24,24 is here, maybe to make sure it's not too small?
         // But why only for linked text?
@@ -169,6 +279,123 @@ QRect AnnotationUtils::annotationGeometry(const Annotation *annotation, double s
     }
 
     return rect;
+}
+
+QPolygonF AnnotationUtils::annotationOutline(const Annotation *annotation, double scaleX, double scaleY)
+{
+    if (!annotation) {
+        return QPolygonF();
+    }
+
+    const AnnotationPrivate *d = AnnotationPrivate::get(const_cast<Annotation *>(annotation));
+    const bool swappedPageDimensions = d && d->m_page && (static_cast<int>(d->m_page->m_rotation) % 2);
+    const double pageWidth = d && d->m_page ? (swappedPageDimensions ? d->m_page->m_height : d->m_page->m_width) : 1.0;
+    const double pageHeight = d && d->m_page ? (swappedPageDimensions ? d->m_page->m_width : d->m_page->m_height) : 1.0;
+    const AnnotationFrame frame = annotation->frame();
+    const QPolygonF pageCorners = frameCornersPagePoints(frame, pageWidth, pageHeight);
+    const QTransform pageRotation = d && d->m_page ? d->m_page->rotationMatrix() : QTransform();
+
+    QPolygonF outline;
+    outline.reserve(4);
+    for (const QPointF &corner : pageCorners) {
+        NormalizedPoint normalized(corner.x() / pageWidth, corner.y() / pageHeight);
+        normalized.transform(pageRotation);
+        outline.append(QPointF(normalized.x * scaleX, normalized.y * scaleY));
+    }
+    return outline;
+}
+
+bool AnnotationUtils::annotationContains(const Annotation *annotation, double x, double y, double scaleX, double scaleY)
+{
+    if (!annotation) {
+        return false;
+    }
+    return annotationOutline(annotation, scaleX, scaleY).containsPoint(QPointF(x * scaleX, y * scaleY), Qt::WindingFill);
+}
+
+double AnnotationUtils::annotationDistanceSqr(const Annotation *annotation, double x, double y, double scaleX, double scaleY)
+{
+    if (!annotation) {
+        return DBL_MAX;
+    }
+
+    const AnnotationPrivate *d = AnnotationPrivate::get(const_cast<Annotation *>(annotation));
+    if (!d) {
+        return DBL_MAX;
+    }
+
+    const AnnotationFrame frame = annotation->frame();
+    const bool outlineBased = !qFuzzyIsNull(frame.rotation) && (annotation->subType() == Annotation::AText || annotation->subType() == Annotation::AGeom || annotation->subType() == Annotation::AStamp);
+    if (!outlineBased) {
+        return d->distanceSqr(x, y, scaleX, scaleY);
+    }
+
+    const QPolygonF outline = annotationOutline(annotation, scaleX, scaleY);
+    if (outline.isEmpty()) {
+        return d->distanceSqr(x, y, scaleX, scaleY);
+    }
+
+    const QPointF point(x * scaleX, y * scaleY);
+    if (outline.containsPoint(point, Qt::OddEvenFill)) {
+        return 0.0;
+    }
+
+    double distance = DBL_MAX;
+    for (int i = 0; i < outline.size(); ++i) {
+        const QPointF &a = outline.at(i);
+        const QPointF &b = outline.at((i + 1) % outline.size());
+        const QPointF segment = b - a;
+        const double lengthSquared = QPointF::dotProduct(segment, segment);
+        double t = 0.0;
+        if (lengthSquared > 0.0) {
+            t = qBound(0.0, QPointF::dotProduct(point - a, segment) / lengthSquared, 1.0);
+        }
+        const QPointF closest = a + t * segment;
+        const QPointF delta = point - closest;
+        distance = std::min(distance, QPointF::dotProduct(delta, delta));
+    }
+    return distance;
+}
+
+QTransform AnnotationUtils::annotationFrameTransform(const Annotation *annotation, double scaleX, double scaleY)
+{
+    if (!annotation) {
+        return QTransform();
+    }
+
+    const AnnotationPrivate *d = AnnotationPrivate::get(const_cast<Annotation *>(annotation));
+    const bool swappedPageDimensions = d && d->m_page && (static_cast<int>(d->m_page->m_rotation) % 2);
+    const double pageWidth = d && d->m_page ? (swappedPageDimensions ? d->m_page->m_height : d->m_page->m_width) : 1.0;
+    const double pageHeight = d && d->m_page ? (swappedPageDimensions ? d->m_page->m_width : d->m_page->m_height) : 1.0;
+    const AnnotationFrame frame = annotation->frame();
+    const QTransform pageRotation = d && d->m_page ? d->m_page->rotationMatrix() : QTransform();
+
+    const auto mapPoint = [&](double localX, double localY) {
+        const QPointF pagePoint = frameLocalToPage(frame, localX, localY, pageWidth, pageHeight);
+        NormalizedPoint normalized(pagePoint.x() / pageWidth, pagePoint.y() / pageHeight);
+        normalized.transform(pageRotation);
+        return QPointF(normalized.x * scaleX, normalized.y * scaleY);
+    };
+
+    const QPointF origin = mapPoint(0.0, 0.0);
+    const QPointF xAxis = mapPoint(1.0, 0.0) - origin;
+    const QPointF yAxis = mapPoint(0.0, 1.0) - origin;
+    return QTransform(xAxis.x(), xAxis.y(), yAxis.x(), yAxis.y(), origin.x(), origin.y());
+}
+
+QSizeF AnnotationUtils::annotationFrameSizeInPagePoints(const Annotation *annotation)
+{
+    if (!annotation) {
+        return QSizeF();
+    }
+
+    const AnnotationPrivate *d = AnnotationPrivate::get(const_cast<Annotation *>(annotation));
+    if (!d) {
+        return QSizeF(annotation->frame().size.width(), annotation->frame().size.height());
+    }
+
+    const AnnotationFrame frame = annotation->frame();
+    return QSizeF(frame.size.width() * d->framePageWidth(), frame.size.height() * d->framePageHeight());
 }
 
 QPixmap AnnotationUtils::loadStamp(const QString &nameOrPath, int size, bool keepAspectRatio)
@@ -674,7 +901,11 @@ int Annotation::flags() const
 void Annotation::setBoundingRectangle(const NormalizedRect &rectangle)
 {
     Q_D(Annotation);
+    if (d->m_frameInitialized && !qFuzzyIsNull(d->m_rotation)) {
+        qWarning("Annotation::setBoundingRectangle() resets a rotated frame; use setFrame(), moveFrame(), resizeFrame() or rotateFrame() instead");
+    }
     d->m_boundary = rectangle;
+    d->updateFrameFromBoundary();
     d->resetTransformation();
     if (d->m_page) {
         d->transform(d->m_page->rotationMatrix());
@@ -693,6 +924,134 @@ NormalizedRect Annotation::transformedBoundingRectangle() const
     return d->m_transformedBoundary;
 }
 
+AnnotationFrame Annotation::frame() const
+{
+    Q_D(const Annotation);
+    AnnotationFrame frame;
+    if (d->m_frameInitialized) {
+        frame.center = d->m_frameCenter;
+        frame.size = d->m_frameSize;
+        frame.rotation = d->m_rotation;
+    } else {
+        frame.center = NormalizedPoint((d->m_boundary.left + d->m_boundary.right) / 2.0, (d->m_boundary.top + d->m_boundary.bottom) / 2.0);
+        frame.size = QSizeF(d->m_boundary.right - d->m_boundary.left, d->m_boundary.bottom - d->m_boundary.top);
+        frame.rotation = 0.0;
+    }
+    return frame;
+}
+
+bool Annotation::setFrame(const AnnotationFrame &frame)
+{
+    Q_D(Annotation);
+    if (!d->setFrameInternal(frame)) {
+        return false;
+    }
+    d->resetTransformation();
+    if (d->m_page) {
+        d->transform(d->m_page->rotationMatrix());
+    }
+    return true;
+}
+
+bool Annotation::initializeFrameFromBoundingRectangle(const NormalizedRect &rectangle)
+{
+    Q_D(Annotation);
+    d->m_boundary = rectangle;
+    d->updateFrameFromBoundary();
+    d->resetTransformation();
+    if (d->m_page) {
+        d->transform(d->m_page->rotationMatrix());
+    }
+    return true;
+}
+
+void Annotation::moveFrame(const NormalizedPoint &delta)
+{
+    translate(delta);
+}
+
+bool Annotation::resizeFrame(const AnnotationFrame &target)
+{
+    Q_D(Annotation);
+    if (!std::isfinite(target.rotation) || target.size.width() < 0.0 || target.size.height() < 0.0) {
+        return false;
+    }
+    if (!d->m_frameInitialized) {
+        d->updateFrameFromBoundary();
+    }
+
+    const AnnotationFrame oldFrame {d->m_frameCenter, d->m_frameSize, d->m_rotation};
+    const double angleDifference = std::fabs(normalizedFrameAngle(oldFrame.rotation) - normalizedFrameAngle(target.rotation));
+    if (qMin(angleDifference, 2.0 * M_PI - angleDifference) > 1e-9) {
+        return false;
+    }
+
+    AnnotationFrame newFrame = target;
+    newFrame.rotation = oldFrame.rotation;
+    d->scaleContent(oldFrame, newFrame);
+    d->setFrameInternal(newFrame);
+    d->resetTransformation();
+    if (d->m_page) {
+        d->transform(d->m_page->rotationMatrix());
+    }
+    return true;
+}
+
+bool Annotation::rotateFrame(double delta, const NormalizedPoint &groupCenter)
+{
+    if (!std::isfinite(delta) || qFuzzyIsNull(delta)) {
+        return true;
+    }
+
+    Q_D(Annotation);
+    if (!d->m_frameInitialized) {
+        d->updateFrameFromBoundary();
+    }
+
+    const double pageWidth = d->framePageWidth();
+    const double pageHeight = d->framePageHeight();
+    const QPointF center(d->m_frameCenter.x * pageWidth, d->m_frameCenter.y * pageHeight);
+    const QPointF pivot(groupCenter.x * pageWidth, groupCenter.y * pageHeight);
+    const QPointF rotatedCenter = pivot + rotateVectorClockwise(center - pivot, delta);
+
+    d->rotateContent(delta, groupCenter);
+
+    AnnotationFrame newFrame {d->m_frameCenter, d->m_frameSize, d->m_rotation};
+    newFrame.center = NormalizedPoint(rotatedCenter.x() / pageWidth, rotatedCenter.y() / pageHeight);
+    newFrame.rotation = normalizedFrameAngle(d->m_rotation + delta);
+    d->setFrameInternal(newFrame);
+    d->resetTransformation();
+    if (d->m_page) {
+        d->transform(d->m_page->rotationMatrix());
+    }
+    return true;
+}
+
+bool Annotation::canBeRotated() const
+{
+    Q_D(const Annotation);
+    if (!d->m_page || !d->m_page->m_doc->m_parent->canModifyPageAnnotation(this)) {
+        return false;
+    }
+    if (d->m_flags & FixedRotation) {
+        return false;
+    }
+
+    switch (subType()) {
+    case AText:
+    case ALine:
+    case AGeom:
+    case AStamp:
+    case AInk:
+        return true;
+    default:
+        // Highlight and caret rotation needs quad/glyph-aware rendering and
+        // hit-testing before it can be exposed.  File attachments and other
+        // fixed icons stay unrotated as well.
+        return false;
+    }
+}
+
 void Annotation::translate(const NormalizedPoint &coord)
 {
     Q_D(Annotation);
@@ -706,6 +1065,10 @@ void Annotation::translate(const NormalizedPoint &coord)
 void Annotation::adjust(const NormalizedPoint &deltaCoord1, const NormalizedPoint &deltaCoord2)
 {
     Q_D(Annotation);
+    if (d->m_frameInitialized && !qFuzzyIsNull(d->m_rotation)) {
+        qWarning("Annotation::adjust() cannot resize a rotated frame; use resizeFrame()");
+        return;
+    }
     d->adjust(deltaCoord1, deltaCoord2);
     d->resetTransformation();
     if (d->m_page) {
@@ -823,6 +1186,10 @@ bool Annotation::canBeResized() const
         return false;
     }
 
+    if (d->m_flags & FixedSize) {
+        return false;
+    }
+
     return d->canBeResized();
 }
 
@@ -868,6 +1235,19 @@ void Annotation::store(QDomNode &annNode, QDomDocument &document) const
     bE.setAttribute(QStringLiteral("t"), QString::number(d->m_boundary.top));
     bE.setAttribute(QStringLiteral("r"), QString::number(d->m_boundary.right));
     bE.setAttribute(QStringLiteral("b"), QString::number(d->m_boundary.bottom));
+
+    const AnnotationFrame frame = this->frame();
+    const double boundaryWidth = d->m_boundary.right - d->m_boundary.left;
+    const double boundaryHeight = d->m_boundary.bottom - d->m_boundary.top;
+    const bool needsGeometry = !qFuzzyIsNull(frame.rotation) || !qFuzzyCompare(frame.size.width() + 1.0, boundaryWidth + 1.0) || !qFuzzyCompare(frame.size.height() + 1.0, boundaryHeight + 1.0);
+    if (needsGeometry) {
+        QDomElement gE = document.createElement(QStringLiteral("geometry"));
+        e.appendChild(gE);
+        gE.setAttribute(QStringLiteral("version"), QStringLiteral("1"));
+        gE.setAttribute(QStringLiteral("rotation"), QString::number(qRadiansToDegrees(frame.rotation), 'f', 6));
+        gE.setAttribute(QStringLiteral("width"), QString::number(frame.size.width(), 'f', 12));
+        gE.setAttribute(QStringLiteral("height"), QString::number(frame.size.height(), 'f', 12));
+    }
 
     // Sub-Node-2 - penStyle
     if (d->m_style.width() != 1 || d->m_style.lineStyle() != Solid || d->m_style.xCorners() != 0 || d->m_style.yCorners() != 0.0 || d->m_style.marks() != 3 || d->m_style.spaces() != 0) {
@@ -951,6 +1331,13 @@ void Annotation::setAnnotationProperties(const QDomNode &node)
     d_ptr->m_flags = d_ptr->m_flags | internalFlags;
     d_ptr->m_disposeFunc = disposeFunc;
 
+    // Rebuild the derived AABB now that the page dimensions are known.  For
+    // unrotated legacy XML this is a no-op; for rotated frames it repairs any
+    // rounding difference between the stored boundary and local size.
+    if (d_ptr->m_page && d_ptr->m_frameInitialized) {
+        d_ptr->recomputeBoundaryFromFrame();
+    }
+
     // Transform annotation to current page rotation
     d_ptr->transform(d_ptr->m_page->rotationMatrix());
 }
@@ -974,6 +1361,14 @@ void AnnotationPrivate::transform(const QTransform &matrix)
 void AnnotationPrivate::baseTransform(const QTransform &matrix)
 {
     m_boundary.transform(matrix);
+
+    // Newly created annotations are initialized in display coordinates and
+    // transformed back into the unrotated page by Document::addPageAnnotation.
+    // Their frame has no rotation yet, so rebuilding it from the transformed
+    // boundary is exact.
+    if (m_frameInitialized && qFuzzyIsNull(m_rotation)) {
+        updateFrameFromBoundary();
+    }
 }
 
 void AnnotationPrivate::resetTransformation()
@@ -987,6 +1382,11 @@ void AnnotationPrivate::translate(const NormalizedPoint &coord)
     m_boundary.right = m_boundary.right + coord.x;
     m_boundary.top = m_boundary.top + coord.y;
     m_boundary.bottom = m_boundary.bottom + coord.y;
+
+    if (m_frameInitialized) {
+        m_frameCenter.x += coord.x;
+        m_frameCenter.y += coord.y;
+    }
 }
 
 void AnnotationPrivate::adjust(const NormalizedPoint &deltaCoord1, const NormalizedPoint &deltaCoord2)
@@ -996,11 +1396,91 @@ void AnnotationPrivate::adjust(const NormalizedPoint &deltaCoord1, const Normali
     ;
     m_boundary.right = m_boundary.right + qBound(m_boundary.left - m_boundary.right, deltaCoord2.x, 1. - m_boundary.right);
     m_boundary.bottom = m_boundary.bottom + qBound(m_boundary.top - m_boundary.bottom, deltaCoord2.y, 1. - m_boundary.bottom);
+
+    if (m_frameInitialized && qFuzzyIsNull(m_rotation)) {
+        updateFrameFromBoundary();
+    }
 }
 
 bool AnnotationPrivate::openDialogAfterCreation() const
 {
     return false;
+}
+
+void AnnotationPrivate::scaleContent(const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame)
+{
+    Q_UNUSED(oldFrame)
+    Q_UNUSED(newFrame)
+}
+
+void AnnotationPrivate::rotateContent(double delta, const NormalizedPoint &center)
+{
+    Q_UNUSED(delta)
+    Q_UNUSED(center)
+}
+
+double AnnotationPrivate::framePageWidth() const
+{
+    if (!m_page) {
+        return 1.0;
+    }
+    // Page width/height are the displayed dimensions; the frame lives in the
+    // unrotated page, so undo the current quarter-turn here.
+    return (static_cast<int>(m_page->m_rotation) % 2) ? m_page->m_height : m_page->m_width;
+}
+
+double AnnotationPrivate::framePageHeight() const
+{
+    if (!m_page) {
+        return 1.0;
+    }
+    return (static_cast<int>(m_page->m_rotation) % 2) ? m_page->m_width : m_page->m_height;
+}
+
+void AnnotationPrivate::updateFrameFromBoundary()
+{
+    m_frameCenter = NormalizedPoint((m_boundary.left + m_boundary.right) / 2.0, (m_boundary.top + m_boundary.bottom) / 2.0);
+    m_frameSize = QSizeF(m_boundary.right - m_boundary.left, m_boundary.bottom - m_boundary.top);
+    m_rotation = 0.0;
+    m_frameInitialized = true;
+}
+
+bool AnnotationPrivate::setFrameInternal(const AnnotationFrame &frame)
+{
+    if (!std::isfinite(frame.center.x) || !std::isfinite(frame.center.y) || !std::isfinite(frame.rotation) || frame.size.width() < 0.0 || frame.size.height() < 0.0) {
+        return false;
+    }
+
+    m_frameCenter = frame.center;
+    m_frameSize = frame.size;
+    m_rotation = normalizedFrameAngle(frame.rotation);
+    m_frameInitialized = true;
+    recomputeBoundaryFromFrame();
+    return true;
+}
+
+void AnnotationPrivate::recomputeBoundaryFromFrame()
+{
+    if (!m_frameInitialized) {
+        return;
+    }
+
+    const double pageWidth = framePageWidth();
+    const double pageHeight = framePageHeight();
+    const QPolygonF corners = frameCornersPagePoints(AnnotationFrame {m_frameCenter, m_frameSize, m_rotation}, pageWidth, pageHeight);
+
+    double left = corners.constFirst().x();
+    double top = corners.constFirst().y();
+    double right = left;
+    double bottom = top;
+    for (const QPointF &corner : corners) {
+        left = qMin(left, corner.x());
+        top = qMin(top, corner.y());
+        right = qMax(right, corner.x());
+        bottom = qMax(bottom, corner.y());
+    }
+
+    m_boundary = NormalizedRect(left / pageWidth, top / pageHeight, right / pageWidth, bottom / pageHeight);
 }
 
 void AnnotationPrivate::setAnnotationProperties(const QDomNode &node)
@@ -1041,6 +1521,12 @@ void AnnotationPrivate::setAnnotationProperties(const QDomNode &node)
 
     // parse -the-subnodes- (describing Style, Window, Revision(s) structures)
     // Note: all subnodes if present must be 'attributes complete'
+    bool hasGeometry = false;
+    bool hasGeometryWidth = false;
+    bool hasGeometryHeight = false;
+    double geometryWidth = 0.0;
+    double geometryHeight = 0.0;
+    double geometryRotation = 0.0;
     QDomNode eSubNode = e.firstChild();
     while (eSubNode.isElement()) {
         QDomElement ee = eSubNode.toElement();
@@ -1049,6 +1535,16 @@ void AnnotationPrivate::setAnnotationProperties(const QDomNode &node)
         // parse boundary
         if (ee.tagName() == QLatin1String("boundary")) {
             m_boundary = NormalizedRect(ee.attribute(QStringLiteral("l")).toDouble(), ee.attribute(QStringLiteral("t")).toDouble(), ee.attribute(QStringLiteral("r")).toDouble(), ee.attribute(QStringLiteral("b")).toDouble());
+        }
+        // parse the oriented frame.  The boundary is kept as the exact AABB
+        // for sources that were loaded without a page yet.
+        else if (ee.tagName() == QLatin1String("geometry")) {
+            hasGeometry = true;
+            hasGeometryWidth = ee.hasAttribute(QStringLiteral("width"));
+            hasGeometryHeight = ee.hasAttribute(QStringLiteral("height"));
+            geometryWidth = ee.attribute(QStringLiteral("width")).toDouble();
+            geometryHeight = ee.attribute(QStringLiteral("height")).toDouble();
+            geometryRotation = qDegreesToRadians(ee.attribute(QStringLiteral("rotation")).toDouble());
         }
         // parse penStyle if not default
         else if (ee.tagName() == QLatin1String("penStyle")) {
@@ -1073,6 +1569,24 @@ void AnnotationPrivate::setAnnotationProperties(const QDomNode &node)
             m_window.setTitle(ee.attribute(QStringLiteral("title")));
             m_window.setSummary(ee.attribute(QStringLiteral("summary")));
         }
+    }
+
+    if (hasGeometry) {
+        const double boundaryWidth = m_boundary.right - m_boundary.left;
+        const double boundaryHeight = m_boundary.bottom - m_boundary.top;
+        m_frameCenter = NormalizedPoint((m_boundary.left + m_boundary.right) / 2.0, (m_boundary.top + m_boundary.bottom) / 2.0);
+        m_frameSize = QSizeF(hasGeometryWidth ? geometryWidth : boundaryWidth, hasGeometryHeight ? geometryHeight : boundaryHeight);
+        m_rotation = normalizedFrameAngle(geometryRotation);
+        m_frameInitialized = true;
+
+        // Without a page we cannot reliably rebuild a rotated AABB from
+        // normalized units.  Keep the exact boundary stored in the file and
+        // rebuild it on the first geometry operation once the page is known.
+        if (m_page || qFuzzyIsNull(m_rotation)) {
+            recomputeBoundaryFromFrame();
+        }
+    } else {
+        updateFrameFromBoundary();
     }
 
     // get the [revisions] element of the annotation node
@@ -1123,6 +1637,8 @@ public:
     void baseTransform(const QTransform &matrix) override;
     void resetTransformation() override;
     void translate(const NormalizedPoint &coord) override;
+    void scaleContent(const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame) override;
+    void rotateContent(double delta, const NormalizedPoint &center) override;
     bool openDialogAfterCreation() const override;
     void setAnnotationProperties(const QDomNode &node) override;
     bool canBeResized() const override;
@@ -1347,6 +1863,24 @@ void TextAnnotationPrivate::translate(const NormalizedPoint &coord)
 #undef ADD_COORD
 }
 
+void TextAnnotationPrivate::scaleContent(const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame)
+{
+    const double pageWidth = framePageWidth();
+    const double pageHeight = framePageHeight();
+    for (NormalizedPoint &point : m_inplaceCallout) {
+        point = mapPointBetweenFrames(point, oldFrame, newFrame, pageWidth, pageHeight);
+    }
+}
+
+void TextAnnotationPrivate::rotateContent(double delta, const NormalizedPoint &center)
+{
+    const double pageWidth = framePageWidth();
+    const double pageHeight = framePageHeight();
+    for (NormalizedPoint &point : m_inplaceCallout) {
+        rotateNormalizedPoint(point, delta, center, pageWidth, pageHeight);
+    }
+}
+
 bool TextAnnotationPrivate::openDialogAfterCreation() const
 {
     return (m_textType == Okular::TextAnnotation::Linked) || (m_inplaceIntent == TextAnnotation::InplaceIntent::Unknown);
@@ -1446,7 +1980,11 @@ public:
     void baseTransform(const QTransform &matrix) override;
     void resetTransformation() override;
     void translate(const NormalizedPoint &coord) override;
+    void adjust(const NormalizedPoint &deltaCoord1, const NormalizedPoint &deltaCoord2) override;
+    void scaleContent(const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame) override;
+    void rotateContent(double delta, const NormalizedPoint &center) override;
     double distanceSqr(double x, double y, double xScale, double yScale) const override;
+    bool canBeResized() const override;
     void setAnnotationProperties(const QDomNode &node) override;
     AnnotationPrivate *getNewAnnotationPrivate() override;
 
@@ -1616,7 +2154,7 @@ void LineAnnotation::store(QDomNode &node, QDomDocument &document) const
         lineElement.setAttribute(QStringLiteral("closed"), d->m_lineClosed);
     }
     if (d->m_lineInnerColor.isValid()) {
-        lineElement.setAttribute(QStringLiteral("innerColor"), d->m_lineInnerColor.name());
+        lineElement.setAttribute(QStringLiteral("innerColor"), d->m_lineInnerColor.alpha() == 255 ? d->m_lineInnerColor.name() : d->m_lineInnerColor.name(QColor::HexArgb));
     }
     if (d->m_lineLeadingFwdPt != 0.0) {
         lineElement.setAttribute(QStringLiteral("leadFwd"), QString::number(d->m_lineLeadingFwdPt));
@@ -1683,6 +2221,36 @@ void LineAnnotationPrivate::translate(const NormalizedPoint &coord)
         p.x = p.x + coord.x;
         p.y = p.y + coord.y;
     }
+}
+
+void LineAnnotationPrivate::adjust(const NormalizedPoint &deltaCoord1, const NormalizedPoint &deltaCoord2)
+{
+    const NormalizedRect oldBoundary = m_boundary;
+    AnnotationPrivate::adjust(deltaCoord1, deltaCoord2);
+    scaleLinePoints(m_linePoints, oldBoundary, m_boundary);
+}
+
+void LineAnnotationPrivate::scaleContent(const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame)
+{
+    const double pageWidth = framePageWidth();
+    const double pageHeight = framePageHeight();
+    for (NormalizedPoint &point : m_linePoints) {
+        point = mapPointBetweenFrames(point, oldFrame, newFrame, pageWidth, pageHeight);
+    }
+}
+
+void LineAnnotationPrivate::rotateContent(double delta, const NormalizedPoint &center)
+{
+    const double pageWidth = framePageWidth();
+    const double pageHeight = framePageHeight();
+    for (NormalizedPoint &point : m_linePoints) {
+        rotateNormalizedPoint(point, delta, center, pageWidth, pageHeight);
+    }
+}
+
+bool LineAnnotationPrivate::canBeResized() const
+{
+    return true;
 }
 
 void LineAnnotationPrivate::setAnnotationProperties(const QDomNode &node)
@@ -1760,7 +2328,7 @@ double LineAnnotationPrivate::distanceSqr(double x, double y, double xScale, dou
         transformedLinePoints.append(transformedLinePoints.first());
     }
 
-    if (m_lineInnerColor.isValid()) {
+    if (m_lineInnerColor.isValid() && m_lineInnerColor.alpha() > 0) {
         QPolygonF polygon;
         for (const NormalizedPoint &p : std::as_const(transformedLinePoints)) {
             polygon.append(QPointF(p.x, p.y));
@@ -2548,6 +3116,8 @@ public:
     double distanceSqr(double x, double y, double xScale, double yScale) const override;
     void translate(const NormalizedPoint &coord) override;
     void adjust(const NormalizedPoint &deltaCoord1, const NormalizedPoint &deltaCoord2) override;
+    void scaleContent(const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame) override;
+    void rotateContent(double delta, const NormalizedPoint &center) override;
     bool canBeResized() const override;
     void setAnnotationProperties(const QDomNode &node) override;
     AnnotationPrivate *getNewAnnotationPrivate() override;
@@ -2725,15 +3295,29 @@ void InkAnnotationPrivate::adjust(const NormalizedPoint &deltaCoord1, const Norm
 {
     const NormalizedRect oldBoundary = m_boundary;
     AnnotationPrivate::adjust(deltaCoord1, deltaCoord2);
+    for (QList<NormalizedPoint> &path : m_inkPaths) {
+        scaleLinePoints(path, oldBoundary, m_boundary);
+    }
+}
 
-    const double oldWidth = oldBoundary.right - oldBoundary.left;
-    const double oldHeight = oldBoundary.bottom - oldBoundary.top;
-    const double scaleX = oldWidth > 0.0 ? (m_boundary.right - m_boundary.left) / oldWidth : 1.0;
-    const double scaleY = oldHeight > 0.0 ? (m_boundary.bottom - m_boundary.top) / oldHeight : 1.0;
+void InkAnnotationPrivate::scaleContent(const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame)
+{
+    const double pageWidth = framePageWidth();
+    const double pageHeight = framePageHeight();
     for (QList<NormalizedPoint> &path : m_inkPaths) {
         for (NormalizedPoint &point : path) {
-            point.x = m_boundary.left + (point.x - oldBoundary.left) * scaleX;
-            point.y = m_boundary.top + (point.y - oldBoundary.top) * scaleY;
+            point = mapPointBetweenFrames(point, oldFrame, newFrame, pageWidth, pageHeight);
+        }
+    }
+}
+
+void InkAnnotationPrivate::rotateContent(double delta, const NormalizedPoint &center)
+{
+    const double pageWidth = framePageWidth();
+    const double pageHeight = framePageHeight();
+    for (QList<NormalizedPoint> &path : m_inkPaths) {
+        for (NormalizedPoint &point : path) {
+            rotateNormalizedPoint(point, delta, center, pageWidth, pageHeight);
         }
     }
 }

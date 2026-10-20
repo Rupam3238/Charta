@@ -448,6 +448,12 @@ QRect AnnotationObjectRect::boundingRect(double xScale, double yScale) const
 
 bool AnnotationObjectRect::contains(double x, double y, double xScale, double yScale) const
 {
+    if (m_annotation) {
+        const AnnotationFrame frame = m_annotation->frame();
+        if (!qFuzzyIsNull(frame.rotation)) {
+            return AnnotationUtils::annotationContains(m_annotation, x, y, xScale, yScale);
+        }
+    }
     return boundingRect(xScale, yScale).contains((int)(x * xScale), (int)(y * yScale), false);
 }
 

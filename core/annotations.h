@@ -12,9 +12,12 @@
 #include <QDomDocument>
 #include <QDomElement>
 #include <QFont>
+#include <QPolygonF>
 #include <QRect>
 #include <QRectF>
+#include <QSizeF>
 #include <QString>
+#include <QTransform>
 
 #include "area.h"
 #include "okularcore_export.h"
@@ -49,6 +52,21 @@ class RichMediaAnnotationPrivate;
 class NewSignatureData;
 
 /**
+ * @short Oriented frame of an annotation.
+ *
+ * The frame is stored in the unrotated page coordinate system.  @c center and
+ * @c size are normalized page coordinates, while @c rotation is a clockwise
+ * angle in radians in the range [0, 2*pi).
+ *
+ * @since 25.08
+ */
+struct OKULARCORE_EXPORT AnnotationFrame {
+    NormalizedPoint center;
+    QSizeF size;
+    double rotation = 0.0;
+};
+
+/**
  * @short Helper class for (recursive) annotation retrieval/storage.
  */
 class OKULARCORE_EXPORT AnnotationUtils
@@ -72,6 +90,37 @@ public:
      * children of @p parentNode or a null element if not found.
      */
     static QDomElement findChildElement(const QDomNode &parentNode, const QString &name);
+
+    /**
+     * Returns the oriented outline of @p annotation in page-item pixels.
+     *
+     * @p scaleX and @p scaleY are the page-item dimensions (pixels per
+     * normalized page unit).
+     */
+    static QPolygonF annotationOutline(const Annotation *annotation, double scaleX, double scaleY);
+
+    /**
+     * Returns whether the normalized point (@p x, @p y) is inside the
+     * annotation outline, using page-item dimensions @p scaleX and @p scaleY.
+     */
+    static bool annotationContains(const Annotation *annotation, double x, double y, double scaleX, double scaleY);
+
+    /**
+     * Returns the squared distance from the normalized point (@p x, @p y) to
+     * @p annotation, using page-item dimensions @p scaleX and @p scaleY.
+     */
+    static double annotationDistanceSqr(const Annotation *annotation, double x, double y, double scaleX, double scaleY);
+
+    /**
+     * Returns a transform that maps the annotation's local page-point
+     * coordinates (0..width, 0..height) to page-item pixels.
+     */
+    static QTransform annotationFrameTransform(const Annotation *annotation, double scaleX, double scaleY);
+
+    /**
+     * Returns the annotation's unrotated local size in PDF/page points.
+     */
+    static QSizeF annotationFrameSizeInPagePoints(const Annotation *annotation);
 
     /**
      * Returns the geometry of the given @p annotation scaled by
@@ -144,7 +193,8 @@ public:
         External = 128,           ///< Is stored external
         ExternallyDrawn = 256,    ///< Is drawn externally (by the generator which provided it) @since 0.10 (KDE 4.4)
         BeingMoved = 512,         ///< Is being moved (mouse drag and drop). If ExternallyDrawn, the generator must not draw it @since 0.15 (KDE 4.9)
-        BeingResized = 1024       ///< Is being resized (mouse drag and drop). If ExternallyDrawn, the generator must not draw it @since 1.1.0
+        BeingResized = 1024,      ///< Is being resized (mouse drag and drop). If ExternallyDrawn, the generator must not draw it @since 1.1.0
+        BeingRotated = 2048       ///< Is being rotated. If ExternallyDrawn, the generator must not draw it
     };
 
     /**
@@ -302,6 +352,53 @@ public:
      * to have them rotated correctly.
      */
     NormalizedRect transformedBoundingRectangle() const;
+
+    /**
+     * Returns the oriented frame of the annotation.
+     *
+     * An annotation loaded from a source that predates the frame model is
+     * reported as an unrotated frame whose size is the bounding rectangle
+     * size.
+     */
+    AnnotationFrame frame() const;
+
+    /**
+     * Restores the complete oriented frame.
+     *
+     * This is the explicit restore path for XML, undo/redo and proxies.  It
+     * does not move or scale subtype content; use moveFrame(), resizeFrame()
+     * or rotateFrame() for gestures.
+     */
+    bool setFrame(const AnnotationFrame &frame);
+
+    /**
+     * Initializes the frame from @p rectangle as an unrotated frame.
+     */
+    bool initializeFrameFromBoundingRectangle(const NormalizedRect &rectangle);
+
+    /**
+     * Moves the annotation and its frame by @p delta.  Angle and size are
+     * preserved.
+     */
+    void moveFrame(const NormalizedPoint &delta);
+
+    /**
+     * Resizes the frame to @p target and maps the subtype content from the
+     * old local frame to the new one.  The angle must not change; return
+     * false if it does.
+     */
+    bool resizeFrame(const AnnotationFrame &target);
+
+    /**
+     * Rotates the annotation by @p delta radians around @p groupCenter,
+     * which is expressed in normalized page coordinates.
+     */
+    bool rotateFrame(double delta, const NormalizedPoint &groupCenter);
+
+    /**
+     * Returns whether this annotation supports rotation.
+     */
+    bool canBeRotated() const;
 
     /**
      * Move the annotation by the specified coordinates.

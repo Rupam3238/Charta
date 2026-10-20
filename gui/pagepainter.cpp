@@ -45,6 +45,13 @@ inline QPen buildPen(const Okular::Annotation *ann, double width, const QColor &
     return p;
 }
 
+static void applyAnnotationFrameTransform(QPainter *painter, const Okular::Annotation *annotation, int scaledWidth, int scaledHeight, const QRect &scaledCrop)
+{
+    QTransform localToDevice = Okular::AnnotationUtils::annotationFrameTransform(annotation, scaledWidth, scaledHeight);
+    localToDevice *= QTransform::fromTranslate(-scaledCrop.left(), -scaledCrop.top());
+    painter->setWorldTransform(localToDevice * painter->worldTransform());
+}
+
 void PagePainter::paintPageOnPainter(QPainter *destPainter, const Okular::Page *page, Okular::DocumentObserver *observer, int flags, int scaledWidth, int scaledHeight, const QRect limits)
 {
     paintCroppedPageOnPainter(destPainter, page, observer, flags, scaledWidth, scaledHeight, limits, Okular::NormalizedRect(0, 0, 1, 1), nullptr);
@@ -181,7 +188,7 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
                     // While an externally drawn (native) annotation is being resized *or moved*, the generator no
                     // longer renders it (see PopplerAnnotationProxy::notifyModification), so Okular draws it live
                     // from its own model. This gives a real preview instead of just an outline.
-                    if ((annFlags & (Okular::Annotation::BeingResized | Okular::Annotation::BeingMoved)) && boundary.intersects(limitRect)) {
+                    if ((annFlags & (Okular::Annotation::BeingResized | Okular::Annotation::BeingMoved | Okular::Annotation::BeingRotated)) && boundary.intersects(limitRect)) {
                         switch (ann->subType()) {
                         case Okular::Annotation::ALine:
                         case Okular::Annotation::AHighlight:
@@ -197,7 +204,7 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
                             boundingRectOnlyAnn = ann;
                             break;
                         }
-                    } else if (annFlags & Okular::Annotation::BeingMoved) {
+                    } else if (annFlags & (Okular::Annotation::BeingMoved | Okular::Annotation::BeingRotated)) {
                         // Not visible in this paint region: nothing to draw live. Types without a live renderer
                         // (default case above) fall back to the bounding-box preview.
                         boundingRectOnlyAnn = ann;
@@ -568,47 +575,83 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
         // draw TextAnnotation
         if (type == Okular::Annotation::AText) {
             Okular::TextAnnotation *text = static_cast<Okular::TextAnnotation *>(a);
+            const bool rotated = !qFuzzyIsNull(a->frame().rotation);
             if (text->textType() == Okular::TextAnnotation::InPlace) {
-                QImage image(annotBoundary.size(), QImage::Format_ARGB32);
-                image.fill(acolor.rgba());
-                QPainter painter(&image);
-                painter.setFont(text->textFont());
-                painter.setPen(text->textColor());
-                const Qt::AlignmentFlag hAlign = (text->inplaceAlignment() == 1 ? Qt::AlignHCenter : (text->inplaceAlignment() == 2 ? Qt::AlignRight : Qt::AlignLeft));
-                const double invXScale = (double)page->width() / scaledWidth;
-                const double invYScale = (double)page->height() / scaledHeight;
                 const double borderWidth = text->style().width();
-                painter.scale(1 / invXScale, 1 / invYScale);
-                painter.drawText(borderWidth * invXScale, borderWidth * invYScale, (image.width() - 2 * borderWidth) * invXScale, (image.height() - 2 * borderWidth) * invYScale, Qt::AlignTop | hAlign | Qt::TextWordWrap, text->contents());
-                painter.resetTransform();
-                // Required as asking for a zero width pen results
-                // in a default width pen (1.0) being created
-                if (borderWidth != 0) {
-                    QPen pen(Qt::black, borderWidth);
-                    painter.setPen(pen);
-                    painter.drawRect(0, 0, image.width() - 1, image.height() - 1);
-                }
-                painter.end();
+                const Qt::AlignmentFlag hAlign = (text->inplaceAlignment() == 1 ? Qt::AlignHCenter : (text->inplaceAlignment() == 2 ? Qt::AlignRight : Qt::AlignLeft));
 
-                mixedPainter->drawImage(annotBoundary.topLeft(), image);
+                if (rotated) {
+                    const QSizeF localSize = Okular::AnnotationUtils::annotationFrameSizeInPagePoints(a);
+                    if (localSize.width() > 0 && localSize.height() > 0) {
+                        const QRectF localRect(0, 0, localSize.width(), localSize.height());
+                        mixedPainter->save();
+                        applyAnnotationFrameTransform(mixedPainter, a, scaledWidth, scaledHeight, scaledCrop);
+                        mixedPainter->setClipRect(localRect);
+                        mixedPainter->fillRect(localRect, acolor);
+                        mixedPainter->setFont(text->textFont());
+                        mixedPainter->setPen(text->textColor());
+                        mixedPainter->drawText(localRect.adjusted(borderWidth, borderWidth, -borderWidth, -borderWidth), Qt::AlignTop | hAlign | Qt::TextWordWrap, text->contents());
+                        if (borderWidth != 0) {
+                            mixedPainter->setPen(QPen(Qt::black, borderWidth));
+                            mixedPainter->setBrush(Qt::NoBrush);
+                            mixedPainter->drawRect(localRect);
+                        }
+                        mixedPainter->restore();
+                    }
+                } else {
+                    QImage image(annotBoundary.size(), QImage::Format_ARGB32);
+                    image.fill(acolor.rgba());
+                    QPainter painter(&image);
+                    painter.setFont(text->textFont());
+                    painter.setPen(text->textColor());
+                    const double invXScale = (double)page->width() / scaledWidth;
+                    const double invYScale = (double)page->height() / scaledHeight;
+                    painter.scale(1 / invXScale, 1 / invYScale);
+                    painter.drawText(borderWidth * invXScale, borderWidth * invYScale, (image.width() - 2 * borderWidth) * invXScale, (image.height() - 2 * borderWidth) * invYScale, Qt::AlignTop | hAlign | Qt::TextWordWrap, text->contents());
+                    painter.resetTransform();
+                    // Required as asking for a zero width pen results
+                    // in a default width pen (1.0) being created
+                    if (borderWidth != 0) {
+                        QPen pen(Qt::black, borderWidth);
+                        painter.setPen(pen);
+                        painter.drawRect(0, 0, image.width() - 1, image.height() - 1);
+                    }
+                    painter.end();
+
+                    mixedPainter->drawImage(annotBoundary.topLeft(), image);
+                }
             } else if (text->textType() == Okular::TextAnnotation::Linked) {
                 // get pixmap, colorize and alpha-blend it
                 QPixmap iconPixmap = QIcon::fromTheme(text->textIcon().toLower()).pixmap(32);
 
-                QPixmap scaledCroppedPixmap = iconPixmap.scaled(TEXTANNOTATION_ICONSIZE * dpr, TEXTANNOTATION_ICONSIZE * dpr).copy(dInnerRect.toAlignedRect());
-                scaledCroppedPixmap.setDevicePixelRatio(dpr);
-                QImage scaledCroppedImage = scaledCroppedPixmap.toImage();
+                if (rotated) {
+                    const QSizeF localSize = Okular::AnnotationUtils::annotationFrameSizeInPagePoints(a);
+                    if (localSize.width() > 0 && localSize.height() > 0) {
+                        QImage iconImage = iconPixmap.toImage();
+                        if (a->style().color().isValid()) {
+                            GuiUtils::colorizeImage(iconImage, a->style().color(), opacity);
+                        }
+                        mixedPainter->save();
+                        applyAnnotationFrameTransform(mixedPainter, a, scaledWidth, scaledHeight, scaledCrop);
+                        mixedPainter->drawImage(QRectF(0, 0, localSize.width(), localSize.height()), iconImage);
+                        mixedPainter->restore();
+                    }
+                } else {
+                    QPixmap scaledCroppedPixmap = iconPixmap.scaled(TEXTANNOTATION_ICONSIZE * dpr, TEXTANNOTATION_ICONSIZE * dpr).copy(dInnerRect.toAlignedRect());
+                    scaledCroppedPixmap.setDevicePixelRatio(dpr);
+                    QImage scaledCroppedImage = scaledCroppedPixmap.toImage();
 
-                // if the annotation color is valid (ie it was set), then
-                // use it to colorize the icon, otherwise the icon will be
-                // "gray"
-                if (a->style().color().isValid()) {
-                    GuiUtils::colorizeImage(scaledCroppedImage, a->style().color(), opacity);
+                    // if the annotation color is valid (ie it was set), then
+                    // use it to colorize the icon, otherwise the icon will be
+                    // "gray"
+                    if (a->style().color().isValid()) {
+                        GuiUtils::colorizeImage(scaledCroppedImage, a->style().color(), opacity);
+                    }
+                    iconPixmap = QPixmap::fromImage(scaledCroppedImage);
+
+                    // draw the mangled image to painter
+                    mixedPainter->drawPixmap(annotRect.topLeft(), iconPixmap);
                 }
-                iconPixmap = QPixmap::fromImage(scaledCroppedImage);
-
-                // draw the mangled image to painter
-                mixedPainter->drawPixmap(annotRect.topLeft(), iconPixmap);
             }
 
         }
@@ -624,7 +667,15 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
                 mixedPainter->save();
                 mixedPainter->setOpacity(mixedPainter->opacity() * opacity / 255.0);
 
-                mixedPainter->drawPixmap(annotRect.topLeft(), stampPixmap.scaled(annotBoundary.width() * dpr, annotBoundary.height() * dpr), dInnerRect.toAlignedRect());
+                if (!qFuzzyIsNull(a->frame().rotation)) {
+                    const QSizeF localSize = Okular::AnnotationUtils::annotationFrameSizeInPagePoints(a);
+                    if (localSize.width() > 0 && localSize.height() > 0) {
+                        applyAnnotationFrameTransform(mixedPainter, a, scaledWidth, scaledHeight, scaledCrop);
+                        mixedPainter->drawPixmap(QRectF(0, 0, localSize.width(), localSize.height()), stampPixmap, QRectF(stampPixmap.rect()));
+                    }
+                } else {
+                    mixedPainter->drawPixmap(annotRect.topLeft(), stampPixmap.scaled(annotBoundary.width() * dpr, annotBoundary.height() * dpr), dInnerRect.toAlignedRect());
+                }
 
                 mixedPainter->restore();
             }
@@ -635,10 +686,25 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
             // check whether there's anything to draw
             if (geom->style().width() || geom->geometricalInnerColor().isValid()) {
                 mixedPainter->save();
-                const double width = geom->style().width() * Okular::Utils::realDpi(nullptr).width() / (72.0 * 2.0) * scaledWidth / page->width();
-                QRectF r(.0, .0, annotBoundary.width(), annotBoundary.height());
-                r.adjust(width, width, -width, -width);
-                r.translate(annotBoundary.topLeft());
+
+                QRectF r;
+                double width;
+                if (!qFuzzyIsNull(a->frame().rotation)) {
+                    const QSizeF localSize = Okular::AnnotationUtils::annotationFrameSizeInPagePoints(a);
+                    if (localSize.width() <= 0 || localSize.height() <= 0) {
+                        mixedPainter->restore();
+                        continue;
+                    }
+                    applyAnnotationFrameTransform(mixedPainter, a, scaledWidth, scaledHeight, scaledCrop);
+                    r = QRectF(0, 0, localSize.width(), localSize.height());
+                    width = geom->style().width() * Okular::Utils::realDpi(nullptr).width() / (72.0 * 2.0);
+                } else {
+                    width = geom->style().width() * Okular::Utils::realDpi(nullptr).width() / (72.0 * 2.0) * scaledWidth / page->width();
+                    r = QRectF(.0, .0, annotBoundary.width(), annotBoundary.height());
+                    r.adjust(width, width, -width, -width);
+                    r.translate(annotBoundary.topLeft());
+                }
+
                 if (geom->geometricalInnerColor().isValid()) {
                     r.adjust(width, width, -width, -width);
                     const QColor color = geom->geometricalInnerColor();

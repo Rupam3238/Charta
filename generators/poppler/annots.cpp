@@ -18,9 +18,11 @@
 #include <QTemporaryFile>
 #include <QTransform>
 #include <QVariant>
+#include <QtMath>
 
 #include <core/annotations.h>
 #include <core/area.h>
+#include <core/page.h>
 
 #include "debug_pdf.h"
 #include "generator_pdf.h"
@@ -28,6 +30,9 @@
 #include "popplerembeddedfile.h"
 #include "popplerversion.h"
 #include <KLocalizedString>
+
+#include <cmath>
+#include <limits>
 
 Q_DECLARE_METATYPE(Poppler::Annotation *)
 
@@ -61,6 +66,74 @@ static QRectF normRectToRectF(const Okular::NormalizedRect &rect)
 {
     return QRectF(QPointF(rect.left, rect.top), QPointF(rect.right, rect.bottom));
 }
+
+static QTransform rotationMatrixFor(Okular::Rotation rotation)
+{
+    QTransform matrix;
+    matrix.rotate(static_cast<int>(rotation) * 90);
+    switch (rotation) {
+    case Okular::Rotation90:
+        matrix.translate(0, -1);
+        break;
+    case Okular::Rotation180:
+        matrix.translate(-1, -1);
+        break;
+    case Okular::Rotation270:
+        matrix.translate(-1, 0);
+        break;
+    default:
+        break;
+    }
+    return matrix;
+}
+
+static QSizeF pdfDisplayPageSizePoints(const Poppler::Page *page)
+{
+    // Poppler exposes the page in its displayed (already /Rotate'd) orientation.
+    // Okular's annotation frame also lives in that orientation.
+    return page->pageSizeF();
+}
+
+static int pageOrientationDegrees(Poppler::Page::Orientation orientation)
+{
+    switch (orientation) {
+    case Poppler::Page::Landscape:
+        return 90;
+    case Poppler::Page::UpsideDown:
+        return 180;
+    case Poppler::Page::Seascape:
+        return 270;
+    case Poppler::Page::Portrait:
+        return 0;
+    }
+    return 0;
+}
+
+#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
+static void applyFrameRotationToPopplerAnnotation(const Okular::Annotation *okularAnnotation, Poppler::Annotation *popplerAnnotation, const Poppler::Page *page)
+{
+    if (!okularAnnotation || !popplerAnnotation || !page) {
+        return;
+    }
+
+    const Okular::AnnotationFrame frame = okularAnnotation->frame();
+    const QSizeF pageSize = pdfDisplayPageSizePoints(page);
+    const double displayWidth = frame.size.width() * pageSize.width();
+    const double displayHeight = frame.size.height() * pageSize.height();
+
+    const int orientation = pageOrientationDegrees(page->orientation());
+    const bool rotatedPage = (orientation % 180) != 0;
+    const double localWidth = rotatedPage ? displayHeight : displayWidth;
+    const double localHeight = rotatedPage ? displayWidth : displayHeight;
+
+    // Okular's frame angle is clockwise in the displayed page. Convert it to
+    // the PDF user-space direction after undoing the page /Rotate.
+    const double frameDegrees = qRadiansToDegrees(frame.rotation);
+    const double pdfDegrees = orientation - frameDegrees;
+
+    popplerAnnotation->setUserRotation(pdfDegrees, localWidth, localHeight);
+}
+#endif
 
 // Poppler and Okular share the same flag values, but we don't want to export internal flags
 static int maskExportedFlags(int flags)
@@ -378,12 +451,13 @@ static void setPopplerStampAnnotationCustomImage(const Poppler::Page *page, Popp
     // Fallback for SVGs, named icons, or failed reads:
     // Calculate a high-DPI size based on the PDF page geometry.
     if (targetSize.isEmpty()) {
-        // Get the annotation rectangle in PDF user units (points).
-        const QSizeF pageSizePoints = page->pageSizeF();
-        const Okular::NormalizedRect &nRect = oStampAnnotation->boundingRectangle();
+        // Get the unrotated annotation size in displayed PDF points.
+        // Using the AABB of a rotated frame would distort the generated icon.
+        const QSizeF pageSizePoints = pdfDisplayPageSizePoints(page);
+        const Okular::AnnotationFrame frame = oStampAnnotation->frame();
 
-        const double widthPoints = nRect.width() * pageSizePoints.width();
-        const double heightPoints = nRect.height() * pageSizePoints.height();
+        const double widthPoints = frame.size.width() * pageSizePoints.width();
+        const double heightPoints = frame.size.height() * pageSizePoints.height();
 
         // Map from PDF points (72 per inch) to a target high DPI (e.g., 288 = 4x).
         constexpr double kPdfDpi = 72.0;
@@ -490,8 +564,42 @@ static QByteArray pdfNumber(qreal value)
 
 static void setInkAppearanceStream(const Okular::InkAnnotation *okularAnnotation, Poppler::InkAnnotation *popplerAnnotation, const Poppler::Page *page)
 {
-    const QByteArray appearance = okularAnnotation->appearanceStream();
-    const QRectF boundingBox = okularAnnotation->appearanceBoundingBox().normalized();
+    QByteArray appearance = okularAnnotation->appearanceStream();
+    QRectF boundingBox = okularAnnotation->appearanceBoundingBox().normalized();
+
+    const double frameRotation = okularAnnotation->frame().rotation;
+    if (!qFuzzyIsNull(frameRotation) && !boundingBox.isNull()) {
+        const double radians = -frameRotation; // Okular clockwise -> PDF counter-clockwise
+        const double c = std::cos(radians);
+        const double s = std::sin(radians);
+        const QPointF center = boundingBox.center();
+
+        const QPointF corners[] = { boundingBox.topLeft(), boundingBox.topRight(), boundingBox.bottomRight(), boundingBox.bottomLeft() };
+        double minX = std::numeric_limits<double>::max();
+        double minY = std::numeric_limits<double>::max();
+        double maxX = std::numeric_limits<double>::lowest();
+        double maxY = std::numeric_limits<double>::lowest();
+        for (const QPointF &corner : corners) {
+            const double x = corner.x() - center.x();
+            const double y = corner.y() - center.y();
+            const double rx = c * x - s * y;
+            const double ry = s * x + c * y;
+            minX = std::min(minX, rx);
+            minY = std::min(minY, ry);
+            maxX = std::max(maxX, rx);
+            maxY = std::max(maxY, ry);
+        }
+
+        if (maxX > minX && maxY > minY) {
+            QByteArray rotated = "q\n";
+            rotated += pdfNumber(c) + ' ' + pdfNumber(s) + ' ' + pdfNumber(-s) + ' ' + pdfNumber(c) + ' ' + pdfNumber(-minX) + ' ' + pdfNumber(-minY) + " cm\n";
+            rotated += appearance;
+            rotated += "\nQ\n";
+            appearance = rotated;
+            boundingBox = QRectF(0, 0, maxX - minX, maxY - minY);
+        }
+    }
+
     if (!page || boundingBox.isNull()) {
         popplerAnnotation->setAppearanceStream(appearance, boundingBox);
         return;
@@ -832,6 +940,10 @@ void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int pag
     // Bind poppler object to page
     ppl_page->addAnnotation(ppl_ann);
 
+#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
+    applyFrameRotationToPopplerAnnotation(okl_ann, ppl_ann, ppl_page.get());
+#endif
+
     // Set pointer to poppler annotation as native Id
     okl_ann->setNativeId(QVariant::fromValue(ppl_ann));
     okl_ann->setDisposeDataFunction(disposeAnnotation);
@@ -849,7 +961,7 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
         return;
     }
 
-    if (okl_ann->flags() & (Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized)) {
+    if (okl_ann->flags() & (Okular::Annotation::BeingMoved | Okular::Annotation::BeingResized | Okular::Annotation::BeingRotated)) {
         // Okular's UI renders the annotation on its own while it is dragged.
         // Hide the native annotation only once. Every later drag step must return
         // without touching the mutex: the generator thread holds it for the whole
@@ -866,7 +978,8 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
 
     const QRectF newBoundary = normRectToRectF(okl_ann->boundingRectangle());
     std::unique_ptr<Poppler::AnnotationAppearance> savedAppearance;
-    const bool positionOnlyGeomChange = ppl_ann->boundary() != newBoundary && sameStyle(okl_ann->style(), ppl_ann->style()) && okl_ann->subType() == Okular::Annotation::AGeom
+    const bool rotatedFrame = !qFuzzyIsNull(okl_ann->frame().rotation);
+    const bool positionOnlyGeomChange = !rotatedFrame && ppl_ann->boundary() != newBoundary && sameStyle(okl_ann->style(), ppl_ann->style()) && okl_ann->subType() == Okular::Annotation::AGeom
         && static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalInnerColor() == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomInnerColor()
         && okularToPoppler(static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalType()) == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomType();
     const bool positionOnlyClipboardStampChange = false; // Disabled for clipboard image stamps because their appearance depends on the boundary
@@ -955,6 +1068,12 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
     if (savedAppearance) {
         ppl_ann->setAnnotationAppearance(*savedAppearance);
     }
+
+#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
+    // Must be last: the appearance generators rebuild the unrotated AP first.
+    std::unique_ptr<Poppler::Page> ppl_page = ppl_doc->page(page);
+    applyFrameRotationToPopplerAnnotation(okl_ann, ppl_ann, ppl_page.get());
+#endif
 
     qCDebug(OkularPdfDebug) << okl_ann->uniqueName();
 }
@@ -1500,4 +1619,46 @@ Okular::Annotation *createAnnotationFromPopplerAnnotation(Poppler::Annotation *p
         }
     }
     return okularAnnotation;
+}
+
+void applyPopplerUserRotationToOkularAnnotation(Okular::Annotation *okularAnnotation, Poppler::Annotation *popplerAnnotation, const Okular::Page *page)
+{
+#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
+    if (!okularAnnotation || !popplerAnnotation || !page) {
+        return;
+    }
+
+    const double pdfRotation = popplerAnnotation->userRotation();
+    const QSizeF localSize = popplerAnnotation->userLocalSize();
+    if (qFuzzyIsNull(pdfRotation) || localSize.isEmpty()) {
+        return;
+    }
+
+    const int orientation = static_cast<int>(page->orientation()) * 90;
+    const bool rotatedPage = (orientation % 180) != 0;
+    const double displayWidth = rotatedPage ? localSize.height() : localSize.width();
+    const double displayHeight = rotatedPage ? localSize.width() : localSize.height();
+
+    const bool userSwapped = (static_cast<int>(page->rotation()) % 2) != 0;
+    const double pageWidth = userSwapped ? page->height() : page->width();
+    const double pageHeight = userSwapped ? page->width() : page->height();
+    if (pageWidth <= 0 || pageHeight <= 0) {
+        return;
+    }
+
+    const Okular::NormalizedRect boundary = okularAnnotation->boundingRectangle();
+    Okular::NormalizedPoint center((boundary.left + boundary.right) / 2.0, (boundary.top + boundary.bottom) / 2.0);
+    center.transform(rotationMatrixFor(page->rotation()).inverted());
+
+    Okular::AnnotationFrame frame;
+    frame.center = center;
+    frame.size = QSizeF(displayWidth / pageWidth, displayHeight / pageHeight);
+    frame.rotation = qDegreesToRadians(orientation - pdfRotation);
+
+    okularAnnotation->setFrame(frame);
+#else
+    Q_UNUSED(okularAnnotation)
+    Q_UNUSED(popplerAnnotation)
+    Q_UNUSED(page)
+#endif
 }

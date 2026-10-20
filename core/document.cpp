@@ -1170,7 +1170,7 @@ void DocumentPrivate::performModifyPageAnnotation(int page, Annotation *annotati
     // Inside a change batch (undo/redo of a macro, committing a multi-selection) the same annotation can be modified
     // many times. Only its final state matters to the generator, so remember it and sync once when the batch ends.
     // Annotations that are being dragged are excluded: their sync is the cheap "hide" path and must happen right away.
-    if (m_annotationChangeBatchDepth > 0 && !(annotation->flags() & (Annotation::BeingMoved | Annotation::BeingResized))) {
+    if (m_annotationChangeBatchDepth > 0 && !(annotation->flags() & (Annotation::BeingMoved | Annotation::BeingResized | Annotation::BeingRotated))) {
         auto pending = m_annotationsPendingModify.find(annotation);
         if (pending == m_annotationsPendingModify.end()) {
             m_annotationsPendingModify.insert(annotation, qMakePair(page, appearanceChanged));
@@ -1198,7 +1198,7 @@ void DocumentPrivate::performModifyPageAnnotation(int page, Annotation *annotati
     if (appearanceChanged && (annotation->flags() & Annotation::ExternallyDrawn)) {
         /* When an annotation is being moved, the generator will not render it.
          * Therefore there's no need to refresh pixmaps after the first time */
-        if (annotation->flags() & (Annotation::BeingMoved | Annotation::BeingResized)) {
+        if (annotation->flags() & (Annotation::BeingMoved | Annotation::BeingResized | Annotation::BeingRotated)) {
             if (m_annotationBeingModified) {
                 return;
             } else { // First time: take note

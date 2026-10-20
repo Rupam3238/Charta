@@ -51,6 +51,24 @@ public:
     virtual AnnotationPrivate *getNewAnnotationPrivate() = 0;
 
     /**
+     * Maps subtype content from @p oldFrame to @p newFrame.  The default is a
+     * no-op for annotations whose appearance is generated from the frame.
+     */
+    virtual void scaleContent(const AnnotationFrame &oldFrame, const AnnotationFrame &newFrame);
+
+    /**
+     * Rotates subtype content by @p delta radians around @p center.  The
+     * center is normalized page coordinates.
+     */
+    virtual void rotateContent(double delta, const NormalizedPoint &center);
+
+    bool setFrameInternal(const AnnotationFrame &frame);
+    void recomputeBoundaryFromFrame();
+    void updateFrameFromBoundary();
+    double framePageWidth() const;
+    double framePageHeight() const;
+
+    /**
      * Determines the distance of the closest point of the annotation to the
      * given point @p x @p y @p xScale @p yScale
      * @since 0.17
@@ -68,6 +86,12 @@ public:
     int m_flags;
     NormalizedRect m_boundary;
     NormalizedRect m_transformedBoundary;
+
+    // Oriented frame, stored in the unrotated page coordinate system.
+    NormalizedPoint m_frameCenter;
+    QSizeF m_frameSize;
+    double m_rotation = 0.0;
+    bool m_frameInitialized = false;
 
     Okular::Annotation::Style m_style;
     Okular::Annotation::Window m_window;

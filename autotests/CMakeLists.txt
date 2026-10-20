@@ -125,10 +125,20 @@ ecm_add_test(addremoveannotationtest.cpp testingutils.cpp ../part/annotationtool
 if(Poppler_Qt6_FOUND)
     target_link_libraries(addremoveannotationtest Poppler::Qt6)
     target_compile_definitions(addremoveannotationtest PRIVATE HAVE_POPPLER_QT6)
+
+    ecm_add_test(annotationpersistencetest.cpp
+        TEST_NAME "annotationpersistencetest"
+        LINK_LIBRARIES Qt6::Test Qt6::Gui Poppler::Qt6
+    )
 endif()
 
 ecm_add_test(translateannotationtest.cpp testingutils.cpp
     TEST_NAME "translateannotationtest"
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
+)
+
+ecm_add_test(annotationrotationtest.cpp
+    TEST_NAME "annotationrotationtest"
     LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
 )
 

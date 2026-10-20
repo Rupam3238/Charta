@@ -1382,8 +1382,9 @@ public:
         Okular::Annotation *ann = nullptr;
         const QString typeString = m_annotElement.attribute(QStringLiteral("type"));
 
-        // create LineAnnotation from path
-        if (typeString == QLatin1String("Line") || typeString == QLatin1String("Polyline") || typeString == QLatin1String("Polygon")) {
+        // create LineAnnotation from path.  GeomPolygon is the polygon tool's
+        // historical XML name; it is the same closed LineAnnotation as Polygon.
+        if (typeString == QLatin1String("Line") || typeString == QLatin1String("Polyline") || typeString == QLatin1String("Polygon") || typeString == QLatin1String("GeomPolygon")) {
             if (points.count() < 2) {
                 return QList<Okular::Annotation *>();
             }
@@ -1806,6 +1807,12 @@ void PageViewAnnotator::startTypewriterTextEdit(Okular::TextAnnotation *annotati
 {
     finishTypewriterTextEdit();
     if (!annotation || !pageViewItem) {
+        return;
+    }
+
+    // v1: the in-place editor is axis aligned.  Editing a rotated annotation
+    // through it would call setBoundingRectangle() and erase the angle.
+    if (!qFuzzyIsNull(annotation->frame().rotation)) {
         return;
     }
 

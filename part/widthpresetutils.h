@@ -125,6 +125,18 @@ inline double minimumNormalizedResizeDimension(double pageExtent)
 {
     return pageExtent > 0.0 ? minimumWidth / pageExtent : minimumWidth;
 }
+
+/**
+ * Minimum normalized resize dimension for an extent expressed in page points.
+ *
+ * This is the variant resize geometry must use: the old helper above is kept
+ * for compatibility but callers were passing page-item pixels, which made the
+ * physical minimum depend on the zoom level.
+ */
+inline double minimumNormalizedResizeDimensionForPagePoints(double pageExtentPoints)
+{
+    return pageExtentPoints > 0.0 ? minimumWidth / pageExtentPoints : minimumWidth;
+}
 }
 
 #endif
