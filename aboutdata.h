@@ -37,6 +37,11 @@ inline KAboutData okularAboutData()
     about.addCredit(i18n("Eugene Trounev"), i18n("Annotations artwork"), QStringLiteral("eugene.trounev@gmail.com"));
     about.addCredit(i18n("Fabio D'Urso"), i18n("Annotation improvements"), QStringLiteral("fabiodurso@hotmail.it"));
 
+    // Charta maintainer. The code in this project was produced with AI tools; see
+    // docs/licensing/ and docs/THIRD-PARTY-NOTICES.md. No authorship claim is made for
+    // generated code; the maintainer is named as the party applying the project licence.
+    about.addAuthor(i18n("Rupam Dutta"), i18n("Charta maintainer"), QStringLiteral("rupamd.work@gmail.com"));
+
     return about;
 }
 

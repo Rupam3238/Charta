@@ -1,7 +1,7 @@
 
 function(okular_add_generator _target)
   kcoreaddons_add_plugin(${_target}
-    INSTALL_NAMESPACE "okular_generators"
+    INSTALL_NAMESPACE "charta_generators"
     SOURCES ${ARGN}
   )
   get_property(aux_list GLOBAL PROPERTY okular_generator_list)

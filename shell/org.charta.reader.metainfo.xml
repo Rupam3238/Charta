@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>org.charta.reader</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+  <project_license>GPL-2.0-or-later AND GFDL-1.2-or-later</project_license>
   <icon type="stock">charta</icon>
   <categories>
     <category>Office</category>

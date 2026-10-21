@@ -1,6 +1,6 @@
 {
     "KParts": {
-        "PluginNamespace": "okular_generators"
+        "PluginNamespace": "charta_generators"
     },
     "KPlugin": {
         "Icon": "charta",

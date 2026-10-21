@@ -1,544 +1,408 @@
+Subject: [PATCH] poppler-26.08.0: annotation rotation / page reorder
+
+Applies to: pristine poppler 26.08.0 after poppler-ink-appearance.patch
+Source state: Poppler fork commit 0fe4c9d ("First pass to add reorder functionality")
+Files: poppler/Annot.cc, poppler/Annot.h, poppler/Page.cc, poppler/Page.h,
+       qt6/src/poppler-annotation.cc, qt6/src/poppler-annotation.h,
+       qt6/src/poppler-annotation-private.h, qt6/src/poppler-page.cc, qt6/src/poppler-qt6.h,
+       qt6/tests/check_annotations.cpp
+Regenerated 2026-10-21: the previous copy of this file carried a different index line and did
+not describe the same delta.
+base: poppler-26.08.0 (tarball sha256 dc906e68cea698109706ac6aa3d2c9d4512fcfcac42d90b8afcda486d1b9abd0)
+state: 8fa0623 -> 7f74adb (Poppler fork, /home/workstation/tools/deps/poppler-26.08.0)
+
 diff --git a/poppler/Annot.cc b/poppler/Annot.cc
-index db09166..d130d53 100644
+index 544f934..db09166 100644
 --- a/poppler/Annot.cc
 +++ b/poppler/Annot.cc
-@@ -74,6 +74,7 @@
- 
- #include <cstdlib>
- #include <cmath>
-+#include <limits>
- #include <cassert>
- #include <numbers>
- #include "goo/gstrtod.h"
-@@ -1336,6 +1337,13 @@ void Annot::initialize(PDFDoc *docA, Dict *dict)
-         ok = false;
-     }
- 
-+    obj1 = dict->lookup("ChartaRotate");
-+    userRotation = obj1.isNum() ? obj1.getNum() : 0;
-+    obj1 = dict->lookup("ChartaLocalW");
-+    userLocalWidth = obj1.isNum() ? obj1.getNum() : 0;
-+    obj1 = dict->lookup("ChartaLocalH");
-+    userLocalHeight = obj1.isNum() ? obj1.getNum() : 0;
-+
-     obj1 = dict->lookup("Contents");
-     if (obj1.isString()) {
-         contents = GooString(obj1.getString());
-@@ -1443,6 +1451,12 @@ void Annot::setRect(const PDFRectangle &rectA)
+@@ -7549,6 +7549,24 @@ bool Annots::removeAnnot(const std::shared_ptr<Annot> &annot)
+     return true;
  }
  
- void Annot::setRect(double x1, double y1, double x2, double y2)
++bool Annots::moveAnnot(const std::shared_ptr<Annot> &annot, int index)
 +{
-+    setRectKeepAppearance(x1, y1, x2, y2);
-+    invalidateAppearance();
++    auto it = std::ranges::find(annots, annot);
++    if (it == annots.end() || index < 0 || index >= static_cast<int>(annots.size())) {
++        return false;
++    }
++
++    const int currentIndex = std::distance(annots.begin(), it);
++    if (currentIndex == index) {
++        return true;
++    }
++
++    std::shared_ptr<Annot> moved = std::move(*it);
++    annots.erase(it);
++    annots.insert(annots.begin() + index, std::move(moved));
++    return true;
 +}
 +
-+void Annot::setRectKeepAppearance(double x1, double y1, double x2, double y2)
+ std::shared_ptr<Annot> Annots::createAnnot(Object &&dictObject, const Object &obj)
  {
-     if (x1 < x2) {
-         rect->x1 = x1;
-@@ -1467,7 +1481,173 @@ void Annot::setRect(double x1, double y1, double x2, double y2)
-     a->add(Object(rect->y2));
- 
-     update("Rect", Object(std::move(a)));
-+}
-+
-+void Annot::setUserRotation(double degreesCounterClockwise, double localWidth, double localHeight)
-+{
-+    annotLocker();
-+
-+    const bool hasLocalSize = std::isfinite(localWidth) && std::isfinite(localHeight) && localWidth > 0 && localHeight > 0;
-+    const bool rotated = hasLocalSize && std::isfinite(degreesCounterClockwise) && std::abs(std::remainder(degreesCounterClockwise, 360.0)) > 1e-9;
-+
-+    // Keep the metadata even for line/ink annotations, whose native geometry
-+    // already carries the rotation. It lets the editor restore the oriented
-+    // frame after reopening.  A zero /ChartaRotate is meaningful when the
-+    // frame angle equals the page orientation: without the local size the
-+    // importer could not distinguish it from an annotation that was never
-+    // rotated.
-+    userRotation = rotated ? degreesCounterClockwise : 0;
-+    userLocalWidth = localWidth;
-+    userLocalHeight = localHeight;
-+
-+    if (hasLocalSize) {
-+        update("ChartaRotate", Object(userRotation));
-+        update("ChartaLocalW", Object(userLocalWidth));
-+        update("ChartaLocalH", Object(userLocalHeight));
-+        update("ChartaRotationV", Object(1));
-+    } else {
-+        update("ChartaRotate", Object::null());
-+        update("ChartaLocalW", Object::null());
-+        update("ChartaLocalH", Object::null());
-+        update("ChartaRotationV", Object::null());
-+    }
-+
-+    const bool nativeGeometry = type == typeLine || type == typePolyLine || type == typePolygon || type == typeInk;
-+    if (nativeGeometry) {
-+        appearanceHasUserRotation = false;
-+        return;
-+    }
-+
-+    const bool wrappedAppearance = type == typeFreeText || type == typeSquare || type == typeCircle || type == typeStamp;
-+    if (!wrappedAppearance) {
-+        return;
-+    }
-+
-+    if (!rotated) {
-+        if (appearanceHasUserRotation) {
-+            const double centerX = (rect->x1 + rect->x2) / 2.0;
-+            const double centerY = (rect->y1 + rect->y2) / 2.0;
-+            setRectKeepAppearance(centerX - localWidth / 2.0, centerY - localHeight / 2.0, centerX + localWidth / 2.0, centerY + localHeight / 2.0);
-+            invalidateAppearance();
-+            generateAppearance();
-+        }
-+        appearanceHasUserRotation = false;
-+        return;
-+    }
-+
-+    // The appearance generators build the unrotated annotation into /Rect.
-+    // Remember the rotated AABB centre, generate at the local size, then wrap
-+    // the appearance and finally move /Rect to the rotated AABB.
-+    const double centerX = (rect->x1 + rect->x2) / 2.0;
-+    const double centerY = (rect->y1 + rect->y2) / 2.0;
-+
-+    setRectKeepAppearance(centerX - localWidth / 2.0, centerY - localHeight / 2.0, centerX + localWidth / 2.0, centerY + localHeight / 2.0);
-     invalidateAppearance();
-+    appearanceHasUserRotation = false;
-+    generateAppearance();
-+
-+    if (appearance.isNull()) {
-+        return;
-+    }
-+
-+    rotateAppearance(degreesCounterClockwise);
-+
-+    const double radians = degreesCounterClockwise * M_PI / 180.0;
-+    const double c = std::abs(std::cos(radians));
-+    const double s = std::abs(std::sin(radians));
-+    const double rotatedWidth = c * localWidth + s * localHeight;
-+    const double rotatedHeight = s * localWidth + c * localHeight;
-+
-+    setRectKeepAppearance(centerX - rotatedWidth / 2.0, centerY - rotatedHeight / 2.0, centerX + rotatedWidth / 2.0, centerY + rotatedHeight / 2.0);
-+}
-+
-+void Annot::rotateAppearance(double degreesCounterClockwise)
-+{
-+    if (appearance.isNull()) {
-+        return;
-+    }
-+
-+    Object appearanceObject = appearance.fetch(doc->getXRef());
-+    if (!appearanceObject.isStream()) {
-+        return;
-+    }
-+
-+    Dict *appearanceDict = appearanceObject.getStream()->getDict();
-+    const Object bboxObject = appearanceDict->lookup("BBox");
-+    if (!bboxObject.isArrayOfLength(4)) {
-+        return;
-+    }
-+
-+    const double bbox[4] = { bboxObject.arrayGet(0).getNumWithDefaultValue(0), bboxObject.arrayGet(1).getNumWithDefaultValue(0), bboxObject.arrayGet(2).getNumWithDefaultValue(0), bboxObject.arrayGet(3).getNumWithDefaultValue(0) };
-+
-+    double matrix[6] = { 1, 0, 0, 1, 0, 0 };
-+    const Object matrixObject = appearanceDict->lookup("Matrix");
-+    if (matrixObject.isArrayOfLength(6)) {
-+        for (int i = 0; i < 6; ++i) {
-+            matrix[i] = matrixObject.arrayGet(i).getNumWithDefaultValue(matrix[i]);
-+        }
-+    }
-+
-+    // Transform the four BBox corners through the appearance Matrix.  The
-+    // wrapper rotates those already-transformed corners around the origin;
-+    // the translation below then moves the rotated bounding box to (0, 0).
-+    // Rotating around the bbox centre and then applying a translation derived
-+    // from the centre-relative corners would draw the appearance offset by the
-+    // original centre (only a quarter of the appearance stayed inside the
-+    // wrapper BBox).
-+    const double corners[4][2] = { { bbox[0], bbox[1] }, { bbox[2], bbox[1] }, { bbox[2], bbox[3] }, { bbox[0], bbox[3] } };
-+    double transformed[4][2];
-+    for (int i = 0; i < 4; ++i) {
-+        transformed[i][0] = matrix[0] * corners[i][0] + matrix[2] * corners[i][1] + matrix[4];
-+        transformed[i][1] = matrix[1] * corners[i][0] + matrix[3] * corners[i][1] + matrix[5];
-+    }
-+
-+    const double radians = degreesCounterClockwise * M_PI / 180.0;
-+    const double c = std::cos(radians);
-+    const double s = std::sin(radians);
-+
-+    double minX = std::numeric_limits<double>::max();
-+    double minY = std::numeric_limits<double>::max();
-+    double maxX = std::numeric_limits<double>::lowest();
-+    double maxY = std::numeric_limits<double>::lowest();
-+    for (int i = 0; i < 4; ++i) {
-+        const double rx = c * transformed[i][0] - s * transformed[i][1];
-+        const double ry = s * transformed[i][0] + c * transformed[i][1];
-+        minX = std::min(minX, rx);
-+        minY = std::min(minY, ry);
-+        maxX = std::max(maxX, rx);
-+        maxY = std::max(maxY, ry);
-+    }
-+
-+    const double width = maxX - minX;
-+    const double height = maxY - minY;
-+    if (width <= 0 || height <= 0) {
-+        return;
-+    }
-+
-+    const double tx = -minX;
-+    const double ty = -minY;
-+
-+    std::string content;
-+    content += "q\n";
-+    content += GooString::format("{0:.8f} {1:.8f} {2:.8f} {3:.8f} {4:.8f} {5:.8f} cm\n", c, s, -s, c, tx, ty);
-+    content += "/ChartaOrig Do\n";
-+    content += "Q\n";
-+
-+    // Copy the original appearance into a new indirect object.  setNewAppearance()
-+    // invalidates the old /AP and removes its xref entries, so referring to the
-+    // old stream by reference here would leave a dangling XObject.
-+    const Ref originalAppearance = doc->getXRef()->addIndirectObject(appearanceObject);
-+
-+    auto xobjects = std::make_unique<Dict>(doc->getXRef());
-+    xobjects->set("ChartaOrig", Object(originalAppearance));
-+    auto resources = std::make_unique<Dict>(doc->getXRef());
-+    resources->set("XObject", Object(std::move(xobjects)));
-+
-+    const std::array<double, 4> wrapperBBox = { 0, 0, width, height };
-+    Object wrapper = createForm(content, wrapperBBox, false, std::move(resources));
-+    setNewAppearance(std::move(wrapper));
-+    appearanceHasUserRotation = true;
- }
- 
- bool Annot::inRect(double x, double y) const
-@@ -1613,6 +1793,7 @@ void Annot::setAppearanceState(const char *state)
- void Annot::invalidateAppearance()
- {
-     annotLocker();
-+    appearanceHasUserRotation = false;
-     updatedAppearanceStream = Ref::INVALID();
-     if (appearStreams) { // Remove existing appearance streams
-         appearStreams->removeAllStreams();
-@@ -6095,61 +6276,68 @@ void AnnotGeometry::setInteriorColor(std::unique_ptr<AnnotColor> &&new_color)
-     invalidateAppearance();
- }
- 
--void AnnotGeometry::draw(Gfx *gfx, bool printing)
-+void AnnotGeometry::generateAppearance()
- {
--    double ca = 1;
--
--    if (!isVisible(printing)) {
-+    if (!appearance.isNull()) {
-         return;
-     }
- 
--    annotLocker();
--    if (appearance.isNull()) {
--        const bool fill = interiorColor && interiorColor->getSpace() != AnnotColor::colorTransparent;
--        ca = opacity;
-+    const bool fill = interiorColor && interiorColor->getSpace() != AnnotColor::colorTransparent;
-+    const double ca = opacity;
- 
--        AnnotAppearanceBuilder appearBuilder;
--        appearBuilder.append("q\n");
--        if (color) {
--            appearBuilder.setDrawColor(*color, false);
--        }
-+    AnnotAppearanceBuilder appearBuilder;
-+    appearBuilder.append("q\n");
-+    if (color) {
-+        appearBuilder.setDrawColor(*color, false);
-+    }
- 
--        double borderWidth = border->getWidth();
--        appearBuilder.setLineStyleForBorder(*border);
-+    const double borderWidth = border->getWidth();
-+    appearBuilder.setLineStyleForBorder(*border);
- 
--        if (interiorColor) {
--            appearBuilder.setDrawColor(*interiorColor, true);
--        }
-+    if (interiorColor) {
-+        appearBuilder.setDrawColor(*interiorColor, true);
-+    }
- 
--        if (type == typeSquare) {
--            appearBuilder.appendf("{0:.2f} {1:.2f} {2:.2f} {3:.2f} re\n", borderWidth / 2.0, borderWidth / 2.0, (rect->x2 - rect->x1) - borderWidth, (rect->y2 - rect->y1) - borderWidth);
--            if (fill) {
--                if (borderWidth > 0) {
--                    appearBuilder.append("b\n");
--                } else {
--                    appearBuilder.append("f\n");
--                }
--            } else if (borderWidth > 0) {
--                appearBuilder.append("S\n");
-+    if (type == typeSquare) {
-+        appearBuilder.appendf("{0:.2f} {1:.2f} {2:.2f} {3:.2f} re\n", borderWidth / 2.0, borderWidth / 2.0, (rect->x2 - rect->x1) - borderWidth, (rect->y2 - rect->y1) - borderWidth);
-+        if (fill) {
-+            if (borderWidth > 0) {
-+                appearBuilder.append("b\n");
-+            } else {
-+                appearBuilder.append("f\n");
-             }
--        } else {
--            const double rx { (rect->x2 - rect->x1) / 2. };
--            const double ry { (rect->y2 - rect->y1) / 2. };
--            const double bwHalf { borderWidth / 2.0 };
--            appearBuilder.drawEllipse(rx, ry, rx - bwHalf, ry - bwHalf, fill, borderWidth > 0);
-+        } else if (borderWidth > 0) {
-+            appearBuilder.append("S\n");
-         }
--        appearBuilder.append("Q\n");
-+    } else {
-+        const double rx { (rect->x2 - rect->x1) / 2. };
-+        const double ry { (rect->y2 - rect->y1) / 2. };
-+        const double bwHalf { borderWidth / 2.0 };
-+        appearBuilder.drawEllipse(rx, ry, rx - bwHalf, ry - bwHalf, fill, borderWidth > 0);
-+    }
-+    appearBuilder.append("Q\n");
- 
--        const std::array<double, 4> bbox = { 0, 0, rect->x2 - rect->x1, rect->y2 - rect->y1 };
--        if (ca == 1) {
--            appearance = createForm(appearBuilder.buffer(), bbox, false, Object {});
--        } else {
--            Object aStream = createForm(appearBuilder.buffer(), bbox, true, Object {});
-+    const std::array<double, 4> bbox = { 0, 0, rect->x2 - rect->x1, rect->y2 - rect->y1 };
-+    if (ca == 1) {
-+        appearance = createForm(appearBuilder.buffer(), bbox, false, Object {});
-+    } else {
-+        Object aStream = createForm(appearBuilder.buffer(), bbox, true, Object {});
- 
--            std::string appearBuf("/GS0 gs\n/Fm0 Do");
--            std::unique_ptr<Dict> resDict = createResourcesDict("Fm0", std::move(aStream), "GS0", ca, nullptr);
--            appearance = createForm(appearBuf, bbox, false, std::move(resDict));
--        }
-+        std::string appearBuf("/GS0 gs\n/Fm0 Do");
-+        std::unique_ptr<Dict> resDict = createResourcesDict("Fm0", std::move(aStream), "GS0", ca, nullptr);
-+        appearance = createForm(appearBuf, bbox, false, std::move(resDict));
-+    }
-+}
-+
-+void AnnotGeometry::draw(Gfx *gfx, bool printing)
-+{
-+    if (!isVisible(printing)) {
-+        return;
-+    }
-+
-+    annotLocker();
-+    if (appearance.isNull()) {
-+        generateAppearance();
-     }
- 
-     // draw the appearance stream
+     std::shared_ptr<Annot> annot = nullptr;
 diff --git a/poppler/Annot.h b/poppler/Annot.h
-index 030faa3..e1a1a8d 100644
+index 79aa2dd..030faa3 100644
 --- a/poppler/Annot.h
 +++ b/poppler/Annot.h
-@@ -736,6 +736,20 @@ public:
+@@ -1771,6 +1771,7 @@ public:
  
-     void setRect(const PDFRectangle &rect);
-     void setRect(double x1, double y1, double x2, double y2);
-+    // Updates /Rect without invalidating a custom appearance stream.
-+    void setRectKeepAppearance(double x1, double y1, double x2, double y2);
-+
-+    // Rotates the annotation around its centre by degreesCounterClockwise
-+    // (PDF user-space direction). localWidth/localHeight are the unrotated
-+    // annotation dimensions in PDF points. The /Rect entry is updated to the
-+    // axis-aligned bounds of the rotated local rectangle and the appearance
-+    // stream is wrapped so that the visual content rotates with it.
-+    // Line, polyline, polygon and ink annotations carry their rotation in
-+    // their native geometry; for those only the metadata keys are written.
-+    void setUserRotation(double degreesCounterClockwise, double localWidth, double localHeight);
-+    double getUserRotation() const { return userRotation; }
-+    double getUserLocalWidth() const { return userLocalWidth; }
-+    double getUserLocalHeight() const { return userLocalHeight; }
- 
-     // Sets the annot contents to new_content
-     // new_content should never be NULL
-@@ -802,6 +816,12 @@ protected:
-     // Delete appearance streams and reset appearance state
-     virtual void invalidateAppearance();
- 
-+    // Creates the normal appearance for subtypes which generate it lazily.
-+    // Subclasses override this so setUserRotation() can wrap the unrotated
-+    // appearance even before the page has ever been rendered.
-+    virtual void generateAppearance() { }
-+    void rotateAppearance(double degreesCounterClockwise);
-+
-     Object annotObj;
- 
-     // required data
-@@ -832,6 +852,13 @@ protected:
- 
-     bool hasBeenUpdated = false;
-     Ref updatedAppearanceStream = Ref::INVALID(); // {-1,-1} if updateAppearanceStream has never been called
-+
-+    // Charta rotation metadata (PDF user space, degrees counter-clockwise).
-+    double userRotation = 0;
-+    double userLocalWidth = 0;
-+    double userLocalHeight = 0;
-+    bool appearanceHasUserRotation = false;
-+
- private:
-     std::unique_ptr<GooString> name; // NM
- };
-@@ -1090,6 +1117,7 @@ public:
- protected:
-     void initialize(Dict *dict);
-     void generateFreeTextAppearance();
-+    void generateAppearance() override { generateFreeTextAppearance(); }
- 
-     // required
-     std::string appearanceString; // DA
-@@ -1241,6 +1269,7 @@ private:
-     void generateStampDefaultAppearance();
-     void generateStampCustomAppearance();
-     void updateAppearanceResDict();
-+    void generateAppearance() override { updateAppearanceResDict(); }
- 
-     std::string icon; // Name       (Default Draft)
-     std::unique_ptr<AnnotStampImageHelper> stampImageHelper;
-@@ -1269,6 +1298,7 @@ public:
+     void appendAnnot(std::shared_ptr<Annot> annot);
+     bool removeAnnot(const std::shared_ptr<Annot> &annot);
++    bool moveAnnot(const std::shared_ptr<Annot> &annot, int index);
  
  private:
-     void initialize(Dict *dict);
-+    void generateAppearance() override;
+     std::shared_ptr<Annot> createAnnot(Object &&dictObject, const Object &obj);
+diff --git a/poppler/Page.cc b/poppler/Page.cc
+index 61b73aa..96189ad 100644
+--- a/poppler/Page.cc
++++ b/poppler/Page.cc
+@@ -549,6 +549,81 @@ void Page::removeAnnot(const std::shared_ptr<Annot> &annot)
+     annot->setPage(0, false);
+ }
  
-     std::unique_ptr<AnnotColor> interiorColor; // IC
-     std::unique_ptr<AnnotBorderEffect> borderEffect; // BE
++bool Page::moveAnnot(const std::shared_ptr<Annot> &annot, int index)
++{
++    if (!annot) {
++        return false;
++    }
++
++    pageLocker();
++    Annots *annotationList = getAnnots();
++    const auto &currentOrder = annotationList->getAnnots();
++    const auto currentIt = std::ranges::find(currentOrder, annot);
++    if (currentIt == currentOrder.end() || index < 0 || index >= static_cast<int>(currentOrder.size())) {
++        return false;
++    }
++
++    const int currentIndex = std::distance(currentOrder.begin(), currentIt);
++    if (currentIndex == index) {
++        return true;
++    }
++
++    std::vector<std::shared_ptr<Annot>> newOrder(currentOrder);
++    std::shared_ptr<Annot> moved = std::move(newOrder[currentIndex]);
++    newOrder.erase(newOrder.begin() + currentIndex);
++    newOrder.insert(newOrder.begin() + index, std::move(moved));
++
++    Object oldAnnotsObject = getAnnotsObject();
++    if (!oldAnnotsObject.isArray()) {
++        return false;
++    }
++
++    std::vector<Ref> orderedRefs;
++    orderedRefs.reserve(newOrder.size() * 2);
++    for (const std::shared_ptr<Annot> &entry : newOrder) {
++        const Ref entryRef = entry->getRef();
++        if (entryRef == Ref::INVALID()) {
++            return false;
++        }
++        orderedRefs.push_back(entryRef);
++
++        auto *markup = dynamic_cast<AnnotMarkup *>(entry.get());
++        const std::shared_ptr<AnnotPopup> popup = markup ? markup->getPopup() : nullptr;
++        if (popup) {
++            const Ref popupRef = popup->getRef();
++            if (popupRef == Ref::INVALID()) {
++                return false;
++            }
++            orderedRefs.push_back(popupRef);
++        }
++    }
++
++    auto refIsInNewOrder = [&orderedRefs](const Ref &ref) { return std::ranges::find(orderedRefs, ref) != orderedRefs.end(); };
++    auto newArray = std::make_unique<Array>(xref);
++    for (const Ref &ref : orderedRefs) {
++        newArray->add(Object(ref));
++    }
++
++    const Array *oldArray = oldAnnotsObject.getArray();
++    for (int i = 0; i < oldArray->getLength(); ++i) {
++        const Object &entry = oldArray->getNF(i);
++        if (!entry.isRef() || !refIsInNewOrder(entry.getRef())) {
++            newArray->add(entry.copy());
++        }
++    }
++
++    Object updatedAnnots(std::move(newArray));
++    if (annotsObj.isRef()) {
++        xref->setModifiedObject(&updatedAnnots, annotsObj.getRef());
++    } else {
++        pageObj.dictSet("Annots", updatedAnnots.copy());
++        annotsObj = std::move(updatedAnnots);
++        xref->setModifiedObject(&pageObj, pageRef);
++    }
++
++    return annotationList->moveAnnot(annot, index);
++}
++
+ std::unique_ptr<Links> Page::getLinks()
+ {
+     return std::make_unique<Links>(getAnnots());
+diff --git a/poppler/Page.h b/poppler/Page.h
+index 45ed187..6355174 100644
+--- a/poppler/Page.h
++++ b/poppler/Page.h
+@@ -168,6 +168,8 @@ public:
+     bool addAnnot(const std::shared_ptr<Annot> &annot);
+     // Remove an existing annotation from the page
+     void removeAnnot(const std::shared_ptr<Annot> &annot);
++    // Move an existing annotation in the back-to-front page order.
++    bool moveAnnot(const std::shared_ptr<Annot> &annot, int index);
+ 
+     // Return a list of links.
+     std::unique_ptr<Links> getLinks();
 diff --git a/qt6/src/poppler-annotation-private.h b/qt6/src/poppler-annotation-private.h
-index 3fd903a..6c37177 100644
+index 22e3f09..3fd903a 100644
 --- a/qt6/src/poppler-annotation-private.h
 +++ b/qt6/src/poppler-annotation-private.h
-@@ -72,6 +72,10 @@ public:
-     Annotation::Flags flags;
-     QRectF boundary;
+@@ -107,6 +107,11 @@ public:
+     /* Add given annotation to given page */
+     static void addAnnotationToPage(::Page *pdfPage, DocumentData *doc, const Annotation *ann);
  
-+    /* oriented annotation frame, in PDF user-space units */
-+    double userRotation = 0;
-+    QSizeF userLocalSize;
++    /* Move an existing annotation in the native page order without recreating it. */
++    static bool moveAnnotationToIndex(::Page *pdfPage, const Annotation *ann, int index);
++    static int annotationIndex(::Page *pdfPage, const Annotation *ann);
++    static int annotationCount(::Page *pdfPage);
 +
-     /* style and popup */
-     Annotation::Style style;
-     Annotation::Popup popup;
+     /* Remove annotation from page and destroy ann */
+     static void removeAnnotationFromPage(::Page *pdfPage, const Annotation *ann);
+ 
 diff --git a/qt6/src/poppler-annotation.cc b/qt6/src/poppler-annotation.cc
-index 1830d53..ac18509 100644
+index 10d2d13..1830d53 100644
 --- a/qt6/src/poppler-annotation.cc
 +++ b/qt6/src/poppler-annotation.cc
-@@ -162,6 +162,11 @@ void AnnotationPrivate::tieToNativeAnnot(std::shared_ptr<Annot> ann, ::Page *pag
-     pdfAnnot = std::move(ann);
-     pdfPage = page;
-     parentDoc = doc;
-+
-+#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
-+    userRotation = pdfAnnot->getUserRotation();
-+    userLocalSize = QSizeF(pdfAnnot->getUserLocalWidth(), pdfAnnot->getUserLocalHeight());
-+#endif
+@@ -807,11 +807,35 @@ void AnnotationPrivate::removeAnnotationFromPage(::Page *pdfPage, const Annotati
+ 
+     // Remove annotation
+     pdfPage->removeAnnot(ann->d_ptr->pdfAnnot);
+-
+     // Destroy object
+     delete ann;
  }
  
- /* This method is called when a new annotation is created, after pdfAnnot and
-@@ -791,6 +796,15 @@ void AnnotationPrivate::addAnnotationToPage(::Page *pdfPage, DocumentData *doc,
-     }
- 
-     pdfPage->addAnnot(nativeAnnot);
-+
-+#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
-+    // Zero is a valid stored rotation when the frame angle equals the page
-+    // orientation; the local size is what tells the importer that the
-+    // Charta metadata is present.
-+    if (!ann->d_ptr->userLocalSize.isEmpty()) {
-+        nativeAnnot->setUserRotation(ann->d_ptr->userRotation, ann->d_ptr->userLocalSize.width(), ann->d_ptr->userLocalSize.height());
-+    }
-+#endif
- }
- 
- void AnnotationPrivate::removeAnnotationFromPage(::Page *pdfPage, const Annotation *ann)
-@@ -1322,6 +1336,34 @@ void Annotation::setBoundary(const QRectF &boundary)
-     d->pdfAnnot->setRect(rect);
- }
- 
-+#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
-+void Annotation::setUserRotation(double degreesCounterClockwise, double localWidth, double localHeight)
++bool AnnotationPrivate::moveAnnotationToIndex(::Page *pdfPage, const Annotation *ann, int index)
 +{
-+    Q_D(Annotation);
-+    d->userRotation = degreesCounterClockwise;
-+    d->userLocalSize = QSizeF(localWidth, localHeight);
-+
-+    if (d->pdfAnnot) {
-+        d->pdfAnnot->setUserRotation(degreesCounterClockwise, localWidth, localHeight);
++    if (!ann || !ann->d_ptr->pdfAnnot || ann->d_ptr->pdfPage != pdfPage) {
++        return false;
 +    }
++
++    return pdfPage->moveAnnot(ann->d_ptr->pdfAnnot, index);
 +}
 +
-+double Annotation::userRotation() const
++int AnnotationPrivate::annotationIndex(::Page *pdfPage, const Annotation *ann)
 +{
-+    Q_D(const Annotation);
-+    return d->pdfAnnot ? d->pdfAnnot->getUserRotation() : d->userRotation;
-+}
-+
-+QSizeF Annotation::userLocalSize() const
-+{
-+    Q_D(const Annotation);
-+    if (d->pdfAnnot) {
-+        return QSizeF(d->pdfAnnot->getUserLocalWidth(), d->pdfAnnot->getUserLocalHeight());
++    if (!ann || !ann->d_ptr->pdfAnnot || ann->d_ptr->pdfPage != pdfPage) {
++        return -1;
 +    }
-+    return d->userLocalSize;
-+}
-+#endif
 +
- Annotation::Style Annotation::style() const
++    const auto &nativeAnnotations = pdfPage->getAnnots()->getAnnots();
++    const auto it = std::ranges::find(nativeAnnotations, ann->d_ptr->pdfAnnot);
++    return it == nativeAnnotations.end() ? -1 : std::distance(nativeAnnotations.begin(), it);
++}
++
++int AnnotationPrivate::annotationCount(::Page *pdfPage)
++{
++    return pdfPage ? pdfPage->getAnnots()->getAnnots().size() : 0;
++}
++
+ class TextAnnotationPrivate : public AnnotationPrivate
  {
-     Q_D(const Annotation);
-diff --git a/qt6/src/poppler-annotation.h b/qt6/src/poppler-annotation.h
-index 962582f..f80ec63 100644
---- a/qt6/src/poppler-annotation.h
-+++ b/qt6/src/poppler-annotation.h
-@@ -36,12 +36,15 @@
- #define _POPPLER_ANNOTATION_H_
- #define POPPLER_QT6_HAS_CUSTOM_INK_APPEARANCE 1
+ public:
+diff --git a/qt6/src/poppler-page.cc b/qt6/src/poppler-page.cc
+index 2a02561..282a2d0 100644
+--- a/qt6/src/poppler-page.cc
++++ b/qt6/src/poppler-page.cc
+@@ -884,6 +884,21 @@ void Page::addAnnotation(const Annotation *ann)
+     AnnotationPrivate::addAnnotationToPage(m_page->page, m_page->parentDoc, ann);
+ }
  
-+#define POPPLER_QT6_HAS_ANNOTATION_ROTATION 1
++bool Page::moveAnnotation(const Annotation *ann, int index)
++{
++    return AnnotationPrivate::moveAnnotationToIndex(m_page->page, ann, index);
++}
 +
- #include <QtCore/QDateTime>
- #include <QtCore/QByteArray>
- #include <QtCore/QSharedDataPointer>
- #include <QtCore/QList>
- #include <QtCore/QPointF>
- #include <QtCore/QRectF>
-+#include <QtCore/QSizeF>
- #include <QtCore/QScopedPointer>
- #include <QtCore/QVector>
- #include <QtGui/QColor>
-@@ -319,6 +322,32 @@ public:
-      */
-     void setBoundary(const QRectF &boundary);
++int Page::annotationIndex(const Annotation *ann) const
++{
++    return AnnotationPrivate::annotationIndex(m_page->page, ann);
++}
++
++int Page::annotationCount() const
++{
++    return AnnotationPrivate::annotationCount(m_page->page);
++}
++
+ void Page::removeAnnotation(const Annotation *ann)
+ {
+     AnnotationPrivate::removeAnnotationFromPage(m_page->page, ann);
+diff --git a/qt6/src/poppler-qt6.h b/qt6/src/poppler-qt6.h
+index 154e93b..66f7911 100644
+--- a/qt6/src/poppler-qt6.h
++++ b/qt6/src/poppler-qt6.h
+@@ -895,6 +895,22 @@ rather unexpected results.
+     */
+     void addAnnotation(const Annotation *ann);
  
-+#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
-+    /**
-+     * Rotates the annotation appearance around its centre.
-+     *
-+     * \param degreesCounterClockwise rotation in PDF user-space direction
-+     * \param localWidth unrotated annotation width in PDF points
-+     * \param localHeight unrotated annotation height in PDF points
-+     *
-+     * Line, polyline, polygon and ink annotations carry their rotation in
-+     * their native geometry and only store these values as metadata.
-+     *
-+     * \since 26.08
-+     */
-+    void setUserRotation(double degreesCounterClockwise, double localWidth, double localHeight);
++   /**
++    * Move an existing annotation to an index in the page's native back-to-front annotation order.
++    * This preserves the existing Poppler annotation object and its PDF dictionary.
++    */
++   bool moveAnnotation(const Annotation *ann, int index);
 +
-+    /**
-+     * Returns the stored PDF user-space rotation in degrees counter-clockwise.
-+     */
-+    double userRotation() const;
++   /**
++    * Returns the annotation's index in Poppler's native page rendering order, or -1 if it is not on the page.
++    */
++   int annotationIndex(const Annotation *ann) const;
 +
-+    /**
-+     * Returns the stored unrotated annotation size in PDF points.
-+     */
-+    QSizeF userLocalSize() const;
-+#endif
++   /**
++    * Returns the number of annotations in Poppler's native page rendering order.
++    */
++   int annotationCount() const;
 +
      /**
-      * \short Container class for Annotation style information
-      */
+      Removes an annotation from the page and destroys the annotation object
+ 
+diff --git a/qt6/tests/check_annotations.cpp b/qt6/tests/check_annotations.cpp
+index 1112260..dfd2053 100644
+--- a/qt6/tests/check_annotations.cpp
++++ b/qt6/tests/check_annotations.cpp
+@@ -1,4 +1,5 @@
+ #include <cmath>
++#include <map>
+ #include <memory>
+ #include <sstream>
+ 
+@@ -8,6 +9,8 @@
+ #include <poppler-qt6.h>
+ 
+ #include "poppler/Annot.h"
++#include "poppler/PDFDoc.h"
++#include "poppler/PDFDocFactory.h"
+ #include "goo/GooString.h"
+ #include "goo/gstrtod.h"
+ 
+@@ -27,6 +30,7 @@ private Q_SLOTS:
+     static void checkModificationCreationDate();
+     static void checkNonMarkupAnnotations();
+     static void checkDefaultAppearance();
++    static void checkAnnotationReorderRenderingAndSave();
+ };
+ 
+ /* Is .5f sufficient for 16 bit color channel roundtrip trough save and load on all architectures? */
+@@ -258,6 +262,117 @@ void TestAnnotations::checkDefaultAppearance()
+     }
+ }
+ 
++void TestAnnotations::checkAnnotationReorderRenderingAndSave()
++{
++    std::unique_ptr<Poppler::Document> doc { Poppler::Document::load(QStringLiteral(TESTDATADIR "/simple-multipage.pdf")) };
++    QVERIFY(doc.get());
++
++    std::unique_ptr<Poppler::Page> page { doc->page(0) };
++    QVERIFY(page.get());
++
++    auto red = std::make_unique<Poppler::GeomAnnotation>();
++    red->setUniqueName(QStringLiteral("stack-red"));
++    red->setBoundary(QRectF(0.2, 0.2, 0.6, 0.6));
++    red->setGeomType(Poppler::GeomAnnotation::InscribedSquare);
++    red->setGeomInnerColor(Qt::red);
++
++    auto blue = std::make_unique<Poppler::GeomAnnotation>();
++    blue->setUniqueName(QStringLiteral("stack-blue"));
++    blue->setBoundary(QRectF(0.2, 0.2, 0.6, 0.6));
++    blue->setGeomType(Poppler::GeomAnnotation::InscribedSquare);
++    blue->setGeomInnerColor(Qt::blue);
++
++    auto ink = std::make_unique<Poppler::InkAnnotation>();
++    ink->setUniqueName(QStringLiteral("stack-custom-ink"));
++    ink->setBoundary(QRectF(0.05, 0.05, 0.1, 0.1));
++    ink->setInkPaths({{QPointF(0.05, 0.05), QPointF(0.15, 0.15)}});
++    ink->setAppearanceStream(QByteArray("0 1 0 rg 0 0 100 100 re f"), QRectF(0, 0, 100, 100));
++
++    page->addAnnotation(red.get());
++    page->addAnnotation(blue.get());
++    page->addAnnotation(ink.get());
++    auto annotations = page->annotations();
++    QCOMPARE(annotations.size(), size_t(3));
++    QCOMPARE(annotations.at(1)->uniqueName(), QStringLiteral("stack-blue"));
++
++    QImage image = page->renderToImage();
++    QVERIFY(!image.isNull());
++    const QPoint samplePoint(image.width() / 2, image.height() / 2);
++    QCOMPARE(image.pixelColor(samplePoint), QColor(Qt::blue));
++
++    QTemporaryFile beforeMoveFile;
++    QVERIFY(beforeMoveFile.open());
++    beforeMoveFile.close();
++    std::unique_ptr<Poppler::PDFConverter> beforeMoveConverter(doc->pdfConverter());
++    beforeMoveConverter->setOutputFileName(beforeMoveFile.fileName());
++    beforeMoveConverter->setPDFOptions(beforeMoveConverter->pdfOptions() | Poppler::PDFConverter::WithChanges);
++    QVERIFY(beforeMoveConverter->convert());
++
++    using AnnotationRefs = std::map<std::string, std::pair<int, int>>;
++    const auto annotationRefs = [](const QString &fileName) {
++        const GooString nativeFileName(fileName.toStdString());
++        std::unique_ptr<PDFDoc> nativeDoc = PDFDocFactory().createPDFDoc(nativeFileName);
++        AnnotationRefs refs;
++        if (!nativeDoc) {
++            return refs;
++        }
++        const auto &nativeAnnotations = nativeDoc->getPage(1)->getAnnots()->getAnnots();
++        for (const std::shared_ptr<Annot> &nativeAnnotation : nativeAnnotations) {
++            const GooString *name = nativeAnnotation->getUniqueName();
++            if (name) {
++                const Ref ref = nativeAnnotation->getRef();
++                refs.emplace(name->toStr(), std::pair { ref.num, ref.gen });
++            }
++        }
++        return refs;
++    };
++    const AnnotationRefs refsBeforeMove = annotationRefs(beforeMoveFile.fileName());
++    QCOMPARE(refsBeforeMove.size(), size_t(3));
++
++    QVERIFY(page->moveAnnotation(red.get(), 1));
++    annotations = page->annotations();
++    QCOMPARE(annotations.size(), size_t(3));
++    QCOMPARE(annotations.at(1)->uniqueName(), QStringLiteral("stack-red"));
++
++    image = page->renderToImage();
++    QCOMPARE(image.pixelColor(samplePoint), QColor(Qt::red));
++
++    QTemporaryFile outputFile;
++    QVERIFY(outputFile.open());
++    outputFile.close();
++    std::unique_ptr<Poppler::PDFConverter> converter(doc->pdfConverter());
++    QVERIFY(converter.get());
++    converter->setOutputFileName(outputFile.fileName());
++    converter->setPDFOptions(converter->pdfOptions() | Poppler::PDFConverter::WithChanges);
++    QVERIFY(converter->convert());
++
++    const AnnotationRefs refsAfterMove = annotationRefs(outputFile.fileName());
++    QCOMPARE(refsAfterMove, refsBeforeMove);
++
++    std::unique_ptr<Poppler::Document> reopened { Poppler::Document::load(outputFile.fileName()) };
++    QVERIFY(reopened.get());
++    std::unique_ptr<Poppler::Page> reopenedPage { reopened->page(0) };
++    QVERIFY(reopenedPage.get());
++    const auto reopenedAnnotations = reopenedPage->annotations();
++    QCOMPARE(reopenedAnnotations.size(), size_t(3));
++    QCOMPARE(reopenedAnnotations.at(1)->uniqueName(), QStringLiteral("stack-red"));
++    QCOMPARE(reopenedAnnotations.back()->uniqueName(), QStringLiteral("stack-custom-ink"));
++    const QImage reopenedImage = reopenedPage->renderToImage();
++    QCOMPARE(reopenedImage.pixelColor(samplePoint), QColor(Qt::red));
++    const QRect customInkRegion(qRound(reopenedImage.width() * 0.04), qRound(reopenedImage.height() * 0.04), qRound(reopenedImage.width() * 0.12), qRound(reopenedImage.height() * 0.12));
++    bool foundCustomInkGreen = false;
++    for (int y = customInkRegion.top(); y <= customInkRegion.bottom() && !foundCustomInkGreen; ++y) {
++        for (int x = customInkRegion.left(); x <= customInkRegion.right(); ++x) {
++            const QColor color = reopenedImage.pixelColor(x, y);
++            if (color.green() > 200 && color.red() < 40 && color.blue() < 40) {
++                foundCustomInkGreen = true;
++                break;
++            }
++        }
++    }
++    QVERIFY(foundCustomInkGreen);
++}
++
+ QTEST_GUILESS_MAIN(TestAnnotations)
+ 
+ #include "check_annotations.moc"

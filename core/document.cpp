@@ -2693,7 +2693,7 @@ QList<KPluginMetaData> DocumentPrivate::availableGenerators()
 {
     static QList<KPluginMetaData> result;
     if (result.isEmpty()) {
-        result = KPluginMetaData::findPlugins(QStringLiteral("okular_generators"));
+        result = KPluginMetaData::findPlugins(QStringLiteral("charta_generators"));
     }
     return result;
 }

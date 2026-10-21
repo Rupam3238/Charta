@@ -32,7 +32,6 @@
         "/lib/*.la",
         "/lib/cmake",
         "/share/man",
-        "/share/doc",
         "/share/pkgconfig",
         "/share/cmake"
     ],
@@ -210,55 +209,6 @@
             ]
         },
         {
-            "name": "ghostscript",
-            "config-opts": [
-                "--disable-cups",
-                "--without-tesseract"
-            ],
-            "make-args": [
-                "so"
-            ],
-            "make-install-args": [
-                "soinstall"
-            ],
-            "post-install": [
-                "mv -f ${FLATPAK_DEST}/bin/{gsc,gs} "
-            ],
-            "cleanup": [
-                "/share/ghostscript/*/doc/",
-                "/share/ghostscript/*/examples"
-            ],
-            "sources": [
-                {
-                    "type": "archive",
-                    "url": "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10080/ghostscript-10.08.0.tar.gz",
-                    "sha256": "caf199e3f233f1290b27d0972d636f66c303355f2353309b7bfddf1edda06b3d",
-                    "x-checker-data": {
-                        "type": "anitya",
-                        "project-id": 1157,
-                        "stable-only": true,
-                        "url-template": "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs${major}0$minor$patch/ghostscript-$version.tar.gz"
-                    }
-                }
-            ]
-        },
-        {
-            "name": "libspectre",
-            "sources": [
-                {
-                    "type": "archive",
-                    "url": "http://libspectre.freedesktop.org/releases/libspectre-0.2.12.tar.gz",
-                    "sha256": "55a7517cd3572bd2565df0cf450944a04d5273b279ebb369a895391957f0f960",
-                    "x-checker-data": {
-                        "type": "anitya",
-                        "project-id": 1724,
-                        "stable-only": true,
-                        "url-template": "http://libspectre.freedesktop.org/releases/libspectre-$version.tar.gz"
-                    }
-                }
-            ]
-        },
-        {
             "name": "poppler-data",
             "buildsystem": "cmake-ninja",
             "builddir": true,
@@ -310,6 +260,14 @@
                 {
                     "type": "patch",
                     "path": "patches/poppler-ink-appearance.patch"
+                },
+                {
+                    "type": "patch",
+                    "path": "patches/poppler-annotation-rotation.patch"
+                },
+                {
+                    "type": "patch",
+                    "path": "patches/poppler-annotation-followup.patch"
                 }
             ]
         },
@@ -415,10 +373,6 @@
                 {
                     "type": "dir",
                     "path": "."
-                },
-                {
-                    "type": "patch",
-                    "path": ".flatpak-patches/okular-mimetypes.patch"
                 },
                 {
                     "type": "script",
