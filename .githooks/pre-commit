@@ -1,0 +1,46 @@
+#!/bin/sh
+# Charta pre-commit hook: licence hygiene.
+#
+# Install with:   git config core.hooksPath .githooks
+#
+# It refuses to commit a staged source file that has no SPDX header, except for the paths that
+# are covered by REUSE.toml (grouped annotations) or that carry no text at all. It never rewrites
+# anything; it only stops the commit and prints what is missing.
+#
+# Escape hatch for a one-off commit:  CHARTA_SKIP_LICENSE_HOOK=1 git commit ...
+
+set -eu
+
+if [ "${CHARTA_SKIP_LICENSE_HOOK:-0}" = "1" ]; then
+    echo "pre-commit: skipped (CHARTA_SKIP_LICENSE_HOOK=1)"
+    exit 0
+fi
+
+# Paths whose licence comes from REUSE.toml, or which are not text.
+skip_re='^(po/|docs/|charta_logo_package/|icons/charta\.svg$|autotests/data/|part/data/sources/|.*/Messages\.sh$|generators/dvi/|mobile/|autotests/closedialoghelper\.(cpp|h)$|cmake/modules/FindDjVuLibre\.cmake$|Okular6Config\.cmake\.in$|OkularConfigureChecks\.cmake$|config-okular\.h\.cmake$|shell/MacOSXBundleInfo\.plist\.in$|LICENSE$|REUSE\.toml$|.*\.orig$|.*\.patch$|.*\.diff$|.*\.svg$|.*\.svgz$|.*\.png$|.*\.jpg$|.*\.pdf$|.*\.eps$|.*\.po$|.*\.ts$|.*\.json$|.*\.ui$|.*\.kcfgc?$|.*\.qrc$)'
+
+# File types that are expected to carry an SPDX header.
+text_re='\.(c|cc|cpp|cxx|h|hh|hpp|qml|js|py|sh|cmake|in|m|mm)$'
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+fail=0
+for f in $staged; do
+    if printf '%s' "$f" | grep -Eq "$skip_re"; then
+        continue
+    fi
+    if ! printf '%s' "$f" | grep -Eq "$text_re"; then
+        continue
+    fi
+    if ! git show ":$f" 2>/dev/null | head -40 | grep -q 'SPDX-License-Identifier'; then
+        echo "pre-commit: $f has no SPDX-License-Identifier header." >&2
+        echo "            Add one, or cover the path in REUSE.toml, or set" >&2
+        echo "            CHARTA_SKIP_LICENSE_HOOK=1 for a one-off commit." >&2
+        fail=1
+    fi
+done
+
+if [ "$fail" -ne 0 ]; then
+    exit 1
+fi
+exit 0

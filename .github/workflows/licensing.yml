@@ -1,0 +1,86 @@
+# SPDX / REUSE lint
+name: licensing
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  reuse-lint:
+    name: REUSE lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install reuse
+        run: |
+          python3 -m venv /tmp/reuse-venv
+          /tmp/reuse-venv/bin/pip install --upgrade pip reuse
+      - name: reuse lint
+        run: |
+          /tmp/reuse-venv/bin/reuse lint
+      - name: reuse lint (deprecated tool version, non-fatal)
+        continue-on-error: true
+        run: /tmp/reuse-venv/bin/reuse lint --lines 2>&1 | tail -40
+
+  license-texts-present:
+    name: every used identifier has a licence text
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check LICENSES/ coverage
+        run: ./docs/licensing/check-license-texts.sh
+
+  poppler-patches:
+    name: the Poppler patch series reproduces the built tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply the series to the pristine archive
+        run: ./docs/licensing/check-poppler-patches.sh
+
+  test-suite:
+    name: Charta's own test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build qt6-base-dev libkf6archive-dev \
+            libkf6bookmarks-dev libkf6config-dev libkf6configwidgets-dev libkf6coreaddons-dev \
+            libkf6i18n-dev libkf6io-dev libkf6threadweaver-dev libkf6widgetsaddons-dev \
+            libkf6xmlgui-dev libkf6iconthemes-dev libpoppler-qt6-dev xvfb
+      - name: Configure
+        run: cmake -S . -B build -DOKULAR_UI=desktop -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+      - name: Charta's own tests (upstream QPDF suites excluded, reported separately)
+        run: xvfb-run --server-args="-screen 0 1024x768x24" docs/licensing/run-tests.sh build
+
+  manifest:
+    name: Flatpak manifest sanity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Manifest parses and references existing patches
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          d = json.load(open('.flatpak-manifest.json'))
+          bad = []
+          for m in d['modules']:
+              for s in m.get('sources', []):
+                  p = s.get('path')
+                  if p and not os.path.exists(p):
+                      bad.append(f"{m['name']}: missing {p}")
+          for m in d['modules']:
+              if m['name'] == 'charta' and m.get('sources') is not None:
+                  pass
+          if bad:
+              print('\n'.join(bad)); sys.exit(1)
+          print('manifest ok:', len(d['modules']), 'modules')
+          PY
