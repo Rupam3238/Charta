@@ -1,5 +1,6 @@
 /*
     SPDX-License-Identifier: GPL-2.0-or-later
+    SPDX-FileCopyrightText: 2026 Charta contributors (licensing party; AI-assisted)
 
     Tests for the Document Builder model: the ordered list of pages, source sharing, page
     metadata read through QPDF, thumbnail rendering through a headless Okular::Document, reordering

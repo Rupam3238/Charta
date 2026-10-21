@@ -1,0 +1,1433 @@
+### git ls-files -z  -> 1935 paths
+### git cat-file --batch-check -> sizes for 1935 blobs
+### git cat-file --batch -> read 1935 blobs (27110535 bytes)
+### upstream Okular master 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9: 2086 tracked paths
+### upstream blob SHAs: 2086
+
+==============================================================================
+PHASE 1 CENSUS RAW SCAN
+==============================================================================
+repo            : /home/workstation/tools/project/Charta
+HEAD            : 73ee06351c30501c9aa990c7d976f8e604ef0c06
+upstream clone  : /tmp/opencode/okular (master @ 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9, tree-only, no blobs)
+tracked files   : 1935
+rows written    : 1935  (csv incl. header = 1936 lines)
+
+-- category counts ----------------------------------------------------------
+translations      1069
+source-part        156
+source-generators   142
+source-core        113
+assets-images       78
+packaging           66
+build-config        56
+test-data           49
+tests               45
+source-mobile       36
+assets-logo         30
+vendored            23
+scripts             18
+source-gui          17
+licence-texts       12
+source-shell         9
+other                7
+documentation        4
+assets-other         3
+assets-icons         2
+
+-- inherited_or_new counts ----------------------------------------------------
+okular-inherited            1864
+charta-original               64
+unknown-pending-phase-3        7
+
+-- upstream content comparison (git blob SHA, upstream @60fd9fbcf531) ---------------------
+inherited, byte-identical to upstream : 1313
+inherited, content MODIFIED vs upstream: 551
+charta-original (no upstream path)     : 64
+
+-- inherited files whose content differs from upstream (Phase 3 diff list) ---------------
+    .clang-tidy
+    .flatpak-manifest.json
+    .gitignore
+    CMakeLists.txt
+    README.md
+    aboutdata.h
+    autotests/CMakeLists.txt
+    autotests/addremoveannotationtest.cpp
+    autotests/annotationtoolbartest.cpp
+    autotests/parttest.cpp
+    autotests/translateannotationtest.cpp
+    conf/okular.kcfg
+    config-okular.h.cmake
+    core/action.cpp
+    core/action.h
+    core/annotations.cpp
+    core/annotations.h
+    core/annotations_p.h
+    core/area.cpp
+    core/area.h
+    core/audioplayer.cpp
+    core/bookmarkmanager.cpp
+    core/document.cpp
+    core/document.h
+    core/document_p.h
+    core/documentcommands.cpp
+    core/documentcommands_p.h
+    core/generator.cpp
+    core/generator.h
+    core/generator_p.h
+    core/observer.cpp
+    core/observer.h
+    core/page.cpp
+    core/page.h
+    core/page_p.h
+    core/printoptionswidget.cpp
+    core/printoptionswidget.h
+    core/script/executor_js.cpp
+    core/script/js_app.cpp
+    core/script/js_app_p.h
+    core/script/js_document.cpp
+    core/script/js_document_p.h
+    core/script/js_event.cpp
+    core/script/js_event_p.h
+    core/script/js_field.cpp
+    core/script/js_field_p.h
+    core/signatureutils.cpp
+    core/signatureutils.h
+    core/textdocumentgenerator.cpp
+    generators/comicbook/okularApplication_comicbook.desktop
+    generators/comicbook/org.kde.mobile.okular_comicbook.desktop
+    generators/comicbook/org.kde.okular-comicbook.metainfo.xml
+    generators/djvu/generator_djvu.cpp
+    generators/djvu/kdjvu.cpp
+    generators/djvu/okularApplication_djvu.desktop
+    generators/djvu/org.kde.mobile.okular_djvu.desktop
+    generators/djvu/org.kde.okular-djvu.metainfo.xml
+    generators/dvi/TeXFont_PK.cpp
+    generators/dvi/dviFile.cpp
+    generators/dvi/dviRenderer.cpp
+    generators/dvi/dviexport.cpp
+    generators/dvi/dvisourcesplitter.cpp
+    generators/dvi/fontpool.cpp
+    generators/dvi/generator_dvi.cpp
+    generators/dvi/okularApplication_dvi.desktop
+    generators/dvi/org.kde.mobile.okular_dvi.desktop
+    generators/dvi/org.kde.okular-dvi.metainfo.xml
+    generators/epub/autotests/epubgeneratortest.cpp
+    generators/epub/okularApplication_epub.desktop
+    generators/epub/org.kde.mobile.okular_epub.desktop
+    generators/epub/org.kde.okular-epub.metainfo.xml
+    generators/fax/okularApplication_fax.desktop
+    generators/fax/org.kde.mobile.okular_fax.desktop
+    generators/fax/org.kde.okular-fax.metainfo.xml
+    generators/fictionbook/hi32-app-okular-fb2.svg
+    generators/fictionbook/okularApplication_fb.desktop
+    generators/fictionbook/org.kde.mobile.okular_fb.desktop
+    generators/fictionbook/org.kde.okular-fb.metainfo.xml
+    generators/kimgio/generator_kimgio.cpp
+    generators/kimgio/okularApplication_kimgio.desktop
+    generators/kimgio/org.kde.mobile.okular_kimgio.desktop
+    generators/kimgio/org.kde.okular-kimgio.metainfo.xml
+    generators/markdown/okularApplication_md.desktop
+    generators/markdown/org.kde.mobile.okular_md.desktop
+    generators/markdown/org.kde.okular-md.metainfo.xml
+    generators/mobipocket/okularApplication_mobi.desktop
+    generators/mobipocket/org.kde.mobile.okular_mobi.desktop
+    generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml
+    generators/poppler/CMakeLists.txt
+    generators/poppler/annots.cpp
+    generators/poppler/annots.h
+    generators/poppler/formfields.cpp
+    generators/poppler/generator_pdf.cpp
+    generators/poppler/generator_pdf.h
+    generators/poppler/okularApplication_pdf.desktop
+    generators/poppler/org.kde.mobile.okular_pdf.desktop
+    generators/poppler/org.kde.okular-poppler.metainfo.xml
+    generators/poppler/pdfsettingswidget.cpp
+    generators/poppler/pdfsignatureutils.cpp
+    generators/poppler/pdfsignatureutils.h
+    generators/spectre/okularApplication_ghostview.desktop
+    generators/spectre/org.kde.mobile.okular_ghostview.desktop
+    generators/spectre/org.kde.okular-spectre.metainfo.xml
+    generators/tiff/okularApplication_tiff.desktop
+    generators/tiff/org.kde.mobile.okular_tiff.desktop
+    generators/tiff/org.kde.okular-tiff.metainfo.xml
+    generators/txt/okularApplication_txt.desktop
+    generators/txt/org.kde.mobile.okular_txt.desktop
+    generators/txt/org.kde.okular-txt.metainfo.xml
+    generators/xps/generator_xps.cpp
+    generators/xps/okularApplication_xps.desktop
+    generators/xps/org.kde.mobile.okular_xps.desktop
+    generators/xps/org.kde.okular-xps.metainfo.xml
+    gui/guiutils.cpp
+    gui/pagepainter.cpp
+    gui/tocmodel.cpp
+    icons/CMakeLists.txt
+    interfaces/printinterface.h
+    interfaces/saveinterface.h
+    mobile/android/AndroidManifest.xml
+    mobile/android/src/OpenFileActivity.java
+    mobile/app/CMakeLists.txt
+    mobile/app/main.cpp
+    mobile/app/org.kde.okular.kirigami.appdata.xml
+    mobile/app/package/metadata.desktop
+    mobile/app/ui/Main.qml
+    mobile/app/ui/OkularDrawer.qml
+    okular.categories
+    okular_part.json
+    part/DistinguishedNameParser.h
+    part/annotationactionhandler.cpp
+    part/annotationactionhandler.h
+    part/annotationmodel.cpp
+    part/annotationpopup.cpp
+    part/annotationpopup.h
+    part/annotationpropertiesdialog.cpp
+    part/annotationtools.cpp
+    part/annotationtools.h
+    part/annotationwidgets.cpp
+    part/data/tools.xml
+    part/dlgannotations.cpp
+    part/dlgeditor.cpp
+    part/dlggeneral.cpp
+    part/editannottooldialog.cpp
+    part/editdrawingtooldialog.cpp
+    part/formwidgets.cpp
+    part/kleopatraintegration.cpp
+    part/magnifierview.cpp
+    part/pageview.cpp
+    part/pageview.h
+    part/pageviewannotator.cpp
+    part/pageviewannotator.h
+    part/pageviewmouseannotation.cpp
+    part/pageviewmouseannotation.h
+    part/part-viewermode.rc
+    part/part.cpp
+    part/part.h
+    part/part.rc
+    part/preferencesdialog.cpp
+    part/presentationwidget.cpp
+    part/selectcertificatedialog.ui
+    part/signaturepartutils.cpp
+    part/signaturepartutils.h
+    part/thumbnaillist.cpp
+    part/thumbnaillist.h
+    part/videowidget.cpp
+    part/widgetdrawingtools.cpp
+    po/ar/okular.po
+    po/ar/okular_djvu.po
+    po/ar/okular_kimgio.po
+    po/ar/okular_poppler.po
+    po/ar/okular_xps.po
+    po/ast/okular.po
+    po/ast/okular_djvu.po
+    po/ast/okular_kimgio.po
+    po/ast/okular_poppler.po
+    po/ast/okular_xps.po
+    po/az/okular.po
+    po/az/okular_djvu.po
+    po/az/okular_kimgio.po
+    po/az/okular_poppler.po
+    po/az/okular_xps.po
+    po/be/okular.po
+    po/be/okular_djvu.po
+    po/be/okular_kimgio.po
+    po/be/okular_poppler.po
+    po/be/okular_xps.po
+    po/bg/okular.po
+    po/bg/okular_djvu.po
+    po/bg/okular_kimgio.po
+    po/bg/okular_poppler.po
+    po/bg/okular_xps.po
+    po/br/okular.po
+    po/bs/okular.po
+    po/bs/okular_djvu.po
+    po/bs/okular_kimgio.po
+    po/bs/okular_poppler.po
+    po/bs/okular_xps.po
+    po/ca/okular.po
+    po/ca/okular_djvu.po
+    po/ca/okular_kimgio.po
+    po/ca/okular_poppler.po
+    po/ca/okular_xps.po
+    po/ca@valencia/okular.po
+    po/ca@valencia/okular_djvu.po
+    po/ca@valencia/okular_kimgio.po
+    po/ca@valencia/okular_poppler.po
+    po/ca@valencia/okular_xps.po
+    po/cs/okular.po
+    po/cs/okular_djvu.po
+    po/cs/okular_kimgio.po
+    po/cs/okular_poppler.po
+    po/cs/okular_xps.po
+    po/cy/okular.po
+    po/da/okular.po
+    po/da/okular_djvu.po
+    po/da/okular_kimgio.po
+    po/da/okular_poppler.po
+    po/da/okular_xps.po
+    po/de/okular.po
+    po/de/okular_djvu.po
+    po/de/okular_kimgio.po
+    po/de/okular_poppler.po
+    po/de/okular_xps.po
+    po/el/okular.po
+    po/el/okular_djvu.po
+    po/el/okular_kimgio.po
+    po/el/okular_poppler.po
+    po/el/okular_xps.po
+    po/en_GB/okular.po
+    po/en_GB/okular_djvu.po
+    po/en_GB/okular_kimgio.po
+    po/en_GB/okular_poppler.po
+    po/en_GB/okular_xps.po
+    po/eo/okular.po
+    po/eo/okular_djvu.po
+    po/eo/okular_kimgio.po
+    po/eo/okular_poppler.po
+    po/eo/okular_xps.po
+    po/es/okular.po
+    po/es/okular_djvu.po
+    po/es/okular_kimgio.po
+    po/es/okular_poppler.po
+    po/es/okular_xps.po
+    po/et/okular.po
+    po/et/okular_djvu.po
+    po/et/okular_kimgio.po
+    po/et/okular_poppler.po
+    po/et/okular_xps.po
+    po/eu/okular.po
+    po/eu/okular_djvu.po
+    po/eu/okular_dvi.po
+    po/eu/okular_kimgio.po
+    po/eu/okular_poppler.po
+    po/eu/okular_xps.po
+    po/fa/okular.po
+    po/fi/okular.po
+    po/fi/okular_djvu.po
+    po/fi/okular_kimgio.po
+    po/fi/okular_poppler.po
+    po/fi/okular_xps.po
+    po/fr/okular.po
+    po/fr/okular_djvu.po
+    po/fr/okular_kimgio.po
+    po/fr/okular_poppler.po
+    po/fr/okular_xps.po
+    po/fy/okular.po
+    po/ga/okular.po
+    po/ga/okular_djvu.po
+    po/ga/okular_kimgio.po
+    po/ga/okular_poppler.po
+    po/ga/okular_xps.po
+    po/gl/okular.po
+    po/gl/okular_djvu.po
+    po/gl/okular_kimgio.po
+    po/gl/okular_poppler.po
+    po/gl/okular_xps.po
+    po/he/okular.po
+    po/he/okular_djvu.po
+    po/he/okular_kimgio.po
+    po/he/okular_poppler.po
+    po/he/okular_xps.po
+    po/hi/okular.po
+    po/hi/okular_djvu.po
+    po/hi/okular_kimgio.po
+    po/hi/okular_poppler.po
+    po/hi/okular_xps.po
+    po/hne/okular.po
+    po/hne/okular_djvu.po
+    po/hne/okular_kimgio.po
+    po/hne/okular_poppler.po
+    po/hne/okular_xps.po
+    po/hr/okular.po
+    po/hr/okular_djvu.po
+    po/hr/okular_kimgio.po
+    po/hr/okular_poppler.po
+    po/hr/okular_xps.po
+    po/hsb/okular.po
+    po/hu/okular.po
+    po/hu/okular_djvu.po
+    po/hu/okular_kimgio.po
+    po/hu/okular_poppler.po
+    po/hu/okular_xps.po
+    po/ia/okular.po
+    po/ia/okular_djvu.po
+    po/ia/okular_kimgio.po
+    po/ia/okular_poppler.po
+    po/ia/okular_xps.po
+    po/id/okular.po
+    po/ie/okular.po
+    po/ie/okular_djvu.po
+    po/ie/okular_kimgio.po
+    po/ie/okular_xps.po
+    po/is/okular.po
+    po/is/okular_djvu.po
+    po/is/okular_kimgio.po
+    po/is/okular_poppler.po
+    po/is/okular_xps.po
+    po/it/okular.po
+    po/it/okular_djvu.po
+    po/it/okular_dvi.po
+    po/it/okular_kimgio.po
+    po/it/okular_poppler.po
+    po/it/okular_xps.po
+    po/ja/okular.po
+    po/ja/okular_djvu.po
+    po/ja/okular_kimgio.po
+    po/ja/okular_poppler.po
+    po/ja/okular_xps.po
+    po/ka/okular.po
+    po/ka/okular_djvu.po
+    po/ka/okular_kimgio.po
+    po/ka/okular_poppler.po
+    po/ka/okular_xps.po
+    po/kk/okular.po
+    po/kk/okular_djvu.po
+    po/kk/okular_kimgio.po
+    po/kk/okular_poppler.po
+    po/kk/okular_xps.po
+    po/km/okular.po
+    po/km/okular_djvu.po
+    po/km/okular_kimgio.po
+    po/km/okular_poppler.po
+    po/km/okular_xps.po
+    po/ko/okular.po
+    po/ko/okular_djvu.po
+    po/ko/okular_dvi.po
+    po/ko/okular_kimgio.po
+    po/ko/okular_poppler.po
+    po/ko/okular_xps.po
+    po/ku/okular.po
+    po/ku/okular_djvu.po
+    po/ku/okular_kimgio.po
+    po/ku/okular_xps.po
+    po/lt/okular.po
+    po/lt/okular_djvu.po
+    po/lt/okular_kimgio.po
+    po/lt/okular_poppler.po
+    po/lt/okular_xps.po
+    po/lv/okular.po
+    po/lv/okular_djvu.po
+    po/lv/okular_kimgio.po
+    po/lv/okular_poppler.po
+    po/lv/okular_xps.po
+    po/mk/okular.po
+    po/mk/okular_djvu.po
+    po/mk/okular_kimgio.po
+    po/mk/okular_poppler.po
+    po/mk/okular_xps.po
+    po/ml/okular.po
+    po/ml/okular_djvu.po
+    po/ml/okular_kimgio.po
+    po/ml/okular_poppler.po
+    po/ml/okular_xps.po
+    po/mr/okular.po
+    po/mr/okular_djvu.po
+    po/mr/okular_kimgio.po
+    po/mr/okular_poppler.po
+    po/mr/okular_xps.po
+    po/ms/okular.po
+    po/nb/okular.po
+    po/nb/okular_djvu.po
+    po/nb/okular_kimgio.po
+    po/nb/okular_poppler.po
+    po/nb/okular_xps.po
+    po/nds/okular.po
+    po/nds/okular_djvu.po
+    po/nds/okular_kimgio.po
+    po/nds/okular_poppler.po
+    po/nds/okular_xps.po
+    po/ne/okular.po
+    po/nl/okular.po
+    po/nl/okular_djvu.po
+    po/nl/okular_kimgio.po
+    po/nl/okular_poppler.po
+    po/nl/okular_xps.po
+    po/nn/okular.po
+    po/nn/okular_djvu.po
+    po/nn/okular_kimgio.po
+    po/nn/okular_poppler.po
+    po/nn/okular_xps.po
+    po/oc/okular.po
+    po/oc/okular_djvu.po
+    po/oc/okular_kimgio.po
+    po/oc/okular_poppler.po
+    po/oc/okular_xps.po
+    po/pa/okular.po
+    po/pa/okular_djvu.po
+    po/pa/okular_kimgio.po
+    po/pa/okular_poppler.po
+    po/pa/okular_xps.po
+    po/pl/okular.po
+    po/pl/okular_djvu.po
+    po/pl/okular_kimgio.po
+    po/pl/okular_poppler.po
+    po/pl/okular_xps.po
+    po/pt/okular.po
+    po/pt/okular_djvu.po
+    po/pt/okular_kimgio.po
+    po/pt/okular_poppler.po
+    po/pt/okular_xps.po
+    po/pt_BR/okular.po
+    po/pt_BR/okular_djvu.po
+    po/pt_BR/okular_kimgio.po
+    po/pt_BR/okular_poppler.po
+    po/pt_BR/okular_xps.po
+    po/ro/okular.po
+    po/ro/okular_djvu.po
+    po/ro/okular_kimgio.po
+    po/ro/okular_poppler.po
+    po/ro/okular_xps.po
+    po/ru/okular.po
+    po/ru/okular_djvu.po
+    po/ru/okular_dvi.po
+    po/ru/okular_ghostview.po
+    po/ru/okular_kimgio.po
+    po/ru/okular_poppler.po
+    po/ru/okular_xps.po
+    po/ru/org.kde.active.documentviewer.po
+    po/sa/okular.po
+    po/sa/okular_djvu.po
+    po/sa/okular_kimgio.po
+    po/sa/okular_poppler.po
+    po/sa/okular_xps.po
+    po/se/okular.po
+    po/se/okular_djvu.po
+    po/se/okular_kimgio.po
+    po/se/okular_poppler.po
+    po/se/okular_xps.po
+    po/si/okular.po
+    po/si/okular_djvu.po
+    po/si/okular_kimgio.po
+    po/si/okular_poppler.po
+    po/si/okular_xps.po
+    po/sk/okular.po
+    po/sk/okular_djvu.po
+    po/sk/okular_kimgio.po
+    po/sk/okular_poppler.po
+    po/sk/okular_xps.po
+    po/sl/okular.po
+    po/sl/okular_djvu.po
+    po/sl/okular_kimgio.po
+    po/sl/okular_poppler.po
+    po/sl/okular_xps.po
+    po/sq/okular_djvu.po
+    po/sq/okular_kimgio.po
+    po/sq/okular_poppler.po
+    po/sq/okular_xps.po
+    po/sr/okular.po
+    po/sr/okular_djvu.po
+    po/sr/okular_kimgio.po
+    po/sr/okular_poppler.po
+    po/sr/okular_xps.po
+    po/sr@ijekavian/okular.po
+    po/sr@ijekavian/okular_djvu.po
+    po/sr@ijekavian/okular_kimgio.po
+    po/sr@ijekavian/okular_poppler.po
+    po/sr@ijekavian/okular_xps.po
+    po/sr@ijekavianlatin/okular.po
+    po/sr@ijekavianlatin/okular_djvu.po
+    po/sr@ijekavianlatin/okular_kimgio.po
+    po/sr@ijekavianlatin/okular_poppler.po
+    po/sr@ijekavianlatin/okular_xps.po
+    po/sr@latin/okular.po
+    po/sr@latin/okular_djvu.po
+    po/sr@latin/okular_kimgio.po
+    po/sr@latin/okular_poppler.po
+    po/sr@latin/okular_xps.po
+    po/sv/okular.po
+    po/sv/okular_djvu.po
+    po/sv/okular_kimgio.po
+    po/sv/okular_poppler.po
+    po/sv/okular_xps.po
+    po/ta/okular.po
+    po/ta/okular_djvu.po
+    po/ta/okular_kimgio.po
+    po/ta/okular_poppler.po
+    po/ta/okular_xps.po
+    po/tg/okular.po
+    po/th/okular.po
+    po/th/okular_djvu.po
+    po/th/okular_kimgio.po
+    po/th/okular_poppler.po
+    po/th/okular_xps.po
+    po/tr/okular.po
+    po/tr/okular_djvu.po
+    po/tr/okular_kimgio.po
+    po/tr/okular_poppler.po
+    po/tr/okular_xps.po
+    po/ug/okular.po
+    po/ug/okular_djvu.po
+    po/ug/okular_kimgio.po
+    po/ug/okular_poppler.po
+    po/ug/okular_xps.po
+    po/uk/okular.po
+    po/uk/okular_djvu.po
+    po/uk/okular_kimgio.po
+    po/uk/okular_poppler.po
+    po/uk/okular_xps.po
+    po/vi/okular.po
+    po/vi/okular_djvu.po
+    po/vi/okular_kimgio.po
+    po/vi/okular_poppler.po
+    po/vi/okular_xps.po
+    po/wa/okular.po
+    po/wa/okular_djvu.po
+    po/wa/okular_kimgio.po
+    po/wa/okular_poppler.po
+    po/wa/okular_xps.po
+    po/xh/okular.po
+    po/zh_CN/okular.po
+    po/zh_CN/okular_djvu.po
+    po/zh_CN/okular_kimgio.po
+    po/zh_CN/okular_poppler.po
+    po/zh_CN/okular_xps.po
+    po/zh_HK/okular.po
+    po/zh_TW/okular.po
+    po/zh_TW/okular_djvu.po
+    po/zh_TW/okular_kimgio.po
+    po/zh_TW/okular_poppler.po
+    po/zh_TW/okular_xps.po
+    shell/CMakeLists.txt
+    shell/main.cpp
+    shell/okular_main.cpp
+    shell/shell.cpp
+    shell/shell.h
+    shell/shell.qrc
+    shell/shell.rc
+    shell/welcomescreen.cpp
+    shell/welcomescreen.h
+    shell/welcomescreen.ui
+
+-- evidence_class counts -------------------------------------------------------
+E0                          1928
+E3                             7
+
+-- SPDX identifier counts -------------------------------------------------------
+files WITH an SPDX-License-Identifier    : 503
+files WITHOUT an SPDX-License-Identifier : 1432
+files WITH SPDX-FileCopyrightText       : 738
+files WITHOUT SPDX-FileCopyrightText    : 1197
+
+-- distinct SPDX identifiers in use ---------------------------------------------
+  473  GPL-2.0-or-later
+    6  X11
+    6  BSD-2-Clause
+    6  LGPL-2.0-or-later
+    4  LGPL-2.0-only
+    3  BSD-3-Clause
+    2  GPL-2.0-only OR GPL-3.0-only
+    2  GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+    1  MIT
+
+-- encoding counts --------------------------------------------------------------
+utf-8         1798
+binary         137
+
+-- anomalies ------------------------------------------------------------------
+broken symlinks: 1
+    mobile/android/icon-playstore.png -> ../../icons/512-apps-okular.png
+binary files (NUL in first 8 kB): 137
+ELF files: 1
+    test_savedepth_simple
+files with CRLF line endings: 0
+non-UTF-8 text files: 0
+UTF-16 files: 0
+files > 1 MiB: 0
+tracked paths absent from the working tree: 1
+    .flatpak-patches/okular-mimetypes.patch
+worktree size differs from tracked blob size: 26
+    .flatpak-manifest.json  worktree=15059 tracked=16856
+    README.md  worktree=18589 tracked=16230
+    aboutdata.h  worktree=2204 tracked=1832
+    docs/README-VERIFICATION.md  worktree=5954 tracked=5304
+    generators/comicbook/org.kde.okular-comicbook.metainfo.xml  worktree=7645 tracked=7628
+    generators/djvu/org.kde.okular-djvu.metainfo.xml  worktree=7747 tracked=7730
+    generators/dvi/org.kde.okular-dvi.metainfo.xml  worktree=7848 tracked=7831
+    generators/epub/org.kde.okular-epub.metainfo.xml  worktree=7088 tracked=7071
+    generators/fax/org.kde.okular-fax.metainfo.xml  worktree=7352 tracked=7335
+    generators/fictionbook/org.kde.okular-fb.metainfo.xml  worktree=7643 tracked=7626
+    generators/kimgio/org.kde.okular-kimgio.metainfo.xml  worktree=9037 tracked=9020
+    generators/markdown/org.kde.okular-md.metainfo.xml  worktree=7679 tracked=7662
+    generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml  worktree=8913 tracked=8896
+    generators/poppler/org.kde.okular-poppler.metainfo.xml  worktree=7078 tracked=7061
+    generators/spectre/org.kde.okular-spectre.metainfo.xml  worktree=8197 tracked=8180
+    generators/tiff/org.kde.okular-tiff.metainfo.xml  worktree=7127 tracked=7110
+    generators/txt/org.kde.okular-txt.metainfo.xml  worktree=7613 tracked=7596
+    generators/xps/org.kde.okular-xps.metainfo.xml  worktree=6954 tracked=6937
+    part/actionbar.cpp  worktree=4106 tracked=3984
+    part/actionbar.h  worktree=1288 tracked=1166
+    part/annotationtools.cpp  worktree=20011 tracked=19765
+    patches/poppler-annotation-rotation.patch  worktree=15778 tracked=20935
+    patches/poppler-ink-appearance.patch  worktree=4485 tracked=3613
+    shell/CMakeLists.txt  worktree=2040 tracked=1491
+    shell/org.charta.reader.desktop  worktree=8208 tracked=7399
+    shell/org.charta.reader.metainfo.xml  worktree=25647 tracked=25630
+unusual extensions: {'(none)': 9, 'pdf': 22}
+
+-- largest 25 files ------------------------------------------------------------
+    388938  core/synctex/synctex_parser.c
+    357713  generators/epub/autotests/data/test.epub
+    303461  autotests/data/1500x300.png
+    254319  core/document.cpp
+    239478  part/pageview.cpp
+    238352  core/document.cpp.backup
+    221884  po/ta/okular.po
+    212832  core/stamps.svg
+    209224  po/el/okular.po
+    201502  po/uk/okular.po
+    201215  po/ka/okular.po
+    200511  po/sa/okular.po
+    200340  part/part.cpp
+    199696  po/ru/okular.po
+    199366  po/km/okular.po
+    198665  po/mr/okular.po
+    192600  po/th/okular.po
+    189714  po/pa/okular.po
+    188546  autotests/data/file2.pdf
+    186632  po/be/okular.po
+    185345  po/kk/okular.po
+    183646  po/si/okular.po
+    182375  po/hi/okular.po
+    176797  po/sr@ijekavian/okular.po
+    176546  po/sr/okular.po
+
+-- files with NO SPDX-License-Identifier, grouped ---------------------------------
+ 1069  po/ (translation catalogues)
+  171  tests / generators
+   72  part/data/ (runtime artwork)
+   30  charta_logo_package/ (brand assets)
+   17  core/synctex/ (vendored SyncTeX)
+   14  other: (top level)
+   12  LICENSES/ (licence texts)
+    9  other: part
+    6  other: shell
+    5  other: conf
+    3  documentation
+    3  other: core
+    3  other: mobile/app
+    2  icons/
+    2  other: mobile/android
+    2  other: mobile/android/res/drawable
+    2  other: mobile/components
+    2  other: patches
+    1  other: .flatpak-patches
+    1  other: CMakeFiles
+    1  other: cmake/modules
+    1  other: core/script
+    1  other: hooks
+    1  other: mobile
+    1  other: mobile/android/src
+    1  other: mobile/app/package
+
+-- all files WITHOUT SPDX-License-Identifier outside po/ ------------------------
+    .clang-tidy
+    .flatpak-manifest.json
+    .flatpak-patches/okular-mimetypes.patch
+    .git-blame-ignore-revs
+    .gitignore
+    CMakeFiles/CMakeSystem.cmake
+    CMakeLists.txt
+    LICENSES/BSD-2-Clause.txt
+    LICENSES/BSD-3-Clause.txt
+    LICENSES/GFDL-1.2-or-later.txt
+    LICENSES/GPL-2.0-only.txt
+    LICENSES/GPL-2.0-or-later.txt
+    LICENSES/GPL-3.0-only.txt
+    LICENSES/GPL-3.0-or-later.txt
+    LICENSES/LGPL-2.0-only.txt
+    LICENSES/LGPL-2.0-or-later.txt
+    LICENSES/LicenseRef-KDE-Accepted-GPL.txt
+    LICENSES/MIT.txt
+    LICENSES/X11.txt
+    Messages.sh
+    Okular6Config.cmake.in
+    OkularConfigureChecks.cmake
+    README.md
+    autotests/CMakeLists.txt
+    autotests/closedialoghelper.cpp
+    autotests/closedialoghelper.h
+    autotests/data/1500x300.png
+    autotests/data/300x1500.png
+    autotests/data/RequestFullScreen.pdf
+    autotests/data/additionalFormActions.pdf
+    autotests/data/checkbox_ro.pdf
+    autotests/data/contents.epub
+    autotests/data/fake_okular_certstore/cert9.db
+    autotests/data/fake_okular_certstore/key4.db
+    autotests/data/fake_okular_certstore/pkcs11.txt
+    autotests/data/fieldFormat.pdf
+    autotests/data/file1-docdata.xml
+    autotests/data/file1.pdf
+    autotests/data/file1.pdf.gz
+    autotests/data/file2.pdf
+    autotests/data/formSamples.pdf
+    autotests/data/formattest.pdf
+    autotests/data/hello_with_dummy_signature.pdf
+    autotests/data/imageSizes.md
+    autotests/data/imageUrlsWithSpecialChars.md
+    autotests/data/kartöffelchen.jpg
+    autotests/data/keystroketest.pdf
+    autotests/data/kjsfunctionstest.pdf
+    autotests/data/pdf_with_internal_links.pdf
+    autotests/data/pdf_with_internal_links.tex
+    autotests/data/pdf_with_links.pdf
+    autotests/data/pdf_with_signature.pdf
+    autotests/data/potato.jpg
+    autotests/data/protected.pdf
+    autotests/data/simple-multipage.pdf
+    autotests/data/simple-multipage.tex
+    autotests/data/simpleCalculate.pdf
+    autotests/data/strikethrough.md
+    autotests/data/synctextest.pdf
+    autotests/data/synctextest.synctex.gz
+    autotests/data/synctextest.tex
+    autotests/data/tocreload.pdf
+    autotests/data/visibilitytest.pdf
+    charta_logo_package/README.md
+    charta_logo_package/app-icon/charta-app-icon-desktop-1024.png
+    charta_logo_package/app-icon/charta-app-icon-desktop-512.png
+    charta_logo_package/app-icon/charta-app-icon-padded-transparent-1024.png
+    charta_logo_package/app-icon/charta-app-icon-padded-transparent-512.png
+    charta_logo_package/app-icon/charta-app-icon-transparent-1024.png
+    charta_logo_package/app-icon/charta-app-icon-transparent-512.png
+    charta_logo_package/charta-logo-color-white-background.svg
+    charta_logo_package/favicon/favicon-16.png
+    charta_logo_package/favicon/favicon-32.png
+    charta_logo_package/favicon/favicon-48.png
+    charta_logo_package/favicon/favicon.svg
+    charta_logo_package/png/charta-logo-1024.png
+    charta_logo_package/png/charta-logo-128.png
+    charta_logo_package/png/charta-logo-16.png
+    charta_logo_package/png/charta-logo-24.png
+    charta_logo_package/png/charta-logo-256.png
+    charta_logo_package/png/charta-logo-32.png
+    charta_logo_package/png/charta-logo-48.png
+    charta_logo_package/png/charta-logo-512.png
+    charta_logo_package/png/charta-logo-64.png
+    charta_logo_package/print/charta-logo-color.eps
+    charta_logo_package/print/charta-logo-color.pdf
+    charta_logo_package/print/charta-logo-monochrome.eps
+    charta_logo_package/print/charta-logo-monochrome.pdf
+    charta_logo_package/svg/charta-logo-color-padded-background.svg
+    charta_logo_package/svg/charta-logo-color-padded.svg
+    charta_logo_package/svg/charta-logo-color.svg
+    charta_logo_package/svg/charta-logo-monochrome-padded.svg
+    charta_logo_package/svg/charta-logo-monochrome.svg
+    cmake/modules/FindDjVuLibre.cmake
+    conf/okular.kcfg
+    conf/okular_core.kcfg
+    conf/settings.kcfgc
+    conf/settings_core.kcfgc
+    conf/settings_mobile.kcfgc
+    config-okular.h.cmake
+    core/chooseenginewidget.ui
+    core/script/builtin.qrc
+    core/stamps.svg
+    core/synctex/002dcd3eac30db5c352f53d4181737961cc7ee9a.diff
+    core/synctex/patches/00-disable-SYNCTEX_INLINE.diff
+    core/synctex/patches/04-gcc-specify-printf-format.diff
+    core/synctex/patches/06-mingw-_synctex_error.diff
+    core/synctex/patches/08-fix_cpp_comments.diff
+    core/synctex/patches/10-fix-typo.diff
+    core/synctex/patches/11-fix-unused-parameters-warnings.diff
+    core/synctex/patches/12-omit-no-file-warning.diff
+    core/synctex/patches/13-fix-Wundef-warnings.diff
+    core/synctex/patches/14-fix-misc-compiler-warnings.diff
+    core/synctex/patches/15-prevent-leaks-and-segfault.diff
+    core/synctex/patches/16-use-windows-ansi-api-path-find.diff
+    core/synctex/patches/17-call-va_end-before-return.diff
+    core/synctex/patches/18-Include-stdarg.h-for-va_start-and-va_end.diff
+    core/synctex/patches/series
+    core/synctex/synctex_parser_readme.md
+    core/synctex/synctex_parser_version.txt
+    core/textdocumentsettings.ui
+    docs/README-VERIFICATION.md
+    docs/architecture.md
+    generators/CMakeLists.txt
+    generators/comicbook/CMakeLists.txt
+    generators/comicbook/Messages.sh
+    generators/comicbook/autotests/data/rotated_cb.cbz
+    generators/comicbook/libokularGenerator_comicbook.json
+    generators/comicbook/okularApplication_comicbook.desktop
+    generators/comicbook/org.kde.mobile.okular_comicbook.desktop
+    generators/comicbook/org.kde.okular-comicbook.metainfo.xml
+    generators/djvu/CMakeLists.txt
+    generators/djvu/Messages.sh
+    generators/djvu/libokularGenerator_djvu.json
+    generators/djvu/okularApplication_djvu.desktop
+    generators/djvu/org.kde.mobile.okular_djvu.desktop
+    generators/djvu/org.kde.okular-djvu.metainfo.xml
+    generators/dvi/CMakeLists.txt
+    generators/dvi/Messages.sh
+    generators/dvi/TeXFont.cpp
+    generators/dvi/TeXFontDefinition.cpp
+    generators/dvi/TeXFontDefinition.h
+    generators/dvi/TeXFont_PK.h
+    generators/dvi/config.h
+    generators/dvi/dvi.h
+    generators/dvi/dviexport.cpp
+    generators/dvi/dviexport.h
+    generators/dvi/dvisourcesplitter.cpp
+    generators/dvi/dvisourcesplitter.h
+    generators/dvi/glyph.cpp
+    generators/dvi/glyph.h
+    generators/dvi/libokularGenerator_dvi.json
+    generators/dvi/okularApplication_dvi.desktop
+    generators/dvi/org.kde.mobile.okular_dvi.desktop
+    generators/dvi/org.kde.okular-dvi.metainfo.xml
+    generators/dvi/psheader.cpp
+    generators/dvi/special.cpp
+    generators/dvi/xdvi.h
+    generators/epub/CMakeLists.txt
+    generators/epub/Messages.sh
+    generators/epub/autotests/data/test.epub
+    generators/epub/data/CMakeLists.txt
+    generators/epub/data/okular-epub-movie.png
+    generators/epub/data/okular-epub-sound-icon.png
+    generators/epub/libokularGenerator_epub.json
+    generators/epub/okularApplication_epub.desktop
+    generators/epub/org.kde.mobile.okular_epub.desktop
+    generators/epub/org.kde.okular-epub.metainfo.xml
+    generators/fax/CMakeLists.txt
+    generators/fax/Messages.sh
+    generators/fax/libokularGenerator_fax.json
+    generators/fax/okularApplication_fax.desktop
+    generators/fax/org.kde.mobile.okular_fax.desktop
+    generators/fax/org.kde.okular-fax.metainfo.xml
+    generators/fictionbook/16-apps-okular-fb2.png
+    generators/fictionbook/32-apps-okular-fb2.png
+    generators/fictionbook/48-apps-okular-fb2.png
+    generators/fictionbook/CMakeLists.txt
+    generators/fictionbook/Messages.sh
+    generators/fictionbook/hi32-app-okular-fb2.svg
+    generators/fictionbook/libokularGenerator_fb.json
+    generators/fictionbook/okularApplication_fb.desktop
+    generators/fictionbook/org.kde.mobile.okular_fb.desktop
+    generators/fictionbook/org.kde.okular-fb.metainfo.xml
+    generators/kimgio/CMakeLists.txt
+    generators/kimgio/Messages.sh
+    generators/kimgio/libokularGenerator_kimgio.json
+    generators/kimgio/okularApplication_kimgio.desktop
+    generators/kimgio/org.kde.mobile.okular_kimgio.desktop
+    generators/kimgio/org.kde.okular-kimgio.metainfo.xml
+    generators/kimgio/tests/data/testExifOrientation-0.jpg
+    generators/kimgio/tests/data/testExifOrientation-0mirror.jpg
+    generators/kimgio/tests/data/testExifOrientation-180.jpg
+    generators/kimgio/tests/data/testExifOrientation-180mirror.jpg
+    generators/kimgio/tests/data/testExifOrientation-270.jpg
+    generators/kimgio/tests/data/testExifOrientation-270mirror.jpg
+    generators/kimgio/tests/data/testExifOrientation-90.jpg
+    generators/kimgio/tests/data/testExifOrientation-90mirror.jpg
+    generators/kimgio/tests/data/testExifOrientation-noexif.jpg
+    generators/kimgio/tests/data/testExifOrientation-unspecified.jpg
+    generators/markdown/CMakeLists.txt
+    generators/markdown/Messages.sh
+    generators/markdown/libokularGenerator_md.json
+    generators/markdown/okularApplication_md.desktop
+    generators/markdown/org.kde.mobile.okular_md.desktop
+    generators/markdown/org.kde.okular-md.metainfo.xml
+    generators/mobipocket/CMakeLists.txt
+    generators/mobipocket/Messages.sh
+    generators/mobipocket/libokularGenerator_mobi.json
+    generators/mobipocket/okularApplication_mobi.desktop
+    generators/mobipocket/org.kde.mobile.okular_mobi.desktop
+    generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml
+    generators/poppler/CMakeLists.txt
+    generators/poppler/Messages.sh
+    generators/poppler/conf/CMakeLists.txt
+    generators/poppler/conf/pdfsettings.kcfg
+    generators/poppler/conf/pdfsettings.kcfgc
+    generators/poppler/conf/pdfsettingswidget.ui
+    generators/poppler/libokularGenerator_poppler.json
+    generators/poppler/okularApplication_pdf.desktop
+    generators/poppler/org.kde.mobile.okular_pdf.desktop
+    generators/poppler/org.kde.okular-poppler.metainfo.xml
+    generators/spectre/16-apps-okular-gv.png
+    generators/spectre/32-apps-okular-gv.png
+    generators/spectre/CMakeLists.txt
+    generators/spectre/DESIGN
+    generators/spectre/Messages.sh
+    generators/spectre/conf/CMakeLists.txt
+    generators/spectre/conf/gssettings.kcfg
+    generators/spectre/conf/gssettings.kcfgc
+    generators/spectre/conf/gssettingswidget.ui
+    generators/spectre/libokularGenerator_ghostview.json
+    generators/spectre/okularApplication_ghostview.desktop
+    generators/spectre/org.kde.mobile.okular_ghostview.desktop
+    generators/spectre/org.kde.okular-spectre.metainfo.xml
+    generators/tiff/CMakeLists.txt
+    generators/tiff/Messages.sh
+    generators/tiff/libokularGenerator_tiff.json
+    generators/tiff/okularApplication_tiff.desktop
+    generators/tiff/org.kde.mobile.okular_tiff.desktop
+    generators/tiff/org.kde.okular-tiff.metainfo.xml
+    generators/txt/CMakeLists.txt
+    generators/txt/Messages.sh
+    generators/txt/libokularGenerator_txt.json
+    generators/txt/okularApplication_txt.desktop
+    generators/txt/org.kde.mobile.okular_txt.desktop
+    generators/txt/org.kde.okular-txt.metainfo.xml
+    generators/xps/.emacs-dirvars
+    generators/xps/CMakeLists.txt
+    generators/xps/Messages.sh
+    generators/xps/libokularGenerator_xps.json
+    generators/xps/okularApplication_xps.desktop
+    generators/xps/org.kde.mobile.okular_xps.desktop
+    generators/xps/org.kde.okular-xps.metainfo.xml
+    hooks/pre-commit
+    icons/CMakeLists.txt
+    icons/charta.svg
+    mobile/CMakeLists.txt
+    mobile/android/AndroidManifest.xml
+    mobile/android/icon-playstore.png
+    mobile/android/res/drawable/charta.xml
+    mobile/android/res/drawable/icon.png
+    mobile/android/src/OpenFileActivity.java
+    mobile/app/CMakeLists.txt
+    mobile/app/Messages.sh
+    mobile/app/org.kde.okular.kirigami.appdata.xml
+    mobile/app/package/metadata.desktop
+    mobile/components/Messages.sh
+    mobile/components/settings.h
+    okular.categories
+    okular_part.json
+    part/CMakeLists.txt
+    part/actionbar.cpp
+    part/actionbar.h
+    part/data/CMakeLists.txt
+    part/data/README.Icons
+    part/data/checkmark.png
+    part/data/circle.png
+    part/data/comment.png
+    part/data/cross.png
+    part/data/drawingtools.xml
+    part/data/help.png
+    part/data/insert.png
+    part/data/key.png
+    part/data/newparagraph.png
+    part/data/note.png
+    part/data/paperclip.png
+    part/data/paragraph.png
+    part/data/pushpin.png
+    part/data/rightarrow.png
+    part/data/rightpointer.png
+    part/data/sources/checkmark.svgz
+    part/data/sources/circle.svgz
+    part/data/sources/comment.svgz
+    part/data/sources/cross.svgz
+    part/data/sources/ghns.svg
+    part/data/sources/help.svgz
+    part/data/sources/insert.svgz
+    part/data/sources/key.svgz
+    part/data/sources/newparagraph.svgz
+    part/data/sources/note.svgz
+    part/data/sources/paragraph.svgz
+    part/data/sources/rightarrow.svgz
+    part/data/sources/rightpointer.svgz
+    part/data/sources/star.svgz
+    part/data/sources/tool-base-okular.svgz
+    part/data/sources/tool-ellipse-okular.svgz
+    part/data/sources/tool-highlighter-okular-colorizable.svgz
+    part/data/sources/tool-highlighter-okular.svgz
+    part/data/sources/tool-ink-okular-colorizable.svgz
+    part/data/sources/tool-ink-okular.svgz
+    part/data/sources/tool-line-okular.svgz
+    part/data/sources/tool-note-inline-okular-colorizable.svgz
+    part/data/sources/tool-note-inline-okular.svgz
+    part/data/sources/tool-note-okular-colorizable.svgz
+    part/data/sources/tool-note-okular.svgz
+    part/data/sources/tool-polygon-okular.svgz
+    part/data/sources/tool-stamp-okular.svgz
+    part/data/sources/tool-typewriter-okular-colorizable.svgz
+    part/data/sources/tool-underline-okular.svgz
+    part/data/sources/uparrow.svgz
+    part/data/sources/upleftarrow.svgz
+    part/data/star.png
+    part/data/tool-base-okular.png
+    part/data/tool-base-okular@2x.png
+    part/data/tool-highlighter-okular-colorizable.png
+    part/data/tool-highlighter-okular-colorizable@2x.png
+    part/data/tool-ink-okular-colorizable.png
+    part/data/tool-ink-okular-colorizable@2x.png
+    part/data/tool-note-inline-okular-colorizable.png
+    part/data/tool-note-inline-okular-colorizable@2x.png
+    part/data/tool-note-inline.png
+    part/data/tool-note-okular-colorizable.png
+    part/data/tool-note-okular-colorizable@2x.png
+    part/data/tool-note.png
+    part/data/tool-typewriter-okular-colorizable.png
+    part/data/tool-typewriter-okular-colorizable@2x.png
+    part/data/tool_hl_orange.png
+    part/data/tool_hl_pink.png
+    part/data/tool_hl_yellow.png
+    part/data/tool_ink_green.png
+    part/data/tool_note.png
+    part/data/tools.xml
+    part/data/toolsQuick.xml
+    part/data/uparrow.png
+    part/data/upleftarrow.png
+    part/part-viewermode.rc
+    part/part.qrc
+    part/part.rc
+    part/selectcertificatedialog.ui
+    part/signingcertificatelistmodel.cpp
+    part/signingcertificatelistmodel.h
+    patches/poppler-annotation-rotation.patch
+    patches/poppler-ink-appearance.patch
+    shell/CMakeLists.txt
+    shell/MacOSXBundleInfo.plist.in
+    shell/org.charta.reader.desktop
+    shell/org.charta.reader.metainfo.xml
+    shell/shell.qrc
+    shell/shell.rc
+    test_savedepth.cpp
+    test_savedepth_simple
+    test_savedepth_simple.cpp
+
+-- files WITHOUT SPDX-FileCopyrightText, grouped ------------------------------
+  804  po/
+  131  generators/
+   72  part/data/
+   37  autotests/data/
+   31  other: part
+   30  charta_logo_package/
+   17  core/synctex/
+   15  other: (top level)
+   12  LICENSES/
+   11  other: autotests
+    6  other: shell
+    5  other: conf
+    3  other: core
+    3  other: mobile/app
+    2  docs/
+    2  icons/
+    2  other: mobile/android
+    2  other: mobile/android/res/drawable
+    2  other: mobile/components
+    2  other: patches
+    1  other: .flatpak-patches
+    1  other: CMakeFiles
+    1  other: cmake/modules
+    1  other: core/script
+    1  other: hooks
+    1  other: mobile
+    1  other: mobile/android/src
+    1  other: mobile/app/package
+
+-- unclassified / unknown-pending-phase-3 list ----------------------------------
+    CMakeFiles/CMakeSystem.cmake                                 other
+    core/document.cpp.backup                                     other
+    shell/org.charta.reader.desktop                              packaging
+    shell/org.charta.reader.metainfo.xml                         packaging
+    test_savedepth.cpp                                           other
+    test_savedepth_simple                                        other
+    test_savedepth_simple.cpp                                    other
+
+-- charta-original list ----------------------------------------------------------
+    autotests/annotationcolorhistorytest.cpp                     tests
+    autotests/annotationpersistencetest.cpp                      tests
+    autotests/annotationrotationtest.cpp                         tests
+    autotests/blankpageswritertest.cpp                           tests
+    autotests/documentbuildermodeltest.cpp                       tests
+    autotests/documentbuilderparttest.cpp                        tests
+    autotests/untitleddocumenttest.cpp                           tests
+    autotests/widthpresetstest.cpp                               tests
+    charta_logo_package/README.md                                assets-logo
+    charta_logo_package/app-icon/charta-app-icon-desktop-1024.png assets-logo
+    charta_logo_package/app-icon/charta-app-icon-desktop-512.png assets-logo
+    charta_logo_package/app-icon/charta-app-icon-padded-transparent-1024.png assets-logo
+    charta_logo_package/app-icon/charta-app-icon-padded-transparent-512.png assets-logo
+    charta_logo_package/app-icon/charta-app-icon-transparent-1024.png assets-logo
+    charta_logo_package/app-icon/charta-app-icon-transparent-512.png assets-logo
+    charta_logo_package/charta-logo-color-white-background.svg   assets-logo
+    charta_logo_package/favicon/favicon-16.png                   assets-logo
+    charta_logo_package/favicon/favicon-32.png                   assets-logo
+    charta_logo_package/favicon/favicon-48.png                   assets-logo
+    charta_logo_package/favicon/favicon.svg                      assets-logo
+    charta_logo_package/png/charta-logo-1024.png                 assets-logo
+    charta_logo_package/png/charta-logo-128.png                  assets-logo
+    charta_logo_package/png/charta-logo-16.png                   assets-logo
+    charta_logo_package/png/charta-logo-24.png                   assets-logo
+    charta_logo_package/png/charta-logo-256.png                  assets-logo
+    charta_logo_package/png/charta-logo-32.png                   assets-logo
+    charta_logo_package/png/charta-logo-48.png                   assets-logo
+    charta_logo_package/png/charta-logo-512.png                  assets-logo
+    charta_logo_package/png/charta-logo-64.png                   assets-logo
+    charta_logo_package/print/charta-logo-color.eps              assets-logo
+    charta_logo_package/print/charta-logo-color.pdf              assets-logo
+    charta_logo_package/print/charta-logo-monochrome.eps         assets-logo
+    charta_logo_package/print/charta-logo-monochrome.pdf         assets-logo
+    charta_logo_package/svg/charta-logo-color-padded-background.svg assets-logo
+    charta_logo_package/svg/charta-logo-color-padded.svg         assets-logo
+    charta_logo_package/svg/charta-logo-color.svg                assets-logo
+    charta_logo_package/svg/charta-logo-monochrome-padded.svg    assets-logo
+    charta_logo_package/svg/charta-logo-monochrome.svg           assets-logo
+    docs/README-VERIFICATION.md                                  documentation
+    docs/architecture.md                                         documentation
+    icons/charta.svg                                             assets-icons
+    mobile/android/res/drawable/charta.xml                       source-mobile
+    part/annotationcolorhistory.cpp                              source-part
+    part/annotationcolorhistory.h                                source-part
+    part/blankpageswriter.cpp                                    source-part
+    part/blankpageswriter.h                                      source-part
+    part/documentbuilder.cpp                                     source-part
+    part/documentbuilder.h                                       source-part
+    part/documentbuilderconfig.h                                 source-part
+    part/documentbuilderexport.cpp                               source-part
+    part/documentbuilderexport.h                                 source-part
+    part/documentbuildermodel.cpp                                source-part
+    part/documentbuildermodel.h                                  source-part
+    part/documentbuildersource.cpp                               source-part
+    part/documentbuildersource.h                                 source-part
+    part/imagepagesettingsdialog.cpp                             source-part
+    part/imagepagesettingsdialog.h                               source-part
+    part/newpagedialog.cpp                                       source-part
+    part/newpagedialog.h                                         source-part
+    part/pagerangeinputdialog.cpp                                source-part
+    part/pagerangeinputdialog.h                                  source-part
+    part/widthpresetutils.h                                      source-part
+    patches/poppler-annotation-rotation.patch                    packaging
+    patches/poppler-ink-appearance.patch                         packaging
+
+-- upstream paths NOT present in Charta -----------------------------------------
+    count: 222
+    .craft.ini
+    .flatpak-patches/gnustep-base-fix_GCC15.patch
+    .flatpak-patches/vlc-ignore-time-for-cache.patch
+    .gitlab-ci.yml
+    .kde-ci.yml
+    .krazy
+    7b51c1bb4ed0b1777db2f018eadaba89f00bf0c5.patch
+    Mainpage.dox
+    README.clang-format
+    README.internals.png
+    TODO
+    cppcheck-suppressions.xml
+    doc/CMakeLists.txt
+    doc/annotation-properties.png
+    doc/annotations.png
+    doc/bookmark-management.png
+    doc/bookmarks.png
+    doc/config-pdf-digital-signatures.png
+    doc/configure-annotations.png
+    doc/configure-editor.png
+    doc/configure.png
+    doc/embedded-files-bar.png
+    doc/enhance-lowcontrast.png
+    doc/enhance-shape.png
+    doc/enhance-solid.png
+    doc/enhance-thinline.png
+    doc/forms-bar.png
+    doc/index.docbook
+    doc/mainwindow.png
+    doc/man-okular.1.docbook
+    doc/presentation.png
+    doc/signatures-bar.png
+    doc/signatures-panel.png
+    doc/tool-draw-arrow.png
+    doc/tool-draw-ellipse.png
+    doc/tool-draw-freehand.png
+    doc/tool-draw-highlight.png
+    doc/tool-draw-line.png
+    doc/tool-draw-polyline.png
+    doc/tool-draw-rectangle.png
+    doc/tool-edit-comment.png
+    doc/tool-edit-line-width.png
+    doc/tool-edit-opacity.png
+    doc/tool-favorite.png
+    doc/tool-fill-color.png
+    doc/tool-font-face.png
+    doc/tool-format-text-color.png
+    doc/tool-format-text-strikethrough.png
+    doc/tool-format-text-underline-squiggle.png
+    doc/tool-format-text-underline.png
+    doc/tool-note.png
+    doc/tool-pin.png
+    doc/tool-settings-configure.png
+    doc/tool-tag.png
+    doc/tool-tool-text.png
+    doc/tool-window-pin.png
+    generators/djvu/TODO
+    generators/epub/README
+    ghostscript-gcc15.patch
+    icons/128-apps-okular.png
+    icons/150-apps-okular.png
+    icons/16-apps-okular.png
+    icons/22-apps-okular.png
+    icons/310-apps-okular.png
+    icons/32-apps-okular.png
+    icons/44-apps-okular.png
+    icons/48-apps-okular.png
+    icons/512-apps-okular.png
+    icons/64-apps-okular.png
+    icons/hisc-apps-okular.svgz
+    icons/small/hi16-apps-okular.svgz
+    icons/small/hi22-apps-okular.svgz
+    metainfo.yaml
+    mobile/android/build.gradle
+    okular-cppcheck.xml
+    po/ca/docs/okular/bookmark-management.png
+    po/ca/docs/okular/configure-annotations.png
+    po/ca/docs/okular/configure-backends.png
+    po/ca/docs/okular/configure-editor.png
+    po/ca/docs/okular/configure.png
+    po/ca/docs/okular/index.docbook
+    po/ca/docs/okular/mainwindow.png
+    po/ca/docs/okular/man-okular.1.docbook
+    po/ca/docs/okular/presentation.png
+    po/de/docs/okular/annotation-properties.png
+    po/de/docs/okular/configure-annotations.png
+    po/de/docs/okular/configure-editor.png
+    po/de/docs/okular/configure.png
+    po/de/docs/okular/embedded-files-bar.png
+    po/de/docs/okular/index.docbook
+    po/de/docs/okular/mainwindow.png
+    po/de/docs/okular/man-okular.1.docbook
+    po/es/docs/okular/configure.png
+    po/es/docs/okular/embedded-files-bar.png
+    po/es/docs/okular/index.docbook
+    po/es/docs/okular/man-okular.1.docbook
+    po/et/docs/okular/man-okular.1.docbook
+    po/fr/docs/okular/annotation-properties.png
+    po/fr/docs/okular/annotations.png
+    po/fr/docs/okular/bookmark-management.png
+    po/fr/docs/okular/configure-annotations.png
+    po/fr/docs/okular/configure-backends.png
+    po/fr/docs/okular/configure-editor.png
+    po/fr/docs/okular/configure.png
+    po/fr/docs/okular/forms-bar.png
+    po/fr/docs/okular/index.docbook
+    po/fr/docs/okular/mainwindow.png
+    po/fr/docs/okular/man-okular.1.docbook
+    po/fr/docs/okular/presentation.png
+    po/gl/docs/okular/index.docbook
+    po/it/docs/okular/annotation-properties.png
+    po/it/docs/okular/annotations.png
+    po/it/docs/okular/bookmark-management.png
+    po/it/docs/okular/configure-annotations.png
+    po/it/docs/okular/configure-backends.png
+    po/it/docs/okular/configure-editor.png
+    po/it/docs/okular/configure.png
+    po/it/docs/okular/embedded-files-bar.png
+    po/it/docs/okular/forms-bar.png
+    po/it/docs/okular/index.docbook
+    po/it/docs/okular/mainwindow.png
+    po/it/docs/okular/man-okular.1.docbook
+    po/it/docs/okular/presentation.png
+    po/it/docs/okular/signatures-bar.png
+    po/it/docs/okular/signatures-panel.png
+    po/ja/docs/okular/configure.png
+    po/ja/docs/okular/embedded-files-bar.png
+    po/ja/docs/okular/index.docbook
+    po/nl/docs/okular/index.docbook
+    po/nl/docs/okular/man-okular.1.docbook
+    po/pl/docs/okular/annotation-properties.png
+    po/pl/docs/okular/annotations.png
+    po/pl/docs/okular/bookmark-management.png
+    po/pl/docs/okular/configure-annotations.png
+    po/pl/docs/okular/configure-backends.png
+    po/pl/docs/okular/configure-editor.png
+    po/pl/docs/okular/configure.png
+    po/pl/docs/okular/embedded-files-bar.png
+    po/pl/docs/okular/forms-bar.png
+    po/pl/docs/okular/index.docbook
+    po/pl/docs/okular/mainwindow.png
+    po/pl/docs/okular/presentation.png
+    po/pl/docs/okular/rating.png
+    po/pl/docs/okular/tool-ellipse-okular.png
+    po/pl/docs/okular/tool-highlighter-okular.png
+    po/pl/docs/okular/tool-ink-okular.png
+    po/pl/docs/okular/tool-line-okular.png
+    po/pl/docs/okular/tool-note-inline-okular.png
+    po/pl/docs/okular/tool-note-okular.png
+    po/pl/docs/okular/tool-polygon-okular.png
+    po/pl/docs/okular/tool-stamp-okular.png
+    po/pl/docs/okular/tool-underline-okular.png
+    po/pt/docs/okular/index.docbook
+    po/pt/docs/okular/man-okular.1.docbook
+    po/pt_BR/docs/okular/annotation-properties.png
+    po/pt_BR/docs/okular/annotations.png
+    po/pt_BR/docs/okular/bookmark-management.png
+    po/pt_BR/docs/okular/configure-annotations.png
+    po/pt_BR/docs/okular/configure-backends.png
+    po/pt_BR/docs/okular/configure-editor.png
+    po/pt_BR/docs/okular/configure.png
+    po/pt_BR/docs/okular/embedded-files-bar.png
+    po/pt_BR/docs/okular/forms-bar.png
+    po/pt_BR/docs/okular/index.docbook
+    po/pt_BR/docs/okular/mainwindow.png
+    po/pt_BR/docs/okular/man-okular.1.docbook
+    po/pt_BR/docs/okular/presentation.png
+    po/pt_BR/docs/okular/signatures-bar.png
+    po/pt_BR/docs/okular/signatures-panel.png
+    po/ru/docs/okular/annotation-properties.png
+    po/ru/docs/okular/annotations.png
+    po/ru/docs/okular/bookmark-management.png
+    po/ru/docs/okular/config-pdf-digital-signatures.png
+    po/ru/docs/okular/configure-annotations.png
+    po/ru/docs/okular/configure-backends.png
+    po/ru/docs/okular/configure-editor.png
+    po/ru/docs/okular/configure.png
+    po/ru/docs/okular/embedded-files-bar.png
+    po/ru/docs/okular/enhance-lowcontrast.png
+    po/ru/docs/okular/enhance-shape.png
+    po/ru/docs/okular/enhance-solid.png
+    po/ru/docs/okular/enhance-thinline.png
+    po/ru/docs/okular/forms-bar.png
+    po/ru/docs/okular/index.docbook
+    po/ru/docs/okular/mainwindow.png
+    po/ru/docs/okular/man-okular.1.docbook
+    po/ru/docs/okular/presentation.png
+    po/ru/docs/okular/rating.png
+    po/ru/docs/okular/signatures-bar.png
+    po/ru/docs/okular/signatures-panel.png
+    po/ru/docs/okular/tool-ellipse-okular.png
+    po/ru/docs/okular/tool-highlighter-okular.png
+    po/ru/docs/okular/tool-ink-okular.png
+    po/ru/docs/okular/tool-line-okular.png
+    po/ru/docs/okular/tool-note-inline-okular.png
+    po/ru/docs/okular/tool-note-okular.png
+    po/ru/docs/okular/tool-polygon-okular.png
+    po/ru/docs/okular/tool-stamp-okular.png
+    po/ru/docs/okular/tool-underline-okular.png
+    po/sl/docs/okular/index.docbook
+    po/sl/docs/okular/man-okular.1.docbook
+    po/sv/docs/okular/configure.png
+    po/sv/docs/okular/index.docbook
+    po/sv/docs/okular/man-okular.1.docbook
+    po/tr/docs/okular/index.docbook
+    po/tr/docs/okular/man-okular.1.docbook
+    po/uk/docs/okular/annotation-properties.png
+    po/uk/docs/okular/annotations.png
+    po/uk/docs/okular/bookmark-management.png
+    po/uk/docs/okular/configure-annotations.png
+    po/uk/docs/okular/configure-backends.png
+    po/uk/docs/okular/configure-editor.png
+    po/uk/docs/okular/configure.png
+    po/uk/docs/okular/embedded-files-bar.png
+    po/uk/docs/okular/forms-bar.png
+    po/uk/docs/okular/index.docbook
+    po/uk/docs/okular/mainwindow.png
+    po/uk/docs/okular/man-okular.1.docbook
+    po/uk/docs/okular/signatures-bar.png
+    po/uk/docs/okular/signatures-panel.png
+    shell/org.kde.okular.appdata.xml
+    shell/org.kde.okular.desktop
+
+-- charta-original files NOT covered by the Phase-1 brief's explicit list ---------
+    autotests/annotationcolorhistorytest.cpp
+    autotests/annotationpersistencetest.cpp
+    autotests/annotationrotationtest.cpp
+    autotests/blankpageswritertest.cpp
+    autotests/documentbuildermodeltest.cpp
+    autotests/documentbuilderparttest.cpp
+    autotests/untitleddocumenttest.cpp
+    autotests/widthpresetstest.cpp
+    mobile/android/res/drawable/charta.xml
+    part/blankpageswriter.cpp
+    part/blankpageswriter.h
+    part/newpagedialog.cpp
+    part/newpagedialog.h
+    part/widthpresetutils.h
+
+-- CSV written to /home/workstation/tools/project/Charta/docs/licensing/file-classification.csv

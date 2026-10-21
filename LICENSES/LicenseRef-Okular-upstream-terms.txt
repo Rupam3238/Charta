@@ -1,0 +1,31 @@
+LicenseRef-Okular-upstream-terms
+
+Redistributor's position for the KDE Okular translation catalogues shipped in po/.
+
+These files are copied verbatim from KDE Okular (https://invent.kde.org/graphics/okular). No
+catalogue carries an SPDX-License-Identifier, and only 265 of the 1 069 carry an
+SPDX-FileCopyrightText line naming a translator; the remaining 804 carry neither. Upstream has no
+REUSE.toml and no .reuse/dep5, so there is no machine-readable grant for them in either project.
+
+STATUS: INTERIM CLASSIFICATION ONLY. It is not a grant, not a permission, and not evidence that
+the upstream copyright holders licensed these files for redistribution on these terms. The
+maintainer's decision of 2026-10-21 was to accept this identifier as an interim classification
+while the question stays open, and to make no claim of permission until KDE clarifies the
+redistribution terms.
+
+This file records the position taken by the redistributor, not a grant made by the upstream
+copyright holders:
+
+  * The files are redistributed unmodified from upstream.
+  * The upstream project as a whole is licensed GPL-2.0-or-later, and the catalogues are shipped
+    as part of that project.
+  * The upstream maintainers and KDE l10n were asked to state the terms explicitly. The question,
+    its status, and the evidence are recorded in docs/licensing/translations.md.
+  * Until that answer arrives, this identifier is a placeholder that says "the upstream terms
+    apply, and here is what we currently believe them to be" - it does not assert them, and it
+    does not discharge anyone's obligations. No licence identifier is asserted for these files
+    beyond the placeholder, and the translator copyright lines are preserved exactly as upstream
+    has them.
+
+If the upstream answer differs from the above, this file and
+docs/licensing/translations.md must be updated in the same change.

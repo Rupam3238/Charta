@@ -1,0 +1,844 @@
+[  0%] Built target libqpdf_object_autogen_timestamp_deps
+[  0%] Generating mo...
+[  0%] Built target libqpdf_autogen_timestamp_deps
+[  0%] Generating settings_core.h, settings_core.cpp
+[  0%] Generating ts...
+[  0%] Built target charta_autogen_timestamp_deps
+[  0%] Built target okularcore_autogen_timestamp_deps
+[  0%] Built target imageScalingTest_autogen_timestamp_deps
+[  0%] Built target tsfiles-dedf3db0cc203710bf3b573d45cd2f51
+[  0%] Built target editdrawingtooldialogtest_autogen_timestamp_deps
+[  0%] Built target distinguishednameparser_autogen_timestamp_deps
+[  0%] Built target urldetecttest_autogen_timestamp_deps
+[  0%] Built target toggleactionmenutest_autogen_timestamp_deps
+[  0%] Automatic MOC for target okularcore
+[  0%] Automatic MOC for target libqpdf_object
+[  0%] Automatic MOC for target libqpdf
+[  0%] Built target libqpdf_object_autogen
+[  0%] Built target libqpdf_autogen
+[  0%] Automatic MOC for target imageScalingTest
+[  0%] Automatic MOC for target charta
+[  0%] Built target imageScalingTest_autogen
+[  0%] Automatic MOC for target editdrawingtooldialogtest
+[  0%] Built target editdrawingtooldialogtest_autogen
+[  0%] Automatic MOC for target urldetecttest
+[  0%] Built target charta_autogen
+[  0%] Automatic MOC for target distinguishednameparser
+[  0%] Built target urldetecttest_autogen
+[  0%] Automatic MOC for target toggleactionmenutest
+[  0%] Built target distinguishednameparser_autogen
+[  0%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/libqpdf_object_autogen/mocs_compilation.cpp.o
+[  0%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/BitStream.cc.o
+[  0%] Built target toggleactionmenutest_autogen
+[  0%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/BitWriter.cc.o
+[  1%] Generating ui_welcomescreen.h
+[  1%] Automatic RCC for shell.qrc
+[  1%] Building CXX object shell/CMakeFiles/charta.dir/charta_autogen/mocs_compilation.cpp.o
+[  1%] Building CXX object shell/CMakeFiles/charta.dir/main.cpp.o
+[  1%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Buffer.cc.o
+[  1%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/BufferInputSource.cc.o
+[  1%] Built target pofiles-dedf3db0cc203710bf3b573d45cd2f51
+[  1%] Building CXX object generators/poppler/CMakeFiles/imageScalingTest.dir/imageScalingTest_autogen/mocs_compilation.cpp.o
+[  1%] Building CXX object generators/poppler/CMakeFiles/imageScalingTest.dir/autotests/testimagescaling.cpp.o
+[  1%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/ClosedFileInputSource.cc.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/ContentNormalizer.cc.o
+[  3%] Built target okularcore_autogen
+[  3%] Building CXX object shell/CMakeFiles/charta.dir/okular_main.cpp.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/CryptoRandomDataProvider.cc.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/FileInputSource.cc.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/InputSource.cc.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/InsecureRandomDataProvider.cc.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/JSON.cc.o
+[  3%] Linking CXX executable ../../bin/imageScalingTest
+[  3%] Building CXX object autotests/CMakeFiles/editdrawingtooldialogtest.dir/editdrawingtooldialogtest_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object autotests/CMakeFiles/editdrawingtooldialogtest.dir/editdrawingtooldialogtest.cpp.o
+[  3%] Built target imageScalingTest
+[  3%] Building CXX object shell/CMakeFiles/charta.dir/shell.cpp.o
+[  3%] Building CXX object shell/CMakeFiles/charta.dir/shellutils.cpp.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/JSONHandler.cc.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/MD5.cc.o
+[  3%] Building CXX object autotests/CMakeFiles/editdrawingtooldialogtest.dir/__/part/editdrawingtooldialog.cpp.o
+[  3%] Building CXX object autotests/CMakeFiles/urldetecttest.dir/urldetecttest_autogen/mocs_compilation.cpp.o
+[  3%] Building CXX object autotests/CMakeFiles/urldetecttest.dir/urldetecttest.cpp.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/NNTree.cc.o
+[  3%] Linking CXX executable ../bin/editdrawingtooldialogtest
+[  3%] Built target editdrawingtooldialogtest
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/OffsetInputSource.cc.o
+[  3%] Building CXX object shell/CMakeFiles/charta.dir/welcomescreen.cpp.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/PDFVersion.cc.o
+[  3%] Linking CXX executable ../bin/urldetecttest
+[  3%] Built target urldetecttest
+[  3%] Building CXX object shell/CMakeFiles/charta.dir/__/gui/recentitemsmodel.cpp.o
+[  3%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pipeline.cc.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_AES_PDF.cc.o
+[  5%] Building CXX object autotests/CMakeFiles/distinguishednameparser.dir/distinguishednameparser_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object autotests/CMakeFiles/distinguishednameparser.dir/check_distinguished_name_parser.cpp.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_ASCII85Decoder.cc.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_ASCIIHexDecoder.cc.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_Base64.cc.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_Buffer.cc.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_Concatenate.cc.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_Count.cc.o
+[  5%] Building CXX object autotests/CMakeFiles/toggleactionmenutest.dir/toggleactionmenutest_autogen/mocs_compilation.cpp.o
+[  5%] Building CXX object autotests/CMakeFiles/toggleactionmenutest.dir/toggleactionmenutest.cpp.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_DCT.cc.o
+[  5%] Building CXX object shell/CMakeFiles/charta.dir/charta_autogen/EWIEGA46WW/qrc_shell.cpp.o
+[  5%] Linking CXX executable ../bin/charta
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_Discard.cc.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_Flate.cc.o
+[  5%] Built target charta
+[  5%] Building CXX object autotests/CMakeFiles/toggleactionmenutest.dir/__/part/toggleactionmenu.cpp.o
+[  5%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_Function.cc.o
+[  7%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_LZWDecoder.cc.o
+[  7%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_MD5.cc.o
+[  7%] Linking CXX executable ../bin/distinguishednameparser
+[  7%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_OStream.cc.o
+[  7%] Generating ui_textdocumentsettings.h
+[  7%] Generating qrc_builtin.cpp
+[  7%] Generating ui_chooseenginewidget.h
+[  7%] Built target distinguishednameparser
+[  7%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_PNGFilter.cc.o
+[  7%] Building CXX object CMakeFiles/okularcore.dir/okularcore_autogen/mocs_compilation.cpp.o
+[  7%] Building CXX object CMakeFiles/okularcore.dir/core/action.cpp.o
+[  7%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_QPDFTokenizer.cc.o
+[  9%] Linking CXX executable ../bin/toggleactionmenutest
+[  9%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_RC4.cc.o
+[  9%] Built target toggleactionmenutest
+[  9%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_RunLength.cc.o
+[  9%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_SHA2.cc.o
+[  9%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_StdioFile.cc.o
+[  9%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_String.cc.o
+[  9%] Building CXX object CMakeFiles/okularcore.dir/core/annotations.cpp.o
+[  9%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/Pl_TIFFPredictor.cc.o
+[ 11%] Building CXX object CMakeFiles/okularcore.dir/core/area.cpp.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF.cc.o
+[ 13%] Building CXX object CMakeFiles/okularcore.dir/core/audioplayer.cpp.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFAcroFormDocumentHelper.cc.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFAnnotationObjectHelper.cc.o
+[ 13%] Building CXX object CMakeFiles/okularcore.dir/core/bookmarkmanager.cpp.o
+[ 13%] Building CXX object CMakeFiles/okularcore.dir/core/chooseenginedialog.cpp.o
+[ 13%] Building CXX object CMakeFiles/okularcore.dir/core/document.cpp.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFArgParser.cc.o
+[ 13%] Building CXX object CMakeFiles/okularcore.dir/core/documentcommands.cpp.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFCryptoProvider.cc.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFDocumentHelper.cc.o
+[ 13%] Building CXX object CMakeFiles/okularcore.dir/core/fontinfo.cpp.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFEFStreamObjectHelper.cc.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFEmbeddedFileDocumentHelper.cc.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFExc.cc.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFFileSpecObjectHelper.cc.o
+[ 13%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFFormFieldObjectHelper.cc.o
+[ 13%] Building CXX object CMakeFiles/okularcore.dir/core/form.cpp.o
+[ 15%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFJob.cc.o
+[ 15%] Building CXX object CMakeFiles/okularcore.dir/core/generator.cpp.o
+[ 15%] Building CXX object CMakeFiles/okularcore.dir/core/generator_p.cpp.o
+[ 15%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFJob_argv.cc.o
+[ 15%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFJob_config.cc.o
+[ 15%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFJob_json.cc.o
+[ 15%] Building CXX object CMakeFiles/okularcore.dir/core/misc.cpp.o
+[ 15%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFLogger.cc.o
+[ 17%] Building CXX object CMakeFiles/okularcore.dir/core/movie.cpp.o
+[ 17%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFMatrix.cc.o
+[ 17%] Building CXX object CMakeFiles/okularcore.dir/core/observer.cpp.o
+[ 17%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFNameTreeObjectHelper.cc.o
+[ 17%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFNumberTreeObjectHelper.cc.o
+[ 17%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFObject.cc.o
+[ 17%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFObjectHandle.cc.o
+[ 17%] Building CXX object CMakeFiles/okularcore.dir/core/debug.cpp.o
+[ 17%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFObjectHelper.cc.o
+[ 17%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFObjGen.cc.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFOutlineDocumentHelper.cc.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/page.cpp.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/pagecontroller.cpp.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/pagesize.cpp.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFOutlineObjectHelper.cc.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFPageDocumentHelper.cc.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/pagetransition.cpp.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFPageLabelDocumentHelper.cc.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFPageObjectHelper.cc.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFParser.cc.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/rotationjob.cpp.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFStreamFilter.cc.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/scripter.cpp.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFSystemError.cc.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/sound.cpp.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFTokenizer.cc.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/sourcereference.cpp.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFUsage.cc.o
+[ 19%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFValue.cc.o
+[ 19%] Building CXX object CMakeFiles/okularcore.dir/core/textdocumentgenerator.cpp.o
+[ 21%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFWriter.cc.o
+[ 21%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFXRefEntry.cc.o
+[ 23%] Building CXX object CMakeFiles/okularcore.dir/core/textdocumentsettings.cpp.o
+[ 23%] Building CXX object CMakeFiles/okularcore.dir/core/textpage.cpp.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Array.cc.o
+[ 23%] Building CXX object CMakeFiles/okularcore.dir/core/tilesmanager.cpp.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Bool.cc.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Destroyed.cc.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Dictionary.cc.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_InlineImage.cc.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Integer.cc.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Name.cc.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Null.cc.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Operator.cc.o
+[ 23%] Building CXX object CMakeFiles/okularcore.dir/core/utils.cpp.o
+[ 23%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Reserved.cc.o
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Real.cc.o
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Stream.cc.o
+[ 25%] Building CXX object CMakeFiles/okularcore.dir/core/view.cpp.o
+[ 25%] Building CXX object CMakeFiles/okularcore.dir/core/fileprinter.cpp.o
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_String.cc.o
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_Unresolved.cc.o
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_encryption.cc.o
+[ 25%] Building CXX object CMakeFiles/okularcore.dir/core/printoptionswidget.cpp.o
+[ 25%] Building CXX object CMakeFiles/okularcore.dir/core/signatureutils.cpp.o
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_json.cc.o
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_linearization.cc.o
+[ 25%] Building CXX object CMakeFiles/okularcore.dir/core/script/event.cpp.o
+[ 25%] Building C object CMakeFiles/okularcore.dir/core/synctex/synctex_parser.c.o
+/home/workstation/tools/project/Charta/core/synctex/synctex_parser.c:1635:61: warning: missing initializer for field ‘page’ of ‘synctex_data_model_s’ {aka ‘const struct synctex_data_model_t’} [-Wmissing-field-initializers]
+ 1635 |                                                             synctex_data_ref_thv_max};
+      |                                                             ^~~~~~~~~~~~~~~~~~~~~~~~
+/home/workstation/tools/project/Charta/core/synctex/synctex_parser.c:141:9: note: ‘page’ declared here
+  141 |     int page;
+      |         ^~~~
+/home/workstation/tools/project/Charta/core/synctex/synctex_parser.c: In function ‘synctex_updater_new_with_output_file’:
+/home/workstation/tools/project/Charta/core/synctex/synctex_parser.c:8137:24: warning: assignment left-hand side might be a candidate for a format attribute [-Wsuggest-attribute=format]
+ 8137 |         updater->print = &_synctex_updater_print;
+      |                        ^
+/home/workstation/tools/project/Charta/core/synctex/synctex_parser.c:8143:24: warning: assignment left-hand side might be a candidate for a format attribute [-Wsuggest-attribute=format]
+ 8143 |         updater->print = &_synctex_updater_print_gz;
+      |                        ^
+[ 25%] Building C object CMakeFiles/okularcore.dir/core/synctex/synctex_parser_utils.c.o
+/home/workstation/tools/project/Charta/core/synctex/synctex_parser_utils.c: In function ‘_synctex_merge_strings’:
+/home/workstation/tools/project/Charta/core/synctex/synctex_parser_utils.c:379:33: warning: ‘__builtin___strncpy_chk’ output truncated before terminating nul copying as many bytes from a string as its length [-Wstringop-truncation]
+  379 |                     if (dest != strncpy(dest, temp, size)) {
+      |                                 ^
+/home/workstation/tools/project/Charta/core/synctex/synctex_parser_utils.c:377:29: note: length computed here
+  377 |                 if ((size = strlen(temp)) > 0) {
+      |                             ^~~~~~~~~~~~
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_optimization.cc.o
+[ 25%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDF_pages.cc.o
+[ 26%] Building CXX object CMakeFiles/okularcore.dir/qrc_builtin.cpp.o
+[ 26%] Building CXX object CMakeFiles/okularcore.dir/settings_core.cpp.o
+[ 26%] Building CXX object CMakeFiles/okularcore.dir/core/script/executor_js.cpp.o
+[ 26%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_app.cpp.o
+[ 26%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QTC.cc.o
+[ 28%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QUtil.cc.o
+[ 28%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/RC4.cc.o
+[ 28%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_data.cpp.o
+[ 28%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/ResourceFinder.cc.o
+[ 28%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_display.cpp.o
+[ 28%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/SecureRandomDataProvider.cc.o
+[ 28%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_document.cpp.o
+[ 28%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/SF_FlateLzwDecode.cc.o
+[ 28%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_field.cpp.o
+[ 28%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/qpdf-c.cc.o
+[ 28%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_fullscreen.cpp.o
+[ 28%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/qpdfjob-c.cc.o
+[ 28%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_spell.cpp.o
+[ 28%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_util.cpp.o
+[ 28%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/qpdflogger-c.cc.o
+[ 30%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_event.cpp.o
+[ 30%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFCrypto_openssl.cc.o
+[ 30%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_ocg.cpp.o
+[ 30%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf_object.dir/QPDFCrypto_gnutls.cc.o
+[ 30%] Built target libqpdf_object
+[ 30%] Building CXX object _deps/qpdf-build/libqpdf/CMakeFiles/libqpdf.dir/libqpdf_autogen/mocs_compilation.cpp.o
+[ 30%] Linking CXX static library ../../../lib/libqpdf.a
+[ 32%] Built target libqpdf
+[ 32%] Building CXX object CMakeFiles/okularcore.dir/core/script/js_global.cpp.o
+[ 32%] Linking CXX shared library bin/libOkular6Core.so
+[ 32%] Built target okularcore
+[ 32%] Generating pdfsettings.h, pdfsettings.cpp
+[ 32%] Built target okularGenerator_kimgio_autogen_timestamp_deps
+[ 32%] Generating settings.h, settings.cpp
+[ 32%] Built target okularGenerator_ghostview_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_djvu_autogen_timestamp_deps
+[ 32%] Built target okularpart_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_poppler_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_dvi_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_tiff_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_xps_autogen_timestamp_deps
+[ 32%] Built target okular_comicbook_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_fb_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_fax_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_epub_autogen_timestamp_deps
+[ 32%] Built target epubgeneratortest_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_txt_autogen_timestamp_deps
+[ 32%] Built target shelltest_autogen_timestamp_deps
+[ 32%] Built target okularGenerator_md_autogen_timestamp_deps
+[ 32%] Built target visibilitytest_autogen_timestamp_deps
+[ 32%] Built target jsfunctionstest_autogen_timestamp_deps
+[ 32%] Built target keystroketest_autogen_timestamp_deps
+[ 32%] Built target formattest_autogen_timestamp_deps
+[ 32%] Built target signunsignedfieldtest_autogen_timestamp_deps
+[ 32%] Built target suggestedfilenametest_autogen_timestamp_deps
+[ 32%] Built target documenttest_autogen_timestamp_deps
+[ 32%] Built target searchtest_autogen_timestamp_deps
+[ 32%] Built target editannotationcontentstest_autogen_timestamp_deps
+[ 32%] Built target translateannotationtest_autogen_timestamp_deps
+[ 32%] Built target annotationstest_autogen_timestamp_deps
+[ 32%] Built target annotationrotationtest_autogen_timestamp_deps
+[ 32%] Built target editformstest_autogen_timestamp_deps
+[ 32%] Built target modifyannotationpropertiestest_autogen_timestamp_deps
+[ 32%] Built target calculatetexttest_autogen_timestamp_deps
+[ 32%] Built target generatorstest_autogen_timestamp_deps
+[ 32%] Built target signatureformtest_autogen_timestamp_deps
+[ 32%] Built target markdowntest_autogen_timestamp_deps
+[ 32%] Automatic MOC for target okularpart
+[ 32%] Automatic MOC for target okularGenerator_poppler
+[ 32%] Automatic MOC for target okularGenerator_ghostview
+[ 32%] Automatic MOC for target okularGenerator_kimgio
+[ 32%] Built target okularGenerator_kimgio_autogen
+[ 32%] Automatic MOC for target okularGenerator_djvu
+[ 32%] Built target okularGenerator_ghostview_autogen
+[ 34%] Automatic MOC for target okularGenerator_dvi
+[ 34%] Built target okularGenerator_djvu_autogen
+[ 34%] Automatic MOC for target okularGenerator_tiff
+[ 34%] Built target okularGenerator_poppler_autogen
+[ 34%] Automatic MOC for target okularGenerator_xps
+[ 34%] Built target okularGenerator_tiff_autogen
+[ 36%] Automatic MOC for target okularGenerator_fb
+[ 36%] Built target okularGenerator_xps_autogen
+[ 36%] Automatic MOC for target okular_comicbook
+[ 36%] Built target okular_comicbook_autogen
+[ 36%] Automatic MOC for target okularGenerator_fax
+[ 36%] Built target okularGenerator_dvi_autogen
+[ 36%] Automatic MOC for target okularGenerator_epub
+[ 36%] Built target okularGenerator_fb_autogen
+[ 36%] Automatic MOC for target epubgeneratortest
+[ 36%] Built target okularGenerator_fax_autogen
+[ 36%] Automatic MOC for target okularGenerator_txt
+[ 36%] Built target epubgeneratortest_autogen
+[ 36%] Automatic MOC for target okularGenerator_md
+[ 36%] Built target okularGenerator_epub_autogen
+[ 36%] Automatic MOC for target shelltest
+[ 36%] Built target okularGenerator_txt_autogen
+[ 36%] Built target shelltest_autogen
+[ 36%] Automatic MOC for target visibilitytest
+[ 36%] Automatic MOC for target jsfunctionstest
+[ 36%] Built target okularGenerator_md_autogen
+[ 38%] Automatic MOC for target formattest
+[ 38%] Built target jsfunctionstest_autogen
+[ 38%] Built target visibilitytest_autogen
+[ 38%] Automatic MOC for target keystroketest
+[ 40%] Automatic MOC for target signunsignedfieldtest
+[ 40%] Built target formattest_autogen
+[ 40%] Automatic MOC for target suggestedfilenametest
+[ 40%] Built target keystroketest_autogen
+[ 40%] Automatic MOC for target documenttest
+[ 40%] Built target signunsignedfieldtest_autogen
+[ 40%] Automatic MOC for target searchtest
+[ 40%] Built target suggestedfilenametest_autogen
+[ 40%] Automatic MOC for target annotationstest
+[ 40%] Built target documenttest_autogen
+[ 40%] Automatic MOC for target editannotationcontentstest
+[ 40%] Built target annotationstest_autogen
+[ 40%] Automatic MOC for target translateannotationtest
+[ 40%] Built target searchtest_autogen
+[ 40%] Automatic MOC for target annotationrotationtest
+[ 40%] Built target editannotationcontentstest_autogen
+[ 42%] Automatic MOC for target modifyannotationpropertiestest
+[ 42%] Built target annotationrotationtest_autogen
+[ 42%] Automatic MOC for target editformstest
+[ 42%] Built target translateannotationtest_autogen
+[ 42%] Automatic MOC for target calculatetexttest
+[ 42%] Built target modifyannotationpropertiestest_autogen
+[ 42%] Automatic MOC for target generatorstest
+[ 42%] Built target calculatetexttest_autogen
+[ 42%] Automatic MOC for target signatureformtest
+[ 42%] Built target editformstest_autogen
+[ 42%] Automatic MOC for target markdowntest
+[ 42%] Built target generatorstest_autogen
+[ 44%] Generating ui_pdfsettingswidget.h
+[ 44%] Built target signatureformtest_autogen
+[ 44%] Building CXX object generators/poppler/CMakeFiles/okularGenerator_poppler.dir/okularGenerator_poppler_autogen/mocs_compilation.cpp.o
+[ 44%] Generating ui_gssettingswidget.h
+[ 44%] Generating gssettings.h, gssettings.cpp
+[ 44%] Building CXX object generators/spectre/CMakeFiles/okularGenerator_ghostview.dir/okularGenerator_ghostview_autogen/mocs_compilation.cpp.o
+[ 44%] Building CXX object generators/spectre/CMakeFiles/okularGenerator_ghostview.dir/generator_ghostview.cpp.o
+[ 44%] Built target markdowntest_autogen
+[ 44%] Building CXX object generators/kimgio/CMakeFiles/okularGenerator_kimgio.dir/okularGenerator_kimgio_autogen/mocs_compilation.cpp.o
+[ 44%] Building CXX object generators/kimgio/CMakeFiles/okularGenerator_kimgio.dir/generator_kimgio.cpp.o
+[ 44%] Building CXX object generators/poppler/CMakeFiles/okularGenerator_poppler.dir/generator_pdf.cpp.o
+In file included from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/Buffer.hh:23,
+                 from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:35,
+                 from /home/workstation/tools/project/Charta/generators/poppler/generator_pdf.cpp:16:
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/PointerHolder.hh:31:3: warning: ‘#warning’ before C++23 is a GCC extension [-Wc++23-extensions]
+   31 | # warning "POINTERHOLDER_TRANSITION is not defined -- see qpdf/PointerHolder.hh"
+      |   ^~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/PointerHolder.hh:31:3: warning: #warning "POINTERHOLDER_TRANSITION is not defined -- see qpdf/PointerHolder.hh" [-Wcpp]
+In file included from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:41:
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:1357:5: warning: type qualifiers ignored on function return type [-Wignored-qualifiers]
+ 1357 |     QPDFObject* const
+      |     ^~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:120:31: warning: ‘virtual bool QPDFObjectHandle::StreamDataProvider::provideStreamData(int, int, Pipeline*, bool, bool)’ was hidden [-Woverloaded-virtual=]
+  120 |         QPDF_DLL virtual bool provideStreamData(
+      |                               ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:119:31: warning: ‘virtual void QPDFObjectHandle::StreamDataProvider::provideStreamData(int, int, Pipeline*)’ was hidden [-Woverloaded-virtual=]
+  119 |         QPDF_DLL virtual void provideStreamData(int objid, int generation, Pipeline* pipeline);
+      |                               ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:115:22: warning: ‘virtual void QPDFObjectHandle::StreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*)’ was hidden [-Woverloaded-virtual=]
+  115 |         virtual void provideStreamData(QPDFObjGen const& og, Pipeline* pipeline);
+      |                      ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+[ 44%] Building CXX object generators/spectre/CMakeFiles/okularGenerator_ghostview.dir/rendererthread.cpp.o
+[ 44%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_kimgio.so
+[ 46%] Built target okularGenerator_kimgio
+[ 46%] Building CXX object generators/spectre/CMakeFiles/okularGenerator_ghostview.dir/spectre_debug.cpp.o
+[ 46%] Building CXX object generators/poppler/CMakeFiles/okularGenerator_poppler.dir/formfields.cpp.o
+[ 46%] Building CXX object generators/spectre/CMakeFiles/okularGenerator_ghostview.dir/gssettings.cpp.o
+[ 46%] Built target okularpart_autogen
+[ 46%] Building CXX object generators/poppler/CMakeFiles/okularGenerator_poppler.dir/annots.cpp.o
+[ 46%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_ghostview.so
+[ 46%] Built target okularGenerator_ghostview
+[ 46%] Building CXX object generators/poppler/CMakeFiles/okularGenerator_poppler.dir/pdfsignatureutils.cpp.o
+[ 46%] Building CXX object generators/poppler/CMakeFiles/okularGenerator_poppler.dir/pdfsettingswidget.cpp.o
+[ 46%] Building CXX object generators/poppler/CMakeFiles/okularGenerator_poppler.dir/imagescaling.cpp.o
+[ 48%] Building CXX object generators/djvu/CMakeFiles/okularGenerator_djvu.dir/okularGenerator_djvu_autogen/mocs_compilation.cpp.o
+[ 48%] Building CXX object generators/djvu/CMakeFiles/okularGenerator_djvu.dir/generator_djvu.cpp.o
+[ 48%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/okularGenerator_dvi_autogen/mocs_compilation.cpp.o
+[ 48%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/generator_dvi.cpp.o
+[ 48%] Building CXX object generators/tiff/CMakeFiles/okularGenerator_tiff.dir/okularGenerator_tiff_autogen/mocs_compilation.cpp.o
+[ 48%] Building CXX object generators/tiff/CMakeFiles/okularGenerator_tiff.dir/generator_tiff.cpp.o
+[ 48%] Building CXX object generators/poppler/CMakeFiles/okularGenerator_poppler.dir/pdfsettings.cpp.o
+[ 48%] Building CXX object generators/djvu/CMakeFiles/okularGenerator_djvu.dir/kdjvu.cpp.o
+[ 50%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_poppler.so
+[ 50%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_tiff.so
+[ 50%] Built target okularGenerator_tiff
+[ 50%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/bigEndianByteReader.cpp.o
+[ 50%] Built target okularGenerator_poppler
+[ 50%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/dviRenderer.cpp.o
+[ 50%] Building CXX object generators/xps/CMakeFiles/okularGenerator_xps.dir/okularGenerator_xps_autogen/mocs_compilation.cpp.o
+[ 50%] Building CXX object generators/xps/CMakeFiles/okularGenerator_xps.dir/generator_xps.cpp.o
+[ 50%] Building CXX object generators/fictionbook/CMakeFiles/okularGenerator_fb.dir/okularGenerator_fb_autogen/mocs_compilation.cpp.o
+[ 50%] Building CXX object generators/fictionbook/CMakeFiles/okularGenerator_fb.dir/converter.cpp.o
+[ 50%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_djvu.so
+[ 50%] Built target okularGenerator_djvu
+[ 50%] Building CXX object generators/comicbook/CMakeFiles/okular_comicbook.dir/okular_comicbook_autogen/mocs_compilation.cpp.o
+[ 50%] Building CXX object generators/comicbook/CMakeFiles/okular_comicbook.dir/document.cpp.o
+[ 50%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/dviRenderer_draw.cpp.o
+[ 50%] Building CXX object generators/fictionbook/CMakeFiles/okularGenerator_fb.dir/document.cpp.o
+[ 50%] Building CXX object generators/comicbook/CMakeFiles/okular_comicbook.dir/directory.cpp.o
+[ 50%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/dviRenderer_prescan.cpp.o
+[ 50%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_xps.so
+[ 50%] Built target okularGenerator_xps
+[ 50%] Building CXX object generators/fictionbook/CMakeFiles/okularGenerator_fb.dir/generator_fb.cpp.o
+[ 51%] Building CXX object generators/comicbook/CMakeFiles/okular_comicbook.dir/unrar.cpp.o
+[ 53%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/dviRenderer_dr.cpp.o
+[ 53%] Building CXX object generators/comicbook/CMakeFiles/okular_comicbook.dir/qnatsort.cpp.o
+[ 53%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_fb.so
+[ 53%] Built target okularGenerator_fb
+[ 53%] Building CXX object generators/fax/CMakeFiles/okularGenerator_fax.dir/okularGenerator_fax_autogen/mocs_compilation.cpp.o
+[ 53%] Building CXX object generators/fax/CMakeFiles/okularGenerator_fax.dir/generator_fax.cpp.o
+[ 53%] Building CXX object generators/comicbook/CMakeFiles/okular_comicbook.dir/unrarflavours.cpp.o
+[ 53%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/special.cpp.o
+[ 53%] Building CXX object generators/epub/CMakeFiles/okularGenerator_epub.dir/okularGenerator_epub_autogen/mocs_compilation.cpp.o
+[ 53%] Building CXX object generators/epub/CMakeFiles/okularGenerator_epub.dir/converter.cpp.o
+[ 53%] Linking CXX static library ../../lib/libokular_comicbook.a
+[ 53%] Built target okular_comicbook
+[ 53%] Building CXX object generators/epub/CMakeFiles/epubgeneratortest.dir/epubgeneratortest_autogen/mocs_compilation.cpp.o
+[ 53%] Building CXX object generators/epub/CMakeFiles/epubgeneratortest.dir/autotests/epubgeneratortest.cpp.o
+[ 55%] Building CXX object generators/fax/CMakeFiles/okularGenerator_fax.dir/faxdocument.cpp.o
+[ 55%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/dviFile.cpp.o
+[ 55%] Building CXX object generators/fax/CMakeFiles/okularGenerator_fax.dir/faxexpand.cpp.o
+[ 55%] Building CXX object generators/epub/CMakeFiles/okularGenerator_epub.dir/epubdocument.cpp.o
+[ 55%] Linking CXX executable ../../bin/epubgeneratortest
+[ 55%] Built target epubgeneratortest
+[ 55%] Building CXX object generators/epub/CMakeFiles/okularGenerator_epub.dir/generator_epub.cpp.o
+[ 55%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/dviPageInfo.cpp.o
+[ 55%] Building CXX object generators/fax/CMakeFiles/okularGenerator_fax.dir/faxinit.cpp.o
+[ 55%] Building CXX object generators/fax/CMakeFiles/okularGenerator_fax.dir/fax_debug.cpp.o
+[ 55%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/psgs.cpp.o
+[ 55%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_epub.so
+[ 55%] Building CXX object generators/txt/CMakeFiles/okularGenerator_txt.dir/okularGenerator_txt_autogen/mocs_compilation.cpp.o
+[ 55%] Building CXX object generators/txt/CMakeFiles/okularGenerator_txt.dir/generator_txt.cpp.o
+[ 55%] Built target okularGenerator_epub
+[ 55%] Building CXX object generators/txt/CMakeFiles/okularGenerator_txt.dir/converter.cpp.o
+[ 55%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_fax.so
+[ 55%] Built target okularGenerator_fax
+[ 55%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/glyph.cpp.o
+[ 57%] Building CXX object generators/txt/CMakeFiles/okularGenerator_txt.dir/document.cpp.o
+[ 57%] Building CXX object generators/markdown/CMakeFiles/okularGenerator_md.dir/okularGenerator_md_autogen/mocs_compilation.cpp.o
+[ 57%] Building CXX object generators/markdown/CMakeFiles/okularGenerator_md.dir/converter.cpp.o
+[ 57%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/TeXFont.cpp.o
+[ 57%] Building CXX object autotests/CMakeFiles/shelltest.dir/shelltest_autogen/mocs_compilation.cpp.o
+[ 57%] Building CXX object autotests/CMakeFiles/shelltest.dir/shelltest.cpp.o
+[ 57%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/TeXFontDefinition.cpp.o
+[ 57%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_txt.so
+[ 57%] Built target okularGenerator_txt
+[ 57%] Building CXX object generators/markdown/CMakeFiles/okularGenerator_md.dir/generator_md.cpp.o
+[ 59%] Building CXX object autotests/CMakeFiles/shelltest.dir/__/shell/shellutils.cpp.o
+[ 59%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/vf.cpp.o
+[ 59%] Building CXX object autotests/CMakeFiles/visibilitytest.dir/visibilitytest_autogen/mocs_compilation.cpp.o
+[ 59%] Building CXX object autotests/CMakeFiles/visibilitytest.dir/visibilitytest.cpp.o
+[ 59%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_md.so
+/home/workstation/tools/project/Charta/generators/dvi/vf.cpp: In member function ‘void TeXFontDefinition::read_VF_index()’:
+/home/workstation/tools/project/Charta/generators/dvi/vf.cpp:82:14: warning: ignoring return value of ‘size_t fread(void*, size_t, size_t, FILE*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+   82 |         fread(newfontname, sizeof(char), len, VF_file);
+      |         ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/workstation/tools/project/Charta/generators/dvi/vf.cpp:160:18: warning: ignoring return value of ‘size_t fread(void*, size_t, size_t, FILE*)’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+  160 |             fread(reinterpret_cast<char *>(m->pos), 1, len, VF_file);
+      |             ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 59%] Built target okularGenerator_md
+[ 59%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/TeXFont_PFB.cpp.o
+[ 59%] Linking CXX executable ../bin/shelltest
+[ 59%] Built target shelltest
+[ 59%] Building CXX object autotests/CMakeFiles/jsfunctionstest.dir/jsfunctionstest_autogen/mocs_compilation.cpp.o
+[ 59%] Building CXX object autotests/CMakeFiles/jsfunctionstest.dir/jsfunctionstest.cpp.o
+[ 59%] Building CXX object autotests/CMakeFiles/formattest.dir/formattest_autogen/mocs_compilation.cpp.o
+[ 59%] Building CXX object autotests/CMakeFiles/formattest.dir/formattest.cpp.o
+[ 61%] Linking CXX executable ../bin/visibilitytest
+[ 61%] Built target visibilitytest
+[ 61%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/TeXFont_PK.cpp.o
+[ 63%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/TeXFont_TFM.cpp.o
+[ 63%] Linking CXX executable ../bin/jsfunctionstest
+[ 63%] Building CXX object autotests/CMakeFiles/keystroketest.dir/keystroketest_autogen/mocs_compilation.cpp.o
+[ 63%] Building CXX object autotests/CMakeFiles/keystroketest.dir/keystroketest.cpp.o
+[ 63%] Built target jsfunctionstest
+[ 63%] Building CXX object autotests/CMakeFiles/signunsignedfieldtest.dir/signunsignedfieldtest_autogen/mocs_compilation.cpp.o
+[ 63%] Building CXX object autotests/CMakeFiles/signunsignedfieldtest.dir/signunsignedfieldtest.cpp.o
+[ 63%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/util.cpp.o
+[ 63%] Linking CXX executable ../bin/formattest
+[ 63%] Built target formattest
+[ 63%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/pageSize.cpp.o
+[ 63%] Building CXX object autotests/CMakeFiles/suggestedfilenametest.dir/suggestedfilenametest_autogen/mocs_compilation.cpp.o
+[ 63%] Building CXX object autotests/CMakeFiles/suggestedfilenametest.dir/suggestedfilenametest.cpp.o
+[ 63%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/length.cpp.o
+[ 63%] Linking CXX executable ../bin/signunsignedfieldtest
+[ 63%] Built target signunsignedfieldtest
+[ 63%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/fontEncoding.cpp.o
+[ 63%] Linking CXX executable ../bin/keystroketest
+[ 63%] Built target keystroketest
+[ 63%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/fontEncodingPool.cpp.o
+[ 63%] Building CXX object autotests/CMakeFiles/documenttest.dir/documenttest_autogen/mocs_compilation.cpp.o
+[ 63%] Building CXX object autotests/CMakeFiles/documenttest.dir/documenttest.cpp.o
+[ 63%] Linking CXX executable ../bin/suggestedfilenametest
+[ 63%] Built target suggestedfilenametest
+[ 63%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/fontMap.cpp.o
+[ 63%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/fontpool.cpp.o
+[ 63%] Building CXX object autotests/CMakeFiles/searchtest.dir/searchtest_autogen/mocs_compilation.cpp.o
+[ 65%] Building CXX object autotests/CMakeFiles/searchtest.dir/searchtest.cpp.o
+[ 67%] Building CXX object autotests/CMakeFiles/annotationstest.dir/annotationstest_autogen/mocs_compilation.cpp.o
+[ 67%] Building CXX object autotests/CMakeFiles/annotationstest.dir/annotationstest.cpp.o
+[ 67%] Linking CXX executable ../bin/documenttest
+[ 67%] Built target documenttest
+[ 69%] Building CXX object autotests/CMakeFiles/editannotationcontentstest.dir/editannotationcontentstest_autogen/mocs_compilation.cpp.o
+[ 69%] Building CXX object autotests/CMakeFiles/editannotationcontentstest.dir/editannotationcontentstest.cpp.o
+[ 69%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/dvisourcesplitter.cpp.o
+[ 69%] Linking CXX executable ../bin/searchtest
+[ 69%] Built target searchtest
+[ 69%] Building CXX object generators/dvi/CMakeFiles/okularGenerator_dvi.dir/dviexport.cpp.o
+[ 69%] Linking CXX executable ../bin/annotationstest
+[ 69%] Building CXX object autotests/CMakeFiles/editannotationcontentstest.dir/testingutils.cpp.o
+[ 69%] Built target annotationstest
+[ 69%] Building CXX object autotests/CMakeFiles/translateannotationtest.dir/translateannotationtest_autogen/mocs_compilation.cpp.o
+[ 69%] Building CXX object autotests/CMakeFiles/translateannotationtest.dir/translateannotationtest.cpp.o
+[ 69%] Building CXX object autotests/CMakeFiles/annotationrotationtest.dir/annotationrotationtest_autogen/mocs_compilation.cpp.o
+[ 69%] Building CXX object autotests/CMakeFiles/annotationrotationtest.dir/annotationrotationtest.cpp.o
+[ 69%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_dvi.so
+[ 69%] Linking CXX executable ../bin/editannotationcontentstest
+[ 69%] Built target okularGenerator_dvi
+[ 69%] Building CXX object autotests/CMakeFiles/translateannotationtest.dir/testingutils.cpp.o
+[ 69%] Built target editannotationcontentstest
+[ 69%] Building CXX object autotests/CMakeFiles/modifyannotationpropertiestest.dir/modifyannotationpropertiestest_autogen/mocs_compilation.cpp.o
+[ 69%] Building CXX object autotests/CMakeFiles/modifyannotationpropertiestest.dir/modifyannotationpropertiestest.cpp.o
+[ 71%] Building CXX object autotests/CMakeFiles/editformstest.dir/editformstest_autogen/mocs_compilation.cpp.o
+[ 71%] Building CXX object autotests/CMakeFiles/editformstest.dir/editformstest.cpp.o
+[ 71%] Linking CXX executable ../bin/annotationrotationtest
+[ 71%] Built target annotationrotationtest
+[ 71%] Building CXX object autotests/CMakeFiles/modifyannotationpropertiestest.dir/testingutils.cpp.o
+[ 71%] Linking CXX executable ../bin/translateannotationtest
+[ 71%] Built target translateannotationtest
+[ 71%] Building CXX object autotests/CMakeFiles/calculatetexttest.dir/calculatetexttest_autogen/mocs_compilation.cpp.o
+[ 71%] Building CXX object autotests/CMakeFiles/calculatetexttest.dir/calculatetexttest.cpp.o
+[ 71%] Building CXX object autotests/CMakeFiles/generatorstest.dir/generatorstest_autogen/mocs_compilation.cpp.o
+[ 71%] Building CXX object autotests/CMakeFiles/generatorstest.dir/generatorstest.cpp.o
+[ 71%] Linking CXX executable ../bin/modifyannotationpropertiestest
+[ 71%] Built target modifyannotationpropertiestest
+[ 71%] Building CXX object autotests/CMakeFiles/signatureformtest.dir/signatureformtest_autogen/mocs_compilation.cpp.o
+[ 71%] Building CXX object autotests/CMakeFiles/signatureformtest.dir/signatureformtest.cpp.o
+[ 71%] Linking CXX executable ../bin/editformstest
+[ 71%] Built target editformstest
+[ 71%] Building CXX object autotests/CMakeFiles/markdowntest.dir/markdowntest_autogen/mocs_compilation.cpp.o
+[ 71%] Building CXX object autotests/CMakeFiles/markdowntest.dir/markdowntest.cpp.o
+[ 71%] Linking CXX executable ../bin/calculatetexttest
+[ 71%] Built target calculatetexttest
+[ 71%] Building CXX object autotests/CMakeFiles/markdowntest.dir/__/generators/markdown/converter.cpp.o
+[ 71%] Linking CXX executable ../bin/generatorstest
+[ 71%] Built target generatorstest
+[ 71%] Generating ui_selectcertificatedialog.h
+[ 71%] Automatic RCC for part/part.qrc
+[ 71%] Building CXX object CMakeFiles/okularpart.dir/okularpart_autogen/mocs_compilation.cpp.o
+[ 71%] Linking CXX executable ../bin/signatureformtest
+[ 71%] Built target signatureformtest
+[ 71%] Building CXX object CMakeFiles/okularpart.dir/gui/certificatemodel.cpp.o
+[ 71%] Built target okularGenerator_comicbook_autogen_timestamp_deps
+[ 71%] Building CXX object CMakeFiles/okularpart.dir/gui/debug_ui.cpp.o
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/gui/guiutils.cpp.o
+[ 73%] Built target comicbooktest_autogen_timestamp_deps
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/gui/pagepainter.cpp.o
+[ 73%] Linking CXX executable ../bin/markdowntest
+[ 73%] Automatic MOC for target okularGenerator_comicbook
+[ 73%] Built target markdowntest
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/gui/signatureguiutils.cpp.o
+[ 73%] Built target okularGenerator_comicbook_autogen
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/gui/signaturemodel.cpp.o
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/gui/tocmodel.cpp.o
+[ 73%] Automatic MOC for target comicbooktest
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/part/preferencesdialog.cpp.o
+[ 73%] Building CXX object generators/comicbook/CMakeFiles/okularGenerator_comicbook.dir/okularGenerator_comicbook_autogen/mocs_compilation.cpp.o
+[ 73%] Building CXX object generators/comicbook/CMakeFiles/okularGenerator_comicbook.dir/generator_comicbook.cpp.o
+[ 73%] Built target comicbooktest_autogen
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/part/dlgaccessibility.cpp.o
+[ 73%] Building CXX object generators/comicbook/CMakeFiles/comicbooktest.dir/comicbooktest_autogen/mocs_compilation.cpp.o
+[ 73%] Building CXX object generators/comicbook/CMakeFiles/comicbooktest.dir/autotests/comicbooktest.cpp.o
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/part/dlgdebug.cpp.o
+[ 73%] Linking CXX shared module ../../bin/charta_generators/okularGenerator_comicbook.so
+[ 73%] Built target okularGenerator_comicbook
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/part/dlgeditor.cpp.o
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/part/dlggeneral.cpp.o
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/part/dlgannotations.cpp.o
+[ 73%] Linking CXX executable ../../bin/comicbooktest
+[ 73%] Built target comicbooktest
+[ 73%] Building CXX object CMakeFiles/okularpart.dir/part/dlgperformance.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/dlgpresentation.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/editannottooldialog.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/editdrawingtooldialog.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/widgetannottools.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/widgetconfigurationtoolsbase.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/widgetdrawingtools.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/part.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/extensions.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/embeddedfilesdialog.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/actionbar.cpp.o
+[ 75%] Building CXX object CMakeFiles/okularpart.dir/part/annotationactionhandler.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/annotationcolorhistory.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/annotwindow.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/annotationmodel.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/annotationpopup.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/annotationpropertiesdialog.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/annotationproxymodels.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/annotationtools.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/annotationwidgets.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/bookmarklist.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/certificateviewer.cpp.o
+[ 76%] Building CXX object CMakeFiles/okularpart.dir/part/colormodemenu.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/cursorwraphelper.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/drawingtoolactions.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/fileprinterpreview.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/findbar.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/formwidgets.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/kleopatraintegration.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/ktreeviewsearchline.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/latexrenderer.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/minibar.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/okmenutitle.cpp.o
+[ 78%] Building CXX object CMakeFiles/okularpart.dir/part/pageitemdelegate.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/pagesizelabel.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/pageviewannotator.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/pageviewmouseannotation.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/pageview.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/magnifierview.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/pageviewutils.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/presentationsearchbar.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/presentationwidget.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/propertiesdialog.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/revisionviewer.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/searchlineedit.cpp.o
+[ 80%] Building CXX object CMakeFiles/okularpart.dir/part/searchwidget.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/sidebar.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/side_reviews.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/thumbnaillist.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/toc.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/toggleactionmenu.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/videowidget.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/layers.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/signaturepartutils.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/signaturepartutilskeydelegate.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/signaturepartutilsrecentimagesmodel.cpp.o
+[ 82%] Building CXX object CMakeFiles/okularpart.dir/part/signaturepartutilsimageitemdelegate.cpp.o
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/signaturepropertiesdialog.cpp.o
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/signaturepanel.cpp.o
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/signingcertificatelistmodel.cpp.o
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/newpagedialog.cpp.o
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/blankpageswriter.cpp.o
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/documentbuildersource.cpp.o
+In file included from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/Buffer.hh:23,
+                 from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:35,
+                 from /home/workstation/tools/project/Charta/part/documentbuildersource.cpp:25:
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/PointerHolder.hh:31:3: warning: ‘#warning’ before C++23 is a GCC extension [-Wc++23-extensions]
+   31 | # warning "POINTERHOLDER_TRANSITION is not defined -- see qpdf/PointerHolder.hh"
+      |   ^~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/PointerHolder.hh:31:3: warning: #warning "POINTERHOLDER_TRANSITION is not defined -- see qpdf/PointerHolder.hh" [-Wcpp]
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/documentbuildermodel.cpp.o
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/documentbuilderexport.cpp.o
+In file included from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/Buffer.hh:23,
+                 from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:35,
+                 from /home/workstation/tools/project/Charta/part/documentbuilderexport.cpp:29:
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/PointerHolder.hh:31:3: warning: ‘#warning’ before C++23 is a GCC extension [-Wc++23-extensions]
+   31 | # warning "POINTERHOLDER_TRANSITION is not defined -- see qpdf/PointerHolder.hh"
+      |   ^~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/PointerHolder.hh:31:3: warning: #warning "POINTERHOLDER_TRANSITION is not defined -- see qpdf/PointerHolder.hh" [-Wcpp]
+In file included from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:41:
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:1357:5: warning: type qualifiers ignored on function return type [-Wignored-qualifiers]
+ 1357 |     QPDFObject* const
+      |     ^~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:115:22: warning: ‘virtual void QPDFObjectHandle::StreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*)’ was hidden [-Woverloaded-virtual=]
+  115 |         virtual void provideStreamData(QPDFObjGen const& og, Pipeline* pipeline);
+      |                      ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:120:31: warning: ‘virtual bool QPDFObjectHandle::StreamDataProvider::provideStreamData(int, int, Pipeline*, bool, bool)’ was hidden [-Woverloaded-virtual=]
+  120 |         QPDF_DLL virtual bool provideStreamData(
+      |                               ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:119:31: warning: ‘virtual void QPDFObjectHandle::StreamDataProvider::provideStreamData(int, int, Pipeline*)’ was hidden [-Woverloaded-virtual=]
+  119 |         QPDF_DLL virtual void provideStreamData(int objid, int generation, Pipeline* pipeline);
+      |                               ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/documentbuilder.cpp.o
+In file included from /tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:41:
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:1357:5: warning: type qualifiers ignored on function return type [-Wignored-qualifiers]
+ 1357 |     QPDFObject* const
+      |     ^~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:119:31: warning: ‘virtual void QPDFObjectHandle::StreamDataProvider::provideStreamData(int, int, Pipeline*)’ was hidden [-Woverloaded-virtual=]
+  119 |         QPDF_DLL virtual void provideStreamData(int objid, int generation, Pipeline* pipeline);
+      |                               ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:115:22: warning: ‘virtual void QPDFObjectHandle::StreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*)’ was hidden [-Woverloaded-virtual=]
+  115 |         virtual void provideStreamData(QPDFObjGen const& og, Pipeline* pipeline);
+      |                      ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDFObjectHandle.hh:120:31: warning: ‘virtual bool QPDFObjectHandle::StreamDataProvider::provideStreamData(int, int, Pipeline*, bool, bool)’ was hidden [-Woverloaded-virtual=]
+  120 |         QPDF_DLL virtual bool provideStreamData(
+      |                               ^~~~~~~~~~~~~~~~~
+/tmp/opencode/charta-build/_deps/qpdf-src/include/qpdf/QPDF.hh:972:14: note:   by ‘virtual bool QPDF::CopiedStreamDataProvider::provideStreamData(const QPDFObjGen&, Pipeline*, bool, bool)’
+  972 |         bool provideStreamData(
+      |              ^~~~~~~~~~~~~~~~~
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/pagerangeinputdialog.cpp.o
+[ 84%] Building CXX object CMakeFiles/okularpart.dir/part/imagepagesettingsdialog.cpp.o
+[ 86%] Building CXX object CMakeFiles/okularpart.dir/part/tts.cpp.o
+[ 86%] Building CXX object CMakeFiles/okularpart.dir/settings.cpp.o
+[ 86%] Building CXX object CMakeFiles/okularpart.dir/okularpart_autogen/EAH7DXM7NH/qrc_part.cpp.o
+[ 86%] Linking CXX shared library bin/kf6/parts/okularpart.so
+[ 86%] Built target okularpart
+[ 86%] Built target blankpageswritertest_autogen_timestamp_deps
+[ 86%] Built target parttest_autogen_timestamp_deps
+[ 86%] Built target documentbuildermodeltest_autogen_timestamp_deps
+[ 86%] Built target untitleddocumenttest_autogen_timestamp_deps
+[ 86%] Built target documentbuilderparttest_autogen_timestamp_deps
+[ 86%] Built target annotationclipboardtest_autogen_timestamp_deps
+[ 86%] Built target annotationpersistencetest_autogen_timestamp_deps
+[ 86%] Built target addremoveannotationtest_autogen_timestamp_deps
+[ 86%] Built target mainshelltest_autogen_timestamp_deps
+[ 86%] Built target widthpresetstest_autogen_timestamp_deps
+[ 86%] Built target annotationcolorhistorytest_autogen_timestamp_deps
+[ 88%] Automatic MOC for target parttest
+[ 88%] Built target annotationtoolbartest_autogen_timestamp_deps
+[ 88%] Automatic MOC for target untitleddocumenttest
+[ 90%] Automatic MOC for target blankpageswritertest
+[ 90%] Automatic MOC for target documentbuildermodeltest
+[ 90%] Built target documentbuildermodeltest_autogen
+[ 90%] Automatic MOC for target documentbuilderparttest
+[ 90%] Built target blankpageswritertest_autogen
+[ 90%] Automatic MOC for target annotationclipboardtest
+[ 90%] Built target parttest_autogen
+[ 90%] Automatic MOC for target addremoveannotationtest
+[ 90%] Built target untitleddocumenttest_autogen
+[ 90%] Automatic MOC for target annotationpersistencetest
+[ 90%] Built target documentbuilderparttest_autogen
+[ 90%] Automatic MOC for target mainshelltest
+[ 90%] Built target annotationpersistencetest_autogen
+[ 90%] Automatic MOC for target widthpresetstest
+[ 90%] Built target addremoveannotationtest_autogen
+[ 90%] Automatic MOC for target annotationcolorhistorytest
+[ 90%] Built target annotationclipboardtest_autogen
+[ 90%] Automatic MOC for target annotationtoolbartest
+[ 90%] Built target widthpresetstest_autogen
+[ 90%] Building CXX object autotests/CMakeFiles/parttest.dir/parttest_autogen/mocs_compilation.cpp.o
+[ 90%] Built target annotationcolorhistorytest_autogen
+[ 90%] Building CXX object autotests/CMakeFiles/parttest.dir/parttest.cpp.o
+[ 90%] Building CXX object autotests/CMakeFiles/parttest.dir/closedialoghelper.cpp.o
+[ 90%] Built target mainshelltest_autogen
+[ 90%] Building CXX object autotests/CMakeFiles/blankpageswritertest.dir/blankpageswritertest_autogen/mocs_compilation.cpp.o
+[ 90%] Building CXX object autotests/CMakeFiles/blankpageswritertest.dir/blankpageswritertest.cpp.o
+[ 90%] Built target annotationtoolbartest_autogen
+[ 90%] Building CXX object autotests/CMakeFiles/untitleddocumenttest.dir/untitleddocumenttest_autogen/mocs_compilation.cpp.o
+[ 92%] Building CXX object autotests/CMakeFiles/untitleddocumenttest.dir/untitleddocumenttest.cpp.o
+[ 92%] Building CXX object autotests/CMakeFiles/documentbuildermodeltest.dir/documentbuildermodeltest_autogen/mocs_compilation.cpp.o
+[ 92%] Building CXX object autotests/CMakeFiles/documentbuildermodeltest.dir/documentbuildermodeltest.cpp.o
+[ 92%] Linking CXX executable ../bin/blankpageswritertest
+[ 92%] Built target blankpageswritertest
+[ 92%] Building CXX object autotests/CMakeFiles/documentbuilderparttest.dir/documentbuilderparttest_autogen/mocs_compilation.cpp.o
+[ 92%] Building CXX object autotests/CMakeFiles/documentbuilderparttest.dir/documentbuilderparttest.cpp.o
+[ 92%] Linking CXX executable ../bin/untitleddocumenttest
+[ 92%] Built target untitleddocumenttest
+[ 92%] Building CXX object autotests/CMakeFiles/annotationclipboardtest.dir/annotationclipboardtest_autogen/mocs_compilation.cpp.o
+[ 92%] Building CXX object autotests/CMakeFiles/annotationclipboardtest.dir/annotationclipboardtest.cpp.o
+[ 92%] Linking CXX executable ../bin/documentbuildermodeltest
+[ 92%] Linking CXX executable ../bin/annotationclipboardtest
+[ 92%] Built target documentbuildermodeltest
+[ 92%] Building CXX object autotests/CMakeFiles/addremoveannotationtest.dir/addremoveannotationtest_autogen/mocs_compilation.cpp.o
+[ 92%] Building CXX object autotests/CMakeFiles/addremoveannotationtest.dir/addremoveannotationtest.cpp.o
+[ 92%] Linking CXX executable ../bin/documentbuilderparttest
+[ 92%] Built target annotationclipboardtest
+[ 92%] Building CXX object autotests/CMakeFiles/addremoveannotationtest.dir/testingutils.cpp.o
+[ 94%] Built target documentbuilderparttest
+[ 94%] Building CXX object autotests/CMakeFiles/addremoveannotationtest.dir/__/part/annotationtools.cpp.o
+[ 94%] Linking CXX executable ../bin/parttest
+[ 94%] Building CXX object autotests/CMakeFiles/annotationpersistencetest.dir/annotationpersistencetest_autogen/mocs_compilation.cpp.o
+[ 94%] Building CXX object autotests/CMakeFiles/annotationpersistencetest.dir/annotationpersistencetest.cpp.o
+[ 94%] Built target parttest
+[ 94%] Building CXX object autotests/CMakeFiles/mainshelltest.dir/mainshelltest_autogen/mocs_compilation.cpp.o
+[ 94%] Building CXX object autotests/CMakeFiles/mainshelltest.dir/mainshelltest.cpp.o
+[ 94%] Building CXX object autotests/CMakeFiles/widthpresetstest.dir/widthpresetstest_autogen/mocs_compilation.cpp.o
+[ 94%] Building CXX object autotests/CMakeFiles/widthpresetstest.dir/widthpresetstest.cpp.o
+[ 94%] Linking CXX executable ../bin/addremoveannotationtest
+[ 94%] Built target addremoveannotationtest
+[ 94%] Building CXX object autotests/CMakeFiles/mainshelltest.dir/__/shell/okular_main.cpp.o
+[ 94%] Building CXX object autotests/CMakeFiles/annotationcolorhistorytest.dir/annotationcolorhistorytest_autogen/mocs_compilation.cpp.o
+[ 94%] Building CXX object autotests/CMakeFiles/annotationcolorhistorytest.dir/annotationcolorhistorytest.cpp.o
+[ 94%] Linking CXX executable ../bin/widthpresetstest
+[ 94%] Built target widthpresetstest
+[ 94%] Building CXX object autotests/CMakeFiles/mainshelltest.dir/__/shell/shellutils.cpp.o
+[ 94%] Linking CXX executable ../bin/annotationpersistencetest
+[ 96%] Built target annotationpersistencetest
+[ 96%] Building CXX object autotests/CMakeFiles/mainshelltest.dir/__/shell/shell.cpp.o
+[ 96%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/annotationtoolbartest_autogen/mocs_compilation.cpp.o
+[ 96%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/annotationtoolbartest.cpp.o
+[ 96%] Linking CXX executable ../bin/annotationcolorhistorytest
+[ 96%] Built target annotationcolorhistorytest
+[ 96%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/__/part/annotationtools.cpp.o
+[ 96%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/__/shell/okular_main.cpp.o
+[ 96%] Building CXX object autotests/CMakeFiles/mainshelltest.dir/__/shell/welcomescreen.cpp.o
+[ 96%] Building CXX object autotests/CMakeFiles/mainshelltest.dir/__/gui/recentitemsmodel.cpp.o
+[ 96%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/__/shell/shellutils.cpp.o
+[ 96%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/__/shell/shell.cpp.o
+[ 98%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/__/shell/welcomescreen.cpp.o
+[ 98%] Building CXX object autotests/CMakeFiles/mainshelltest.dir/closedialoghelper.cpp.o
+[ 98%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/__/gui/recentitemsmodel.cpp.o
+[100%] Linking CXX executable ../bin/mainshelltest
+[100%] Building CXX object autotests/CMakeFiles/annotationtoolbartest.dir/closedialoghelper.cpp.o
+[100%] Built target mainshelltest
+[100%] Linking CXX executable ../bin/annotationtoolbartest
+[100%] Built target annotationtoolbartest
+BUILD_OK

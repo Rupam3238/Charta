@@ -237,10 +237,10 @@ if (NOT QPDF_LINK_TARGET)
     # (KF6CoreAddonsMacros.cmake: "if (NOT BUILD_SHARED_LIBS) set(ARGS_STATIC ON)") builds every
     # document generator as a STATIC archive instead of a MODULE plugin, and its static branch
     # returns before setting LIBRARY_OUTPUT_DIRECTORY or creating an install() rule. No .so would
-    # then be produced in ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/okular_generators or installed, while
-    # the app discovers generators at runtime only (KPluginMetaData::findPlugins("okular_generators")
+    # then be produced in ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/charta_generators or installed, while
+    # the app discovers generators at runtime only (KPluginMetaData::findPlugins("charta_generators")
     # in core/document.cpp) -- so the running app would silently keep using whatever stale plugin
-    # .so an earlier configuration happened to leave in build/bin/okular_generators/.
+    # .so an earlier configuration happened to leave in build/bin/charta_generators/.
     #
     # The options are therefore set as normal (non-cache) variables, which are visible inside the
     # qpdf subdirectory only. cmake_minimum_required(3.22) implies CMP0077 NEW, so qpdf's
@@ -405,6 +405,11 @@ if(BUILD_MOBILE)
 endif()
 
 if(BUILD_TESTING)
+   # Charta's own test suite must be registered by Charta. This used to happen only by accident:
+   # the fetched QPDF calls enable_testing() in its own CMakeLists, and that call enables testing
+   # for the whole project. With the upstream QPDF suites labelled and excluded (see below), that
+   # accident would have stopped working, so the call is made explicitly here.
+   enable_testing()
    add_subdirectory( autotests )
 endif()
 

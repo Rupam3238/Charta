@@ -1,0 +1,33 @@
+SPDX-FileCopyrightText: 2015-2025 Prayag2 and the KDE Drawy contributors
+SPDX-License-Identifier: LGPL-2.1-only
+
+The Drawy-derived expression used by Charta
+===========================================
+
+Expression (as it appears in KDE Drawy, snapshot 35194a7ec850ee54454917597f34d5b4c62bc81c,
+file src/controller/controller.cpp, line 45):
+
+    m_context->event().setPressure(event->pressure() / 1.60 + 0.375);
+
+Charta's use (part/annotationtools.cpp, AnnotatorEngine::decodeEvent):
+
+    *pressure = qBound(0.0, tabletEvent->pressure() / 1.60 + 0.375, 1.0);
+
+Upstream:     https://invent.kde.org/graphics/drawy
+Snapshot:     35194a7ec850ee54454917597f34d5b4c62bc81c (2025-06-07), at that time named "Drawly"
+Licence:      LGPL-2.1-only - the snapshot's LICENSE is LGPL 2.1 and contains no "or later"
+              statement. Text: LICENSES/LGPL-2.1-only.txt
+
+Modification: the expression was carried into Okular's AnnotatorEngine::decodeEvent and bounded
+with qBound(0.0, ..., 1.0). Nothing else was taken from that snapshot. The seven-point stroke
+smoothing in Charta is NOT from Drawy; it extends Okular's own SmoothPathEngine, and the Drawy
+snapshot contains no smoothing code at all.
+
+Combination with the rest of Charta: LGPL-2.1 section 3 permits the licensee to apply the
+ordinary GNU General Public License, version 2 or any later version, instead. Charta is
+GPL-2.0-or-later, so the combined work is distributed under GPL-2.0-or-later with the notices
+altered as section 3 requires. This file carries the unmodified expression under its own original
+terms, so that the LGPL-2.1-only text has a file to apply to.
+
+Full analysis and the evidence trail: docs/licensing/drawy-provenance.md
+Attribution for the shipped binary: docs/THIRD-PARTY-NOTICES.md

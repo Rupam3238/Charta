@@ -1,0 +1,90 @@
+# Drawy evidence captured 2026-10-21T20:00:01+05:30
+
+## snapshot 35194a7e: src/controller/controller.cpp (setPressure context)
+21-void Controller::mousePressed(QMouseEvent* event) {
+22-    m_context->event().setPos(event->pos(), m_context->canvas().scale());
+23-    m_context->event().setButton(event->button());
+24-    m_context->toolBar().curTool().mousePressed(m_context);
+25-
+26-    if (event->type() != QEvent::TabletPress) {
+27:        m_context->event().setPressure(1.0);
+28-    }
+29-}
+30-
+31-void Controller::mouseMoved(QMouseEvent* event) {
+32-    m_context->event().setPos(event->pos(), m_context->canvas().scale());
+33-    m_context->event().setButton(event->button());
+--
+39-    m_context->event().setButton(event->button());
+40-    m_context->toolBar().curTool().mouseReleased(m_context);
+41-}
+42-
+43-void Controller::tablet(QTabletEvent* event) {
+44-    // TODO: Remove magic numbers
+45:    m_context->event().setPressure(event->pressure() / 1.60 + 0.375);
+46-}
+47-
+48-void Controller::wheel(QWheelEvent* event) {
+49-    m_context->setOffsetPos(m_context->offsetPos() - event->pixelDelta() / m_context->zoomFactor());
+50-    Common::renderItems(m_context);
+51-    m_context->canvas().update();
+
+## snapshot: smoothing search (expect: nothing)
+35194a7e:src/context/applicationcontext.cpp:66:    m_canvasPainter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+35194a7e:src/context/applicationcontext.cpp:67:    m_overlayPainter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+35194a7e:src/context/applicationcontext.cpp:127:        m_canvasPainter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+35194a7e:src/context/applicationcontext.cpp:132:        m_overlayPainter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+35194a7e:src/data-structures/cachegrid.cpp:13:    m_painter->setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+35194a7e:src/item/freeform.cpp:76:    painter.setRenderHints(QPainter::SmoothPixmapTransform | QPainter::Antialiasing);
+35194a7e:src/item/freeform.cpp:90:    painter.setRenderHints(QPainter::SmoothPixmapTransform | QPainter::Antialiasing);
+
+## snapshot LICENSE head
+                  GNU LESSER GENERAL PUBLIC LICENSE
+                       Version 2.1, February 1999
+
+ Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+ 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ Everyone is permitted to copy and distribute verbatim copies
+
+## snapshot README licence section
+11:# Licence
+12:This project uses the GNU Lesser General Public Licence.
+13-
+14-# Plan
+15-Started: `2025-01-02 04:40PM`  
+
+## snapshot: any 'or later' statement?
+(none)
+
+## current HEAD licence
+40:### License
+41:This project uses the GNU General Public License V3.
+
+## current HEAD (eb7e925a) licence state
+LICENSES/ contains (first 8):
+LICENSES/BSD-2-Clause.txt
+LICENSES/BSD-3-Clause.txt
+LICENSES/CC-BY-SA-4.0.txt
+LICENSES/CC0-1.0.txt
+LICENSES/GPL-2.0-or-later.txt
+LICENSES/GPL-3.0-or-later.txt
+LICENSES/LGPL-2.0-or-later.txt
+LICENSES/MIT.txt
+
+README:
+### License
+This project uses the GNU General Public License V3.
+
+REUSE.toml present:
+REUSE.toml
+
+relicense commit:
+801a5640 chore: adopt reuse-tool for linting and add SPDX headers
+801a5640 chore: adopt reuse-tool for linting and add SPDX headers
+ LICENSE                                            | 674 ---------------------
+ LICENSES/GPL-3.0-or-later.txt                      | 232 +++++++
+ LICENSE_HEADER                                     |  21 -
+ src/canvas/canvas.cpp                              |  20 +-
+ src/canvas/canvas.hpp                              |  20 +-
+ src/command/command.hpp                            |  20 +-
+ src/command/commandhistory.cpp                     |  20 +-

@@ -250,21 +250,36 @@ The Document Builder accepts PDFs and images readable by Qt's `QImageReader`.
 - [docs/architecture.md](docs/architecture.md): layering, save pipelines, Document Builder.
 - [docs/README-VERIFICATION.md](docs/README-VERIFICATION.md): claim-to-evidence mapping, checks
   performed, and unresolved questions.
+- [docs/licensing/](docs/licensing/): provenance evidence, licence inventory, the third-party
+  notices, the AGPL decision, and the per-release compliance checklist.
+- [CONTRIBUTING.md](CONTRIBUTING.md): licence terms for contributions, SPDX header rules, and the
+  rules for adding third-party code.
 
 ## Attribution and provenance
 
 Charta retains applicable upstream components, copyright notices, and license terms, including
 those from KDE Okular; existing notices remain with their files.
 
-Some annotation behaviour, including pressure mapping and seven-point stroke smoothing, was
-reimplemented or adapted from [KDE Drawy](https://invent.kde.org/graphics/drawy), particularly
-`src/controller/controller.cpp` and `src/item/freeform.cpp`. The Drawy source snapshot and the
-applicable license are **not established** in project records and must be resolved before
-release. Disclosure does not satisfy any licensing requirement.
+One annotation behaviour — the tablet pressure mapping — was derived from
+[KDE Drawy](https://invent.kde.org/graphics/drawy), snapshot `35194a7e` (2025-06-07, at that time
+named *Drawly*), file `src/controller/controller.cpp`. The expression
+`pressure() / 1.60 + 0.375` appears in `part/annotationtools.cpp`, bounded with `qBound`. That
+snapshot is **LGPL-2.1-only** (there is no "or later" statement in it), its text is shipped as
+[`LICENSES/LGPL-2.1-only.txt`](LICENSES/LGPL-2.1-only.txt), and the attribution is in
+[`docs/THIRD-PARTY-NOTICES.md`](docs/THIRD-PARTY-NOTICES.md). The **seven-point stroke smoothing
+is not from Drawy** — it extends Okular's own `SmoothPathEngine`, and the Drawy snapshot contains
+no smoothing code. The evidence, including the quoted upstream hunk, is in
+[`docs/licensing/drawy-provenance.md`](docs/licensing/drawy-provenance.md).
 
-The Poppler fork's commits are authored as `Workspace Experiment <workspace@example.com>`, and
-the upstream Poppler commit it was imported from is not recorded. Poppler's license and notices
-remain relevant to the modified code.
+Charta builds against a patched Poppler 26.08.0 (archive sha256
+`dc906e68cea698109706ac6aa3d2c9d4512fcfcac42d90b8afcda486d1b9abd0`). The complete patch series
+lives in [`patches/`](patches/) and is verified to reproduce the built library byte-for-byte. It
+adds `Annotator::setUserRotation()`, rotated appearance handling, page reorder and ink appearance
+support, none of which is upstream. Poppler's license and notices remain relevant to the modified
+code. Provenance, the exact series, and the reproduction recipe are in
+[`docs/licensing/poppler-provenance.md`](docs/licensing/poppler-provenance.md). The fork's earlier
+commits are authored as `Workspace Experiment <workspace@example.com>`; the auditable state of the
+fork is the patch series, and a commit of the fork's uncommitted work is still pending.
 
 AI tools were used to generate or modify essentially all of Charta's implementation under the
 direction of its project creator and maintainer, who integrated and tested the work. AI systems
@@ -274,8 +289,13 @@ and is not a substitute for copyright attribution.
 ## License
 
 Licensing is expressed through per-file SPDX headers (predominantly `GPL-2.0-or-later`) and the
-texts in [`LICENSES/`](LICENSES/); there is no top-level `COPYING`. Upstream Okular code keeps
-its original licenses. This is not a legal review, and the Drawy question above is open.
+texts in [`LICENSES/`](LICENSES/); [`LICENSE`](LICENSE) is the pointer file, and
+[`docs/THIRD-PARTY-NOTICES.md`](docs/THIRD-PARTY-NOTICES.md) lists every third-party component,
+its licence, and the obligation that creates. Upstream Okular code keeps its original licenses;
+files that carry no per-file header are covered by [`REUSE.toml`](REUSE.toml). The documentation
+under `docs/` is GFDL-1.2-or-later. The Flatpak bundle deliberately excludes Ghostscript and
+libspectre, so no AGPL code is shipped. This is not a legal review; the provenance evidence, the
+open questions, and the per-release checklist are in [`docs/licensing/`](docs/licensing/).
 
 ## Contributing and reporting issues
 

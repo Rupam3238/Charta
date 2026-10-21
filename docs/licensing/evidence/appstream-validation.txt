@@ -1,0 +1,21 @@
+# AppStream / desktop validation (Phase 7)
+date: 2026-10-21T20:12:30+05:30
+
+appstreamcli validate --no-net <file>
+shell/org.charta.reader.metainfo.xml                           ✔ Validation was successful.
+generators/comicbook/org.kde.okular-comicbook.metainfo.xml     ✔ Validation was successful: infos: 1, pedantic: 1
+generators/djvu/org.kde.okular-djvu.metainfo.xml               ✔ Validation was successful: infos: 1, pedantic: 1
+generators/dvi/org.kde.okular-dvi.metainfo.xml                 ✔ Validation was successful: infos: 1, pedantic: 1
+generators/epub/org.kde.okular-epub.metainfo.xml               ✔ Validation was successful: infos: 1, pedantic: 1
+generators/fax/org.kde.okular-fax.metainfo.xml                 ✔ Validation was successful: infos: 1, pedantic: 1
+generators/fictionbook/org.kde.okular-fb.metainfo.xml          ✔ Validation was successful: infos: 1, pedantic: 1
+generators/kimgio/org.kde.okular-kimgio.metainfo.xml           ✔ Validation was successful: infos: 1, pedantic: 1
+generators/markdown/org.kde.okular-md.metainfo.xml             ✔ Validation was successful: infos: 1, pedantic: 1
+generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml   ✔ Validation was successful: infos: 1, pedantic: 1
+generators/poppler/org.kde.okular-poppler.metainfo.xml         ✔ Validation was successful: infos: 1, pedantic: 1
+generators/spectre/org.kde.okular-spectre.metainfo.xml         ✔ Validation was successful: infos: 1, pedantic: 1
+generators/tiff/org.kde.okular-tiff.metainfo.xml               ✔ Validation was successful: infos: 1, pedantic: 1
+generators/txt/org.kde.okular-txt.metainfo.xml                 ✔ Validation was successful: infos: 1, pedantic: 1
+generators/xps/org.kde.okular-xps.metainfo.xml                 ✔ Validation was successful: infos: 1, pedantic: 1
+
+desktop-file-validate:

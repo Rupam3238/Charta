@@ -1,0 +1,4 @@
+ M README.md
+ M docs/README-VERIFICATION.md
+?? docs/images/
+?? docs/licensing/

@@ -32,3 +32,7 @@ build-dir
 # Python bytecode cache left behind by local helper scripts
 __pycache__/
 
+# Scratch files, build residue and editor backups that must never be tracked
+/CMakeFiles/
+/test_savedepth*
+/core/*.backup

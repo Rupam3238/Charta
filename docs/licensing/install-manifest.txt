@@ -1,0 +1,63 @@
+# Install manifest (Phase 7, P7-09)
+
+**How it was produced:**
+
+```sh
+DESTDIR=/tmp/opencode/charta-install cmake --install /tmp/opencode/charta-build
+find /tmp/opencode/charta-install -type f -o -type l | sed 's|/tmp/opencode/charta-install||' | sort
+```
+
+The install was staged into a throwaway prefix. **Nothing was installed into a system prefix**
+(`cmake --install` was only ever run with `DESTDIR` set).
+
+## 1. Totals
+
+| Item | Count |
+| --- | --- |
+| Files installed | 1 214 |
+| Licence texts installed | 16 (`/usr/share/licenses/charta/`) |
+| Notices installed | 2 (`/usr/share/doc/charta/`) |
+| Shared libraries | 17 (1 core library + its 2 soname links, 13 generator plugins, 1 part plugin) |
+| Installed paths whose name still contains "okular" | **1 136** |
+
+## 2. The compliance artefacts are in the package
+
+```
+/usr/share/doc/charta/THIRD-PARTY-NOTICES.md
+/usr/share/doc/charta/QPDF-NOTICE.md
+/usr/share/licenses/charta/Apache-2.0.txt          (QPDF, statically linked)
+/usr/share/licenses/charta/LGPL-2.1-only.txt        (the Drawy expression)
+/usr/share/licenses/charta/CC0-1.0.txt              (AppStream metadata)
+/usr/share/licenses/charta/LicenseRef-Okular-upstream-terms.txt
+/usr/share/licenses/charta/GPL-2.0-or-later.txt     ... and the rest of the 16
+```
+
+**Verified by inspection of the staged install** — this is the check the Flatpak `cleanup` bug used
+to make impossible.
+
+## 3. Collisions with a distro Okular install
+
+| Installed path | Collides with | Severity |
+| --- | --- | --- |
+| `/usr/lib/x86_64-linux-gnu/libOkular6Core.so.4.0.0` (+ `libOkular6Core.so`, `.so.4`) | a distro `libokular` package installs the **same soname** | **high** — a distro that installs both will overwrite one with the other; the ABI is not guaranteed compatible |
+| `/usr/include/okular/**` (21 headers) | the Okular development package installs the same header path | **medium** — header collision; the two trees are not interchangeable |
+| `/usr/lib/.../qt6/plugins/charta_generators/okularGenerator_*.so` | none: the **directory** is now `charta_generators` | low — file names still say "okular", the path does not |
+| `/usr/share/…/org.kde.okular-*.metainfo.xml` (14 files) | a distro Okular installs the same component ids | **medium** — AppStream would see duplicate component ids |
+| `org.kde.okular` D-Bus name (`X-DBUS-ServiceName`, `--own-name=org.kde.okular`) | a running Okular on the same session bus | **high at runtime** — the two applications fight over the service name; Charta additionally uses the `org.kde.okular-<pid>` per-process name |
+| `application/vnd.kde.okular-archive` (MIME type) | a system-wide MIME type | low — shared identifier, not a file collision |
+
+## 4. What this pass changed, and what it did not
+
+* **Changed:** the generator plugin *directory* (`okular_generators` -> `charta_generators`), both
+  in the build tree and in the install tree. This removes the plugin-directory collision.
+* **Not changed:** the core library name/soname (`Okular6Core`), the header path (`include/okular`),
+  the 14 component ids, the D-Bus service name, the MIME type. Each of these is a rename with
+  user-visible or packaging consequences; they are listed as tasks in
+  `docs/licensing/FIRST-PASS-REPORT.md` §7 and in `packaging.md` §2.
+
+## 5. The complete list
+
+The full list of 1 214 installed paths is regenerable with the command at the top of this file; it
+is not duplicated here to keep this document readable. The parts that matter for compliance are in
+§2 and §3.
+

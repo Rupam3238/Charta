@@ -1,0 +1,28 @@
+component,kind,version,source,licence,linkage,text_in_LICENSES,obligation,evidence_class,notes
+Okular,upstream application code,master @ 60fd9fbc (candidate),https://invent.kde.org/graphics/okular,GPL-2.0-or-later (per file),source (fork),yes:GPL-2.0-or-later.txt,keep notices; state modifications; ship licence; offer source,E2,base SHA being pinned in Phase 3
+Poppler (+ Charta fork),patched dependency,26.08.0,https://poppler.freedesktop.org/poppler-26.08.0.tar.xz,GPL-2.0-or-later,dynamic (module),yes:GPL-2.0-or-later.txt,"ship licence, upstream notices, and the fork's source/patch series",E0,3-patch series regenerated and verified in Phase 5
+QPDF,"build-time, statically linked",v11.9.1,https://github.com/qpdf/qpdf.git (FetchContent),Apache-2.0,"STATIC (libqpdf.a, --exclude-libs)","yes:Apache-2.0.txt (+ docs/QPDF-NOTICE.md, Artistic-2.0.txt)",ship Apache-2.0 text AND upstream NOTICE; state modifications,E0,obligation: Apache-2.0 section 4; text + upstream NOTICE now shipped
+Qt6,runtime dependency,6.x,https://download.qt.io,LGPL-3.0-or-later (also GPL-3.0/commercial),"dynamic, from org.kde.Platform",NO,"not conveyed by the app ref; if ever bundled, ship LGPL-3.0 text and re-analyse",E1,"runtime is a separate Flatpak ref, not this manifest"
+KDE Frameworks 6,runtime dependency,6.x,https://download.kde.org,LGPL-2.1-or-later (mostly),"dynamic, from org.kde.Platform",NO,not conveyed by the app ref,E1,same runtime boundary as Qt
+libspectre,optional build dep,0.2.12,http://libspectre.freedesktop.org,GPL-2.0-or-later,"dynamic, optional",yes:GPL-2.0-or-later.txt,notices only if shipped,E0,"links libgs (AGPL) -> removed from bundle, see agpl-ghostscript.md"
+Ghostscript,optional build dep,from ghostpdl-downloads,https://github.com/ArtifexSoftware/ghostpdl-downloads,AGPL-3.0,was bundled via libspectre,NO,D11: dropped from the Flatpak; never ship in the bundle,E0,AGPL-3.0 - the reason for D11
+DjVuLibre,optional build dep,3.5.30,http://downloads.sourceforge.net/djvu,GPL-2.0-or-later,dynamic,yes:GPL-2.0-or-later.txt,notices; source availability for a bundled module,E1,
+ebook-tools,optional build dep,via sourceforge,https://downloads.sourceforge.net/project/ebook-tools,GPL-2.0-or-later,dynamic,yes:GPL-2.0-or-later.txt,notices; source availability,E3,licence not re-verified in this pass
+kdegraphics-mobipocket,optional build dep,KDE release-service 26.08.1,https://download.kde.org,GPL-2.0-or-later,dynamic,yes:GPL-2.0-or-later.txt,notices; source availability,E3,
+libkexiv2 / KExiv2,optional build dep,KDE release-service 26.08.1,https://download.kde.org,GPL-2.0-or-later,dynamic,yes:GPL-2.0-or-later.txt,notices; source availability,E3,
+exiv2,optional build dep,v0.28.9,https://github.com/Exiv2/exiv2,GPL-2.0-or-later,dynamic,yes:GPL-2.0-or-later.txt,notices; source availability,E3,
+discount,optional build dep,v3.0.2.0,https://github.com/Orc/discount,BSD-3-Clause,dynamic,yes:BSD-3-Clause.txt,keep copyright notice,E3,
+inih,optional build dep,r62,https://github.com/benhoyt/inih,BSD-3-Clause,dynamic,yes:BSD-3-Clause.txt,keep copyright notice,E3,
+libzip,optional build dep,1.11.4,https://libzip.org,BSD-3-Clause,dynamic,yes:BSD-3-Clause.txt,keep copyright notice,E3,
+boost,optional build dep,1.92.0,https://archives.boost.io,BSL-1.0,headers only,NO,ship BSL-1.0 text if headers are redistributed,E3,BSL-1.0 text is NOT in LICENSES/
+poppler-data,optional build dep,0.4.12,https://poppler.freedesktop.org,MIT-style + Adobe CMaps under separate terms,data,NO,keep upstream notices; the CMaps have their own terms,E3,licence of the bundled CMap data must be checked
+gnustep-make / libs-base,optional build dep,make-2_9_3 / base-1.29,https://github.com/gnustep,GPL-2.0-or-later (make) / LGPL-2.1 (libs-base),dynamic,partial,ship the matching texts if the modules ship,E3,one local patch applied to libs-base
+unarchiver (XADMaster),optional build dep,universal-detector,https://github.com/MacPaw/universal-detector,LGPL-2.1,dynamic,NO,ship LGPL-2.1 text if shipped,E3,
+Freetype,build dep,system,https://www.freetype.org,FTL or GPL-2.0-or-later,dynamic,NO,notices; the FTL text is missing from LICENSES/,E3,
+libtiff,build dep,system,http://www.libtiff.org,libtiff licence (BSD-like),dynamic,NO,notices,E3,
+zlib,build dep,system,https://zlib.net,zlib,dynamic,NO,notices,E3,
+poppler-utils (pdfseparate/pdfunite),runtime helper,system,https://poppler.freedesktop.org,GPL-2.0-or-later,external process,yes:GPL-2.0-or-later.txt,none beyond attribution; not bundled,E1,used as a fallback by generator_pdf.cpp
+SyncTeX parser,vendored source,in-tree,https://github.com/TeX-Live/texlive-source (synctex_parser),X11 (per in-tree headers),compiled in,yes:X11.txt,keep copyright notice,E1,core/synctex carries its own .diff and patches/ subdirectory
+Okular translations (po/),data,1 069 catalogues,https://invent.kde.org/graphics/okular,UNRESOLVED - no licence identifier in the files,installed as domain 'okular',n/a,keep translator notices; do not invent a licence,E1,Phase 6 must resolve; upstream has no identifier either
+Charta brand assets,assets,30 files,AI-generated (maintainer),maintainer's choice / AI output,distributed,NO,state the position; do not claim commissioned authorship,E3,see assets.md
+Okular test fixtures,data,37 files,https://invent.kde.org/graphics/okular,Okular's terms (GPL-2.0-or-later),distributed in the source tree,yes:GPL-2.0-or-later.txt,keep; do not delete for licence reasons,E1,content check (private keys) is P6-06

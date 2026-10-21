@@ -1,5 +1,6 @@
 /*
     SPDX-License-Identifier: GPL-2.0-or-later
+    SPDX-FileCopyrightText: 2026 Charta contributors (licensing party; AI-assisted)
 */
 
 // Tests for the part side of "Create a PDF": a brand-new document that has no location yet lives in

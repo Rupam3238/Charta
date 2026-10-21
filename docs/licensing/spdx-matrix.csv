@@ -1,0 +1,165 @@
+identifier,copyright_text,file_count,example_paths,text_present_in_LICENSES,evidence_class,notes
+GPL-2.0-or-later,2008 Pino Toscano <pino@kde.org>,37,core/movie.cpp; core/movie.h; core/script/executor_js.cpp (+34 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2007 Pino Toscano <pino@kde.org>,36,aboutdata.h; core/annotations_p.h; core/audioplayer.cpp (+33 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2017 Klarälvdalens Datakonsult AB a KDAB Group company <info@kdab.com>,32,autotests/documenttest.cpp; autotests/parttest.cpp; core/document.h (+29 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,,26,autotests/annotationcolorhistorytest.cpp; autotests/annotationpersistencetest.cpp; autotests/annotationrotationtest.cpp (+23 more),yes,E0,Okular/KDE upstream default; identifier present but NO SPDX-FileCopyrightText in this file
+GPL-2.0-or-later,2007 Tobias Koenig <tokoe@kde.org>,22,core/generator_p.cpp; core/generator_p.h; core/global.h (+19 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2018 Chinmoy Ranjan Pradhan <chinmoyrp65@gmail.com>,19,autotests/signatureformtest.cpp; core/signatureutils.cpp; core/signatureutils.h (+16 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2006 Pino Toscano <toscano.pino@tiscali.it>,18,core/chooseenginedialog.cpp; core/chooseenginedialog_p.h; generators/djvu/generator_djvu.cpp (+15 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2012 Marco Martin <mart@kde.org>,16,mobile/app/ui/Bookmarks.qml; mobile/app/ui/Main.qml; mobile/app/ui/MainView.qml (+13 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004 Enrico Ros <eros.kde@email.it>,15,core/action.h; core/page.cpp; core/page.h (+12 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2008 Harri Porten <porten@kde.org>,15,core/script/executor_js.cpp; core/script/js_app.cpp; core/script/js_app_p.h (+12 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2005 Enrico Ros <eros.kde@email.it>,14,core/annotations.cpp; core/annotations.h; core/observer.cpp (+11 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2006 Pino Toscano <pino@kde.org>,14,core/bookmarkmanager.cpp; core/bookmarkmanager.h; core/sound.cpp (+11 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2002 Wilco Greven <greven@kde.org>,13,part/extensions.cpp; part/extensions.h; part/pageview.cpp (+10 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003 Stefan Kebekus,13,generators/dvi/TeXFont.h; generators/dvi/TeXFont_PFB.cpp; generators/dvi/TeXFont_PFB.h (+10 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003 Laurent Montel <montel@kde.org>,11,part/pageview.cpp; part/pageview.h; part/pageviewmouseannotation.cpp (+8 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2015 Laurent Montel <montel@kde.org>,11,autotests/editdrawingtooldialogtest.cpp; autotests/editdrawingtooldialogtest.h; part/drawingtoolactions.cpp (+8 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004-2005 Enrico Ros <eros.kde@email.it>,10,core/action.cpp; core/document.cpp; core/document.cpp.backup (+7 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2013 Azat Khuzhin <a3at.mail@gmail.com>,9,core/textdocumentsettings.cpp; core/textdocumentsettings.h; core/textdocumentsettings_p.h (+6 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2013 Jon Mease <jon.mease@gmail.com>,9,autotests/addremoveannotationtest.cpp; autotests/editannotationcontentstest.cpp; autotests/editformstest.cpp (+6 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2018 Intevation GmbH <intevation@intevation.de>,9,autotests/calculatetexttest.cpp; autotests/visibilitytest.cpp; core/script/builtin.js (+6 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2023 g10 Code GmbH,9,autotests/check_distinguished_name_parser.cpp; autotests/suggestedfilenametest.cpp; generators/poppler/autotests/testimagescaling.cpp (+6 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004-2006 Albert Astals Cid <aacid@kde.org>,8,part/pageview.cpp; part/pageviewmouseannotation.cpp; part/pageviewmouseannotation.h (+5 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2005 Piotr Szymanski <niedakh@gmail.com>,8,core/area.cpp; core/area.h; core/generator.cpp (+5 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2008 Ely Levy <elylevy@cs.huji.ac.il>,8,generators/epub/converter.cpp; generators/epub/converter.h; generators/epub/epubdocument.cpp (+5 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2014 Frederik Gladhorn <gladhorn@kde.org>,8,core/debug.cpp; core/debug_p.h; generators/comicbook/debug_comicbook.h (+5 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2023-2025 g10 Code GmbH,8,part/signaturepartutilsimageitemdelegate.cpp; part/signaturepartutilsimageitemdelegate.h; part/signaturepartutilskconfig.h (+5 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003 Christophe Devriese <Christophe.Devriese@student.kuleuven.ac.be>,7,part/pageview.cpp; part/pageview.h; part/pageviewmouseannotation.cpp (+4 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2006 Luigi Toscano <luigi.toscano@tiscali.it>,7,core/utils.cpp; core/utils.h; generators/dvi/debug_dvi.h (+4 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2019 João Netto <joaonetto901@gmail.com>,7,autotests/formattest.cpp; autotests/jsfunctionstest.cpp; autotests/keystroketest.cpp (+4 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004-2008 Albert Astals Cid <aacid@kde.org>,6,core/document.cpp; core/document.cpp.backup; core/document.h (+3 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2006 Albert Astals Cid <aacid@kde.org>,6,part/embeddedfilesdialog.cpp; part/embeddedfilesdialog.h; part/minibar.cpp (+3 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2012 Fabio D 'Urso <fabiodurso@hotmail.it>,6,core/tile.h; generators/poppler/annots.h; part/editannottooldialog.cpp (+3 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+BSD-2-Clause,1994 Paul Vojta. All rights reserved.,5,generators/dvi/TeXFont_PK.cpp; generators/dvi/dviFile.cpp; generators/dvi/dviRenderer_draw.cpp (+2 more),yes,E0,this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004 Albert Astals Cid <aacid@kde.org>,5,part/pageview.h; part/propertiesdialog.cpp; part/propertiesdialog.h (+2 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2006 Tobias Koenig <tokoe@kde.org>,5,core/rotationjob.cpp; core/rotationjob_p.h; core/textpage_p.h (+2 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2021 Jiří Wolker <woljiri@gmail.com>,5,gui/recentitemsmodel.cpp; gui/recentitemsmodel.h; shell/welcomescreen.cpp (+2 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+X11,2008-2017 jerome DOT laurens AT u-bourgogne DOT fr,5,core/synctex/synctex_parser.c; core/synctex/synctex_parser.h; core/synctex/synctex_parser_advanced.h (+2 more),yes,E0,this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003 Dirk Mueller <mueller@kde.org>,4,part/pageview.cpp; part/pageviewmouseannotation.cpp; part/pageviewmouseannotation.h (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004-2005 Stefan Kebekus,4,generators/dvi/anchor.h; generators/dvi/dviFile.h; generators/dvi/hyperlink.h (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2005 Albert Astals Cid <aacid@kde.org>,4,core/observer.cpp; core/observer.h; generators/kimgio/generator_kimgio.cpp (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2006 Chu Xiaodong <xiaodongchu@gmail.com>,4,part/annotationpropertiesdialog.cpp; part/annotationpropertiesdialog.h; part/annotwindow.cpp (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2008 Jakub Stachowski <qbast@go2.pl>,4,generators/mobipocket/converter.cpp; generators/mobipocket/converter.h; generators/mobipocket/mobidocument.cpp (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2008 Tobias Koenig <tokoe@kde.org>,4,generators/fax/faxdocument.cpp; generators/fax/faxdocument.h; generators/fax/generator_fax.cpp (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2012 Guillermo A. Amaral B. <gamaral@kde.org>,4,core/movie.cpp; core/movie.h; generators/poppler/annots.cpp (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2017 Julian Wolff <wolff@julianwolff.de>,4,generators/markdown/converter.cpp; generators/markdown/converter.h; generators/markdown/generator_md.cpp (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2019-2021 David Hurka <david.hurka@mailbox.org>,4,part/colormodemenu.cpp; part/colormodemenu.h; part/toggleactionmenu.cpp (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2024 Carl Schwan <carl@carlschwan.eu>,4,mobile/app/ui/CertificateViewerPage.qml; mobile/app/ui/SignaturePropertiesPage.qml; mobile/components/types.cpp (+1 more),yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+LGPL-2.0-or-later,2014 Laurent Montel <montel@kde.org>,4,generators/fax/fax_debug.cpp; generators/fax/fax_debug.h; generators/spectre/spectre_debug.cpp (+1 more),yes,E0,this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,"1990, 1995 Frank D. Cringle.",3,generators/fax/faxexpand.cpp; generators/fax/faxexpand.h; generators/fax/faxinit.cpp,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003-2004 Christophe Devriese <Christophe.Devriese@student.kuleuven.ac.be>,3,part/part.cpp; part/part.h; shell/shell.cpp,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003-2007 Albert Astals Cid <aacid@kde.org>,3,shell/main.cpp; shell/okular_main.cpp; shell/okular_main.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004 Andy Goossens <andygoossens@telenet.be>,3,shell/main.cpp; shell/okular_main.cpp; shell/okular_main.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004 Dominique Devriese <devriese@kde.org>,3,part/part.cpp; part/part.h; shell/shell.cpp,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004 James Ots <kde@jamesots.com>,3,part/pageview.cpp; part/pageviewmouseannotation.cpp; part/pageviewmouseannotation.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004 Stefan Kebekus,3,generators/dvi/pageNumber.h; generators/dvi/psgs.cpp; generators/dvi/psgs.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2006-2007 Pino Toscano <pino@kde.org>,3,generators/kimgio/generator_kimgio.cpp; gui/guiutils.cpp; gui/guiutils.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2007 Albert Astals Cid <aacid@kde.org>,3,generators/spectre/generator_ghostview.h; generators/spectre/rendererthread.cpp; generators/spectre/rendererthread.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2007 Alex Merry <huntedhacker@tiscali.co.uk>,3,core/fileprinter.cpp; part/fileprinterpreview.cpp; part/fileprinterpreview.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2009 Pino Toscano <pino@kde.org>,3,autotests/shelltest.cpp; shell/shellutils.cpp; shell/shellutils.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2011 Jiri Baum - NICTA <jiri@baum.com.au>,3,part/pageview.cpp; part/pageviewmouseannotation.cpp; part/pageviewmouseannotation.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2013 Albert Astals Cid <aacid@kde.org>,3,autotests/parttest.cpp; autotests/searchtest.cpp; gui/priorities.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2019 Oliver Sander <oliver.sander@tu-dresden.de>,3,generators/poppler/formfields.cpp; generators/poppler/formfields.h; generators/poppler/generator_pdf.cpp,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2020 David Hurka <david.hurka@mailbox.org>,3,autotests/toggleactionmenutest.cpp; part/cursorwraphelper.cpp; part/cursorwraphelper.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2025 Sebastian Kügler <sebas@kde.org>,3,mobile/app/ui/WelcomeView.qml; mobile/components/welcomeitem.cpp; mobile/components/welcomeitem.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-only OR GPL-3.0-only,2007 Tobias Koenig <tokoe@kde.org>,2,generators/comicbook/qnatsort.cpp; generators/comicbook/qnatsort.h,yes,E0,this copyright text co-occurs with this identifier in these files
+GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL,,2,part/magnifierview.cpp; part/magnifierview.h,yes,E0,compound OR expression; REUSE needs all 3 texts; identifier present but NO SPDX-FileCopyrightText in this file
+GPL-2.0-or-later,2001-2005 Stefan Kebekus,2,generators/dvi/dviRenderer.cpp; generators/dvi/fontpool.cpp,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2002 Chris Cheney <ccheney@cheney.cx>,2,part/part.cpp; shell/shell.cpp,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003 Andy Goossens <andygoossens@telenet.be>,2,part/part.cpp; part/part.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003 Benjamin Meyer <benjamin@csh.rit.edu>,2,shell/shell.cpp; shell/shell.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2003 Luboš Luňák <l.lunak@kde.org>,2,shell/shell.cpp; shell/shell.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004 Duncan Mac-Vicar Prett <duncan@kde.org>,2,part/latexrenderer.cpp; part/latexrenderer.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004-05 Enrico Ros <eros.kde@email.it>,2,core/area.cpp; core/area.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004-2005 Olivier Goffart <ogoffart@kde.org>,2,part/latexrenderer.cpp; part/latexrenderer.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2004-2007 Albert Astals Cid <aacid@kde.org>,2,core/document_p.h; part/part.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2005 Tobias Koenig <tokoe@kde.org>,2,core/pagetransition.cpp; core/pagetransition.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2006 Wilfried Huss,2,generators/dvi/length.cpp; generators/dvi/length.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,"2006, 2008 Pino Toscano <pino@kde.org>",2,part/dlgpresentation.cpp; part/dlgpresentation.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2007 John Layt <john@layt.net>,2,part/fileprinterpreview.cpp; part/fileprinterpreview.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,"2007, 2009-2010 Pino Toscano <pino@kde.org>",2,part/searchlineedit.cpp; part/searchlineedit.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,"2007, 2010 John Layt <john@layt.net>",2,core/fileprinter.cpp; core/fileprinter.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2008 Albert Astals Cid <aacid@kde.org>,2,core/generator.cpp; core/generator.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2011 David Palacio <dpalacio@orbitalibre.org>,2,generators/comicbook/directory.cpp; generators/comicbook/directory.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2011 Niels Ole Salscheider,2,part/latexrenderer.cpp; part/latexrenderer.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2012 Mailson Menezes <mailson@gmail.com>,2,core/tilesmanager.cpp; core/tilesmanager_p.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2013 Fabio D 'Urso <fabiodurso@hotmail.it>,2,autotests/documenttest.cpp; generators/kimgio/tests/kimgiotest.cpp,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2013 Jaydeep Solanki <jaydp17@gmail.com>,2,autotests/urldetecttest.cpp; part/url_utils.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2013 Peter Grasch <me@bedahr.org>,2,autotests/annotationclipboardtest.cpp; autotests/annotationstest.cpp,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2015 Albert Astals Cid <aacid@kde.org>,2,part/drawingtoolactions.cpp; part/drawingtoolactions.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2015 Marco Martin <mart@kde.org>,2,mobile/components/DocumentView.qml; mobile/components/private/PageView.qml,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2015 Saheb Preet Singh <saheb.preet@gmail.com>,2,part/layers.cpp; part/layers.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2017 Tobias Deiminger <haxtibal@t-online.de>,2,part/pageviewmouseannotation.cpp; part/pageviewmouseannotation.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,"2017, 2018 Klarälvdalens Datakonsult AB a KDAB Group company <info@kdab.com>",2,core/document.cpp; core/document.cpp.backup,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2018 Aleix Pol <aleixpol@kde.org>,2,mobile/app/android.cpp; mobile/app/android.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2018 Aleix Pol Gonzalez <aleixpol@kde.org>,2,mobile/components/okularsingleton.cpp; mobile/components/okularsingleton.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2018 Chinmoy Ranjan Pradhan <chinmoyrp65@gmail.com,2,gui/signaturemodel.cpp; gui/signaturemodel.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2019 Bubli <Katarina.Behrens@cib.de>,2,generators/poppler/pdfsettingswidget.cpp; generators/poppler/pdfsettingswidget.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2019 Michael Weghorn <m.weghorn@posteo.de>,2,core/printoptionswidget.cpp; core/printoptionswidget.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2019 Simone Gaiarin <simgunz@gmail.com>,2,part/annotationactionhandler.cpp; part/annotationactionhandler.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2020 Albert Astals Cid <albert.astals.cid@kdab.com>,2,generators/poppler/pdfsettingswidget.cpp; generators/poppler/pdfsettingswidget.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2022 Albert Astals Cid <aacid@kde.org>,2,autotests/signunsignedfieldtest.cpp; mobile/app/ui/SignaturePropertiesPage.qml,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2024 Albert Astals Cid <aacid@kde.org>,2,part/newpagedialog.cpp; part/newpagedialog.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2024 Pratham Gandhi <ppg.1382@gmail.com>,2,core/script/js_global.cpp; core/script/js_global_p.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+GPL-2.0-or-later,2025 g10 Code GmbH,2,part/kleopatraintegration.cpp; part/kleopatraintegration.h,yes,E0,Okular/KDE upstream default; this copyright text co-occurs with this identifier in these files
+LGPL-2.0-only,,2,part/okmenutitle.cpp; part/okmenutitle.h,yes,E0,identifier present but NO SPDX-FileCopyrightText in this file
+LGPL-2.0-only,2003 Scott Wheeler <wheeler@kde.org>,2,part/ktreeviewsearchline.cpp; part/ktreeviewsearchline.h,yes,E0,this copyright text co-occurs with this identifier in these files
+LGPL-2.0-only,2005 Rafal Rzepecki <divide@users.sourceforge.net>,2,part/ktreeviewsearchline.cpp; part/ktreeviewsearchline.h,yes,E0,this copyright text co-occurs with this identifier in these files
+LGPL-2.0-only,2006 Hamish Rodda <rodda@kde.org>,2,part/ktreeviewsearchline.cpp; part/ktreeviewsearchline.h,yes,E0,this copyright text co-occurs with this identifier in these files
+LGPL-2.0-only,2007 Pino Toscano <pino@kde.org>,2,part/ktreeviewsearchline.cpp; part/ktreeviewsearchline.h,yes,E0,this copyright text co-occurs with this identifier in these files
+LGPL-2.0-or-later,2020 Marco Martin <mart@kde.org>,2,mobile/app/ui/TreeItem.qml; mobile/app/ui/TreeViewDecoration.qml,yes,E0,this copyright text co-occurs with this identifier in these files
+BSD-2-Clause,2024 Carl Schwan <carl@carlschwan.eu>,1,mobile/components/CMakeLists.txt,yes,E0,
+BSD-3-Clause,2006-2007 Pino Toscano <pino@kde.org>,1,cmake/modules/FindLibSpectre.cmake,yes,E0,
+BSD-3-Clause,2008 Albert Astals Cid <aacid@kde.org>,1,cmake/modules/FindLibSpectre.cmake,yes,E0,
+BSD-3-Clause,2008 Pino Toscano <pino@kde.org>,1,cmake/modules/FindEPub.cmake,yes,E0,
+BSD-3-Clause,2017 Julian Wolff <wolff@julianwolff.de>,1,cmake/modules/FindDiscount.cmake,yes,E0,
+BSD-3-Clause,2018 Sune Vuorela <sune@kde.org>,1,cmake/modules/FindDiscount.cmake,yes,E0,
+GPL-2.0-or-later,2001 Stefan Kebekus (kebekus@kde.org),1,generators/dvi/bigEndianByteReader.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2001-2004 Stefan Kebekus,1,generators/dvi/fontpool.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2001-2006 Stefan Kebekus,1,generators/dvi/dviRenderer.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2002 Malcolm Hunter <malcolm.hunter@gmx.co.uk>,1,part/part.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2002 g10 Code GmbH,1,part/DistinguishedNameParser.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2002-2003 Stefan Kebekus,1,generators/dvi/pageSize.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2002-2004 Stefan Kebekus,1,generators/dvi/simplePageSize.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2002-2005 Stefan Kebekus,1,generators/dvi/pageSize.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2003 Daniel Molkentin <molkentin@kde.org>,1,part/part.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2003 Kurt Pfeifle <kpfeifle@danka.de>,1,part/pageview.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2003 Malcolm Hunter <malcolm.hunter@gmx.co.uk>,1,shell/shell.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2003-2004 Albert Astals Cid <aacid@kde.org>,1,shell/shell.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2003-2004 Stefan Kebekus,1,generators/dvi/dviRenderer_prescan.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004 Antti Markus <antti.markus@starman.ee>,1,part/part.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004 Christoph Cullmann <crossfire@babylon2k.de>,1,part/part.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004 Christophe Devriese <Christophe.Devriese@student.kuleuven.ac.be>,1,shell/shell.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004 Dirk Mueller <mueller@kde.org>,1,shell/shell.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004 Henrique Pinto <stampede@coltec.ufmg.br>,1,part/part.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004 Klarälvdalens Datakonsult AB,1,part/DistinguishedNameParser.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004 Waldo Bastian <bastian@kde.org>,1,part/part.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004-2005 Wilfried Huss,1,generators/dvi/dviRenderer_dr.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004-2006 Stefan Kebekus.,1,generators/dvi/dviRenderer_dr.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2004-5 Enrico Ros <eros.kde@email.it>,1,core/generator.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2005 Helge Deller <deller@kde.org>,1,generators/fax/faxexpand.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2005 Stefan Kebekus,1,generators/dvi/length.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2005 Stefan Kebekus <kebekus@kde.org>,1,generators/dvi/prebookmark.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2006 Brad Hards <bradh@frogmouth.net>,1,generators/xps/generator_xps.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2006 Luigi Toscano <luigi.toscano@tiscali.it> *,1,generators/markdown/debug_md.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,"2006, 2009 Brad Hards <bradh@frogmouth.net>",1,generators/xps/generator_xps.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2006-2007 Tobias Koenig <tokoe@kde.org>,1,generators/kimgio/generator_kimgio.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2006-2008 Albert Astals Cid <aacid@kde.org>,1,generators/poppler/popplerembeddedfile.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2006-2009 Luigi Toscano <luigi.toscano@tiscali.it>,1,generators/dvi/generator_dvi.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,"2007, 2008 Pino Toscano <pino@kde.org>",1,core/sourcereference.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2007-2008 Albert Astals Cid <aacid@kde.org>,1,generators/spectre/generator_ghostview.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2009 Eike Hein <hein@kde.org>,1,part/sidebar.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2010 Aleix Pol <aleixpol@kde.org>,1,mobile/app/main.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2011 Michel Ludwig <michel.ludwig@kdemail.net>,1,interfaces/viewerinterface.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2014 Albert Astals Cid <aacid@kde.org>,1,autotests/mainshelltest.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2014 Frederik Gladhorn <gladhorn@kde.org> *,1,generators/markdown/debug_md.h,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2015 Alex Richardson <arichardson.kde@gmail.com>,1,autotests/generatorstest.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2017 Gilbert Assaf <gassaf@gmx.de>,1,generators/epub/autotests/epubgeneratortest.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2020 Albert Astals Cid <aacid@kde.org>,1,generators/comicbook/autotests/comicbooktest.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2020 Markus Brenneis <support.gulp21+kde@gmail.com>,1,autotests/markdowntest.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2020 Simone Gaiarin <simgunz@gmail.com>,1,autotests/annotationtoolbartest.cpp,yes,E0,Okular/KDE upstream default
+GPL-2.0-or-later,2021 g10 Code GmbH,1,part/DistinguishedNameParser.h,yes,E0,Okular/KDE upstream default
+MIT,2019 Christoph Cullmann <cullmann@kde.org>,1,_clang-format,yes,E0,
+MIT,2019 Gernot Gebhard <gebhard@absint.com>,1,_clang-format,yes,E0,
+X11,"2008, 2009, 2010 , 2011 jerome DOT laurens AT u-bourgogne DOT fr",1,core/synctex/synctex_parser_local.h,yes,E0,

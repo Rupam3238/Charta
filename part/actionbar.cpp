@@ -1,3 +1,9 @@
+/*
+    SPDX-FileCopyrightText: 2020 Simone Gaiarin <simgunz@gmail.com>
+
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
 /***************************************************************************
  *   Copyright (C) 2020 by Simone Gaiarin <simgunz@gmail.com>              *
  *                                                                         *

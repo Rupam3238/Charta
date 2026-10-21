@@ -1,0 +1,1 @@
+symlink BROKEN mobile/android/icon-playstore.png -> ../../icons/512-apps-okular.png

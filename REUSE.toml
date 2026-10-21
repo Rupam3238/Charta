@@ -1,0 +1,164 @@
+# SPDX-FileCopyrightText: 2026 Charta contributors
+# SPDX-License-Identifier: CC0-1.0
+
+version = 1
+SPDX-PackageName = "Charta"
+SPDX-PackageSupplier = "Rupam Dutta <rupamd.work@gmail.com>"
+SPDX-PackageDownloadLocation = "https://github.com/Rupam3238/Charta"
+
+# ---------------------------------------------------------------------------------------------
+# Grouped annotations.
+#
+# These cover the classes of file that cannot carry a per-file header, or that upstream Okular
+# ships without one. Every group says where the material came from and which licence applies.
+# `precedence = "aggregate"` means: if a file in the group has its own tag, that tag wins.
+# `precedence = "override"` means: the group's answer is used regardless of what the file says
+# (used for generated evidence, whose text may contain licence-like strings).
+# ---------------------------------------------------------------------------------------------
+
+# --- Translation catalogues inherited from Okular -------------------------------------------------
+# Upstream ships them with translator copyright lines and no licence identifier, so no identifier
+# is invented here. See docs/licensing/translations.md for the open question.
+[[annotations]]
+path = ["po/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2003-2026 The Okular translation contributors"
+SPDX-License-Identifier = "LicenseRef-Okular-upstream-terms"
+
+# --- Documentation and policy --------------------------------------------------------------------
+[[annotations]]
+path = ["docs/**", "README.md", "CONTRIBUTING.md", "LICENSE"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Charta contributors"
+SPDX-License-Identifier = "GFDL-1.2-or-later"
+
+# --- Generated evidence ---------------------------------------------------------------------------
+# These files quote licence identifiers inside command output; "override" keeps the quoted text
+# from being parsed as a licence statement of its own.
+[[annotations]]
+path = "docs/licensing/evidence/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Charta contributors"
+SPDX-License-Identifier = "GFDL-1.2-or-later"
+
+# --- The Drawy-derived expression ------------------------------------------------------------------
+# The file below carries the Drawy expression under its own (LGPL-2.1-only) terms, so the
+# LGPL-2.1-only text has a file to apply to.
+[[annotations]]
+path = "docs/licensing/drawy-expression-notice.txt"
+precedence = "override"
+SPDX-FileCopyrightText = "2015-2025 Prayag2 and the KDE Drawy contributors"
+SPDX-License-Identifier = "LGPL-2.1-only"
+
+# --- The QPDF NOTICE --------------------------------------------------------------------------------
+# QPDF is statically linked into the Poppler generator plugin, so the upstream NOTICE must
+# travel with the binary. It is Apache-2.0 material and is shipped verbatim.
+[[annotations]]
+path = "docs/QPDF-NOTICE.md"
+precedence = "override"
+SPDX-FileCopyrightText = "QPDF is copyright (c) 2005-2024 Jay Berkenbilt"
+SPDX-License-Identifier = "Apache-2.0"
+
+# --- Brand assets and icon ------------------------------------------------------------------------
+# Generated with AI tools. The project is the licensing party; no authorship claim is made.
+[[annotations]]
+path = ["charta_logo_package/**", "icons/charta.svg"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Charta contributors (licensing party; assets generated with AI tools)"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+# --- Test fixtures and annotation artwork inherited from Okular -----------------------------------
+[[annotations]]
+path = ["autotests/data/**", "part/data/**", "generators/*/autotests/data/**", "generators/*/data/**", "generators/kimgio/tests/data/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2002-2026 The Okular authors and contributors"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+# --- Vendored SyncTeX parser and its local patch history ------------------------------------------
+# The parser sources carry X11 headers; the .diff files in the same directory are part of that
+# vendored material and inherit the same terms.
+[[annotations]]
+path = "core/synctex/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2008-2017 Jerome Laurens and contributors"
+SPDX-License-Identifier = "X11"
+
+# --- The Poppler patch series ----------------------------------------------------------------------
+# The series is Charta's own work on GPL-2.0-or-later Poppler and carries the upstream notices
+# in its context lines.
+[[annotations]]
+path = "patches/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Charta contributors"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+# --- Inherited Okular sources without a header upstream ---------------------------------------------
+# Okular itself ships these without SPDX headers; the repository's default licence applies.
+[[annotations]]
+path = [
+    "**/Messages.sh",
+    "generators/dvi/**",
+    "mobile/**",
+    "autotests/closedialoghelper.cpp",
+    "autotests/closedialoghelper.h",
+    "cmake/modules/FindDjVuLibre.cmake",
+    "Okular6Config.cmake.in",
+    "OkularConfigureChecks.cmake",
+    "config-okular.h.cmake",
+    "shell/MacOSXBundleInfo.plist.in",
+    "**/CMakeLists.txt",
+    "**/*.cmake",
+    "**/*.cmake.in",
+    "**/*.h.cmake",
+    "**/*.kcfg",
+    "**/*.kcfgc",
+    "**/*.ui",
+    "**/*.qrc",
+    "**/*.rc",
+    "**/*.svg",
+    "**/*.desktop",
+    "**/*.categories",
+    "**/DESIGN",
+    "**/.emacs-dirvars",
+    "**/README.Icons",
+    "part/data/*.png",
+    "generators/*/16-apps-*.png",
+    "generators/*/22-apps-*.png",
+    "generators/*/32-apps-*.png",
+    "generators/*/48-apps-*.png",
+    "generators/*/64-apps-*.png",
+    "okular_part.json",
+    "generators/*/libokularGenerator_*.json",
+    "hooks/pre-commit",
+    ".clang-tidy",
+    ".git-blame-ignore-revs",
+    ".gitignore",
+    "CMakeFiles/CMakeSystem.cmake",
+    "test_savedepth.cpp",
+    "test_savedepth_simple.cpp",
+    "test_savedepth_simple",
+    "part/signingcertificatelistmodel.cpp",
+    "part/signingcertificatelistmodel.h",
+    "part/magnifierview.h",
+    "part/okmenutitle.cpp",
+    "part/okmenutitle.h",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2002-2026 The Okular authors and contributors"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+# --- Charta's own build and enforcement files --------------------------------------------------------
+[[annotations]]
+path = [".flatpak-manifest.json", ".githooks/**", ".github/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Charta contributors"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+# --- AppStream metadata files ----------------------------------------------------------------------
+# metadata_license is CC0-1.0: that is the licence of the METADATA in these files, not of the
+# software they describe. The software licence is declared in the <project_license> element.
+[[annotations]]
+path = ["shell/org.charta.reader.metainfo.xml", "generators/*/org.kde.okular-*.metainfo.xml", "mobile/app/org.kde.okular.kirigami.appdata.xml"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Charta contributors"
+SPDX-License-Identifier = "CC0-1.0"

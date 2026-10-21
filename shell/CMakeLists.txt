@@ -49,3 +49,13 @@ endif()
 
 install(PROGRAMS org.charta.reader.desktop DESTINATION ${KDE_INSTALL_APPDIR})
 install(FILES org.charta.reader.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR})
+
+# Ship the licence texts and the third-party notices with the application: a GPL-2.0-or-later
+# distribution must convey the licence, and the Apache-2.0 NOTICE for the statically linked QPDF
+# is assembled into the same place at release time. See docs/licensing/packaging.md.
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/LICENSES/
+        DESTINATION ${KDE_INSTALL_DATAROOTDIR}/licenses/charta
+        FILES_MATCHING PATTERN "*.txt")
+install(FILES ${CMAKE_SOURCE_DIR}/docs/THIRD-PARTY-NOTICES.md
+              ${CMAKE_SOURCE_DIR}/docs/QPDF-NOTICE.md
+        DESTINATION ${KDE_INSTALL_DATAROOTDIR}/doc/charta)

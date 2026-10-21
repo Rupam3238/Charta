@@ -83,6 +83,9 @@ void AnnotatorEngine::decodeEvent(const QTabletEvent *tabletEvent, EventType *ev
 
     if (pressure) {
         // Match Drawy's pressure response curve while keeping the value bounded.
+        // The pressure mapping below is derived from KDE Drawy, snapshot 35194a7e
+        // (src/controller/controller.cpp:45), which is licensed LGPL-2.1-only.
+        // See docs/THIRD-PARTY-NOTICES.md and docs/licensing/drawy-provenance.md.
         *pressure = qBound(0.0, tabletEvent->pressure() / 1.60 + 0.375, 1.0);
     }
 }

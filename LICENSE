@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2002-2026 The Okular authors and contributors
+# SPDX-FileCopyrightText: 2026 Charta contributors
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+Charta is a document reader and annotator derived from KDE Okular.
+
+The project licence is **GPL-2.0-or-later**, expressed per file through SPDX headers. This file is
+a pointer, not a replacement for the per-file terms:
+
+* SPDX licence texts live in `LICENSES/`. The text that applies to most of the tree is
+  `LICENSES/GPL-2.0-or-later.txt`.
+* Files inherited from Okular keep their own terms and copyright notices.
+* Vendored code keeps its own licence (see `core/synctex/`, X11).
+* One expression derived from KDE Drawy is LGPL-2.1-only; see `LICENSES/LGPL-2.1-only.txt` and
+  `docs/THIRD-PARTY-NOTICES.md`.
+* QPDF is statically linked and is Apache-2.0 (its text and NOTICE are added in the release).
+* The translation catalogues in `po/` carry translator copyright lines and no licence identifier,
+  upstream either; see `docs/licensing/translations.md`.
+
+The complete statement, with sources and obligations, is `docs/THIRD-PARTY-NOTICES.md`.
+The documentation under `docs/` is GFDL-1.2-or-later.
+
+The code in this project was produced with AI tools and is reviewed by the maintainer; the project
+makes no claim of human authorship over generated code. See `docs/licensing/` for the provenance
+evidence, including the exact upstream revisions this tree is based on.

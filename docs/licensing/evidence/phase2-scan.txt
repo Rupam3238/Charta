@@ -1,0 +1,481 @@
+==============================================================================
+PHASE 2 - SPDX / REUSE BASELINE SCAN (raw command output)
+==============================================================================
+repo        : /home/workstation/tools/project/Charta
+baseline SHA: 73ee06351c30501c9aa990c7d976f8e604ef0c06
+upstream    : Okular 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 (probe clone, NOT the Phase-3 pinned base)
+date        : 2026-10-21 (IST)
+NOTE        : every 'git grep' below is pinned to the baseline SHA with an
+              explicit tree-ish, so the numbers do not drift with the
+              concurrent edits another agent is making in this checkout.
+
+##############################################################################
+# SECTION 1 - TREE AND TOTALS
+##############################################################################
+
+$ git rev-parse HEAD
+  [cwd: /home/workstation/tools/project/Charta]
+73ee06351c30501c9aa990c7d976f8e604ef0c06
+  [exit 0]
+
+$ git ls-tree -r --name-only 73ee06351c30501c9aa990c7d976f8e604ef0c06 | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+1935
+  [exit 0]
+
+$ git ls-files | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+1935
+  [exit 0]
+
+$ git ls-tree -r --name-only 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- LICENSES/
+  [cwd: /home/workstation/tools/project/Charta]
+LICENSES/BSD-2-Clause.txt
+LICENSES/BSD-3-Clause.txt
+LICENSES/GFDL-1.2-or-later.txt
+LICENSES/GPL-2.0-only.txt
+LICENSES/GPL-2.0-or-later.txt
+LICENSES/GPL-3.0-only.txt
+LICENSES/GPL-3.0-or-later.txt
+LICENSES/LGPL-2.0-only.txt
+LICENSES/LGPL-2.0-or-later.txt
+LICENSES/LicenseRef-KDE-Accepted-GPL.txt
+LICENSES/MIT.txt
+LICENSES/X11.txt
+  [exit 0]
+
+##############################################################################
+# SECTION 2 - SPDX IDENTIFIER HISTOGRAM
+##############################################################################
+
+$ git grep -h 'SPDX-License-Identifier' 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- | sed 's/.*SPDX-License-Identifier:[[:space:]]*//' | sed 's/[[:space:]]*$//' | sort | uniq -c | sort -rn
+  [cwd: /home/workstation/tools/project/Charta]
+    473 GPL-2.0-or-later
+      6 X11
+      6 LGPL-2.0-or-later
+      6 BSD-2-Clause
+      4 LGPL-2.0-only
+      3 BSD-3-Clause
+      2 GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+      2 GPL-2.0-only OR GPL-3.0-only
+      1 MIT
+  [exit 0]
+
+$ git grep -l 'SPDX-License-Identifier' 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+503
+  [exit 0]
+
+$ git grep -l 'SPDX-FileCopyrightText' 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+738
+  [exit 0]
+
+$ git grep -l 'SPDX-' 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+768
+  [exit 0]
+
+$ git grep -h 'SPDX-FileCopyrightText' 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- | sed 's/.*SPDX-FileCopyrightText:[[:space:]]*//' | sort -u | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+371
+  [exit 0]
+
+##############################################################################
+# SECTION 3 - FILES WITH NEITHER IDENTIFIER NOR COPYRIGHT (1167)
+##############################################################################
+
+$ comm -23 <(git ls-tree -r --name-only 73ee06351c30501c9aa990c7d976f8e604ef0c06 | sort) <(git grep -l 'SPDX-License-Identifier\|SPDX-FileCopyrightText' 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- | sed 's/^73ee06351c30501c9aa990c7d976f8e604ef0c06://' | sort -u) | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+[stderr]
+/bin/sh: 1: Syntax error: "(" unexpected
+  [exit 2]
+
+$ bash -c awk -F'\t' 'NR>1{print $2}' /tmp/opencode/upstream-compare-head.tsv | sort | uniq -c | sort -rn
+  [cwd: /home/workstation/tools/project/Charta]
+    804 translation-catalogue
+    188 upstream-okular-gap
+    116 binary/asset
+     38 charta-original
+     17 vendored
+      4 scratch-file
+  [exit 0]
+
+##############################################################################
+# SECTION 4 - LICENSES/ TEXT PRESENCE
+##############################################################################
+
+$ git ls-tree -r --name-only 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- LICENSES/
+  [cwd: /home/workstation/tools/project/Charta]
+LICENSES/BSD-2-Clause.txt
+LICENSES/BSD-3-Clause.txt
+LICENSES/GFDL-1.2-or-later.txt
+LICENSES/GPL-2.0-only.txt
+LICENSES/GPL-2.0-or-later.txt
+LICENSES/GPL-3.0-only.txt
+LICENSES/GPL-3.0-or-later.txt
+LICENSES/LGPL-2.0-only.txt
+LICENSES/LGPL-2.0-or-later.txt
+LICENSES/LicenseRef-KDE-Accepted-GPL.txt
+LICENSES/MIT.txt
+LICENSES/X11.txt
+  [exit 0]
+
+Per-identifier text check (SPDX id -> LICENSES/<id>.txt):
+  GPL-2.0-or-later                                               files=473  text=ALL PRESENT
+  X11                                                            files=6    text=ALL PRESENT
+  LGPL-2.0-or-later                                              files=6    text=ALL PRESENT
+  BSD-2-Clause                                                   files=6    text=ALL PRESENT
+  LGPL-2.0-only                                                  files=4    text=ALL PRESENT
+  BSD-3-Clause                                                   files=3    text=ALL PRESENT
+  GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL    files=2    text=ALL PRESENT
+  GPL-2.0-only OR GPL-3.0-only                                   files=2    text=ALL PRESENT
+  MIT                                                            files=1    text=ALL PRESENT
+
+  -> Identifiers IN USE with NO text in LICENSES/ : NONE (empty set).
+  -> Identifiers REFERENCED but NOT used as a file identifier, and with no text:
+     CC0-1.0              16 x <metadata_license>CC0-1.0</metadata_license> - 14 x generators/*/org.kde.okular-*.metainfo.xml, shell/org.charta.reader.metainfo.xml:5, mobile/app/org.kde.okular.kirigami.appdata.xml:4   [text in LICENSES/ at baseline SHA: NO]
+     GFDL-1.3             16 x <project_license>GPL-2.0+ and GFDL-1.3</project_license> (same 16 files, line 6 / line 5)   [text in LICENSES/ at baseline SHA: NO]
+     GFDL-1.3-or-later    canonical SPDX form of the GFDL-1.3 reference above   [text in LICENSES/ at baseline SHA: NO]
+     Apache-2.0           QPDF v11.9.1 is FetchContent-built STATIC and linked into okularGenerator_poppler (CMakeLists.txt:232-300)   [text in LICENSES/ at baseline SHA: NO]
+     LGPL-2.1-only        Drawy snapshot reference, part/annotationtools.cpp:87 (comment only, no SPDX tag)   [text in LICENSES/ at baseline SHA: NO]
+
+  -> CONVERSELY: GFDL-1.2-or-later IS present in LICENSES/ but is referenced by
+     NO file at the baseline SHA (all 16 AppStream files say GFDL-1.3). That is
+     precisely why `reuse lint` reports it as an UNUSED licence.
+
+##############################################################################
+# SECTION 5 - UPSTREAM PROBE (Okular 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9)
+##############################################################################
+
+$ git -C /tmp/opencode/okular-probe log -1 --format=%H %cI %s
+  [cwd: /home/workstation/tools/project/Charta]
+60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 2026-10-13T09:42:05+02:00 MacOS: Look for kleopatra in applicationDirPath(), too
+  [exit 0]
+
+$ git -C /tmp/opencode/okular-probe ls-tree -r --name-only 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 -- LICENSES/
+  [cwd: /home/workstation/tools/project/Charta]
+LICENSES/BSD-2-Clause.txt
+LICENSES/BSD-3-Clause.txt
+LICENSES/GFDL-1.2-or-later.txt
+LICENSES/GPL-2.0-only.txt
+LICENSES/GPL-2.0-or-later.txt
+LICENSES/GPL-3.0-only.txt
+LICENSES/GPL-3.0-or-later.txt
+LICENSES/LGPL-2.0-only.txt
+LICENSES/LGPL-2.0-or-later.txt
+LICENSES/LicenseRef-KDE-Accepted-GPL.txt
+LICENSES/MIT.txt
+LICENSES/X11.txt
+  [exit 0]
+
+$ git -C /tmp/opencode/okular-probe grep -h 'SPDX-License-Identifier' 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 -- | sed 's/.*SPDX-License-Identifier:[[:space:]]*//' | sed 's/[[:space:]]*$//' | sort | uniq -c | sort -rn
+  [cwd: /home/workstation/tools/project/Charta]
+    444 GPL-2.0-or-later
+      7 BSD-2-Clause
+      6 X11
+      6 LGPL-2.0-or-later
+      4 LGPL-2.0-only
+      3 BSD-3-Clause
+      2 GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+      2 GPL-2.0-only OR GPL-3.0-only
+      2 CC0-1.0
+      1 MIT
+  [exit 0]
+
+$ git -C /tmp/opencode/okular-probe ls-files po/ | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+1214
+  [exit 0]
+
+$ git -C /tmp/opencode/okular-probe grep -l 'SPDX-License-Identifier' 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 -- po/ | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+0
+  [exit 0]
+
+$ git -C /tmp/opencode/okular-probe grep -l 'SPDX-FileCopyrightText' 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 -- po/ | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+265
+  [exit 0]
+
+SHA-256 comparison of LICENSES/*.txt, local baseline SHA vs upstream 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9:
+  BSD-2-Clause.txt                 IDENTICAL  24a7109c41c79a79ecfc245fa0c63d60b5a3bc0a08d88a33250a22e8445c2a70
+  BSD-3-Clause.txt                 IDENTICAL  42639b2e5507163d35069be166e37a784f48a5f17e3577c16eb48fab215247cd
+  GFDL-1.2-or-later.txt            IDENTICAL  1118a91a3290bc8981f922dfcffc1a619592c007aa31b7a98cee694d933c86ce
+  GPL-2.0-only.txt                 IDENTICAL  b58671fb4d9e9efeb9a6af1bdba02e61ac69af654855b45a372efe8f52413f83
+  GPL-2.0-or-later.txt             IDENTICAL  b58671fb4d9e9efeb9a6af1bdba02e61ac69af654855b45a372efe8f52413f83
+  GPL-3.0-only.txt                 IDENTICAL  c7120bba88c79b87ca40eacc1cf4ac95bcb2e96b8a00dd91886ef81dbad87f33
+  GPL-3.0-or-later.txt             IDENTICAL  c7120bba88c79b87ca40eacc1cf4ac95bcb2e96b8a00dd91886ef81dbad87f33
+  LGPL-2.0-only.txt                IDENTICAL  e2eb0591a1bd9f9d49bb8c0dbbdae232b6ee9e1b2f5584617b0f2d6072464afe
+  LGPL-2.0-or-later.txt            IDENTICAL  e2eb0591a1bd9f9d49bb8c0dbbdae232b6ee9e1b2f5584617b0f2d6072464afe
+  LicenseRef-KDE-Accepted-GPL.txt  IDENTICAL  ef839531eb65b0168f9aed14047c84be13e9ea38801a73bc18abe24dc93e6ac9
+  MIT.txt                          IDENTICAL  b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0
+  X11.txt                          IDENTICAL  e1963c9958b93bc2578b34f8ae22cfe205e8c0e7d5be7235cfdbdefbf92a5423
+  -> the 12 LICENSES/ texts are byte-identical to upstream Okular: inherited wholesale.
+
+##############################################################################
+# SECTION 6 - APPSTREAM / QPDF LICENCE REFERENCES
+##############################################################################
+
+$ appstreamcli --version
+  [cwd: /home/workstation/tools/project/Charta]
+AppStream version: 1.1.2
+  [exit 0]
+
+$ appstreamcli check-license CC0-1.0
+  [cwd: /home/workstation/tools/project/Charta]
+License Type: license
+Canonical ID: CC0-1.0
+Suitable for AppStream metadata: yes
+Free and Open Source: yes
+URL: https://spdx.org/licenses/CC0-1.0.html#page
+  [exit 0]
+
+$ appstreamcli check-license GFDL-1.2-or-later
+  [cwd: /home/workstation/tools/project/Charta]
+License Type: license
+Canonical ID: GFDL-1.2-or-later
+Suitable for AppStream metadata: yes
+Free and Open Source: yes
+URL: https://spdx.org/licenses/GFDL-1.2-or-later.html#page
+  [exit 0]
+
+$ appstreamcli check-license GFDL-1.3
+  [cwd: /home/workstation/tools/project/Charta]
+License Type: license
+Canonical ID: GFDL-1.3
+Suitable for AppStream metadata: yes
+Free and Open Source: yes
+URL: https://spdx.org/licenses/GFDL-1.3.html#page
+  [exit 0]
+
+$ appstreamcli check-license Apache-2.0
+  [cwd: /home/workstation/tools/project/Charta]
+License Type: license
+Canonical ID: Apache-2.0
+Suitable for AppStream metadata: no
+Free and Open Source: yes
+URL: https://choosealicense.com/licenses/apache-2.0/
+  [exit 0]
+
+$ git grep -n '<metadata_license>\|<project_license>' 73ee06351c30501c9aa990c7d976f8e604ef0c06 -- '*.metainfo.xml' '*.appdata.xml'
+  [cwd: /home/workstation/tools/project/Charta]
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/comicbook/org.kde.okular-comicbook.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/comicbook/org.kde.okular-comicbook.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/djvu/org.kde.okular-djvu.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/djvu/org.kde.okular-djvu.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/dvi/org.kde.okular-dvi.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/dvi/org.kde.okular-dvi.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/epub/org.kde.okular-epub.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/epub/org.kde.okular-epub.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/fax/org.kde.okular-fax.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/fax/org.kde.okular-fax.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/fictionbook/org.kde.okular-fb.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/fictionbook/org.kde.okular-fb.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/kimgio/org.kde.okular-kimgio.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/kimgio/org.kde.okular-kimgio.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/markdown/org.kde.okular-md.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/markdown/org.kde.okular-md.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/poppler/org.kde.okular-poppler.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/poppler/org.kde.okular-poppler.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/spectre/org.kde.okular-spectre.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/spectre/org.kde.okular-spectre.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/tiff/org.kde.okular-tiff.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/tiff/org.kde.okular-tiff.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/txt/org.kde.okular-txt.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/txt/org.kde.okular-txt.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/xps/org.kde.okular-xps.metainfo.xml:5:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:generators/xps/org.kde.okular-xps.metainfo.xml:6:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:mobile/app/org.kde.okular.kirigami.appdata.xml:4:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:mobile/app/org.kde.okular.kirigami.appdata.xml:5:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:shell/org.charta.reader.metainfo.xml:4:  <metadata_license>CC0-1.0</metadata_license>
+73ee06351c30501c9aa990c7d976f8e604ef0c06:shell/org.charta.reader.metainfo.xml:5:  <project_license>GPL-2.0+ and GFDL-1.3</project_license>
+  [exit 0]
+
+$ git show 73ee06351c30501c9aa990c7d976f8e604ef0c06:CMakeLists.txt | sed -n '215,300p'
+  [cwd: /home/workstation/tools/project/Charta]
+
+find_package(ZLIB REQUIRED)
+
+# QPDF is used to write added, removed and reordered pages when saving a PDF
+find_package(qpdf CONFIG QUIET)
+if (TARGET qpdf::libqpdf)
+    set(QPDF_LINK_TARGET qpdf::libqpdf)
+else()
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(QPDF QUIET IMPORTED_TARGET libqpdf)
+    endif()
+    if (TARGET PkgConfig::QPDF)
+        set(QPDF_LINK_TARGET PkgConfig::QPDF)
+    endif()
+endif()
+
+if (NOT QPDF_LINK_TARGET)
+    include(FetchContent)
+
+    # qpdf must be built as a static library, but BUILD_SHARED_LIBS must not outlive this block:
+    # if it is still OFF when add_subdirectory(generators) is reached, kcoreaddons_add_plugin()
+    # (KF6CoreAddonsMacros.cmake: "if (NOT BUILD_SHARED_LIBS) set(ARGS_STATIC ON)") builds every
+    # document generator as a STATIC archive instead of a MODULE plugin, and its static branch
+    # returns before setting LIBRARY_OUTPUT_DIRECTORY or creating an install() rule. No .so would
+    # then be produced in ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/okular_generators or installed, while
+    # the app discovers generators at runtime only (KPluginMetaData::findPlugins("okular_generators")
+    # in core/document.cpp) -- so the running app would silently keep using whatever stale plugin
+    # .so an earlier configuration happened to leave in build/bin/okular_generators/.
+    #
+    # The options are therefore set as normal (non-cache) variables, which are visible inside the
+    # qpdf subdirectory only. cmake_minimum_required(3.22) implies CMP0077 NEW, so qpdf's
+    # option(BUILD_SHARED_LIBS ...) honours the normal variable and creates no cache entry. The
+    # values in effect for the rest of Charta are restored below, because a normal variable set
+    # here would otherwise also be inherited by add_subdirectory(generators).
+    set(_charta_build_shared_libs_saved "${BUILD_SHARED_LIBS}")
+    set(_charta_build_static_libs_saved "${BUILD_STATIC_LIBS}")
+    set(_charta_build_doc_saved "${BUILD_DOC}")
+    set(BUILD_SHARED_LIBS OFF)
+    set(BUILD_STATIC_LIBS ON)
+    set(BUILD_DOC OFF)
+    set(BUILD_TOOLS OFF)
+    set(BUILD_FUZZ_TARGETS OFF)
+    set(INSTALL_CMAKE_PACKAGE OFF)
+    set(REQUIRE_CRYPTO_GNUTLS OFF)
+    set(REQUIRE_CRYPTO_OPENSSL OFF)
+    set(USE_IMPL_CRYPTO_OPENSSL OFF)
+    set(USE_IMPL_CRYPTO_GNUTLS OFF)
+    set(USE_IMPL_CRYPTO_NATIVE ON)
+    FetchContent_Declare(
+        qpdf
+        GIT_REPOSITORY https://github.com/qpdf/qpdf.git
+        GIT_TAG v11.9.1
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_GetProperties(qpdf)
+    if (NOT qpdf_POPULATED)
+        FetchContent_Populate(qpdf)
+        add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR} EXCLUDE_FROM_ALL)
+    endif()
+    if (TARGET libqpdf_object)
+        target_compile_options(libqpdf_object PRIVATE -fexceptions -w)
+        # qpdf only produces position-independent objects when it is not building a static
+        # library (libqpdf/CMakeLists.txt:391-395 sets OBJECT_LIB_IS_PIC OFF as soon as
+        # BUILD_STATIC_LIBS is ON, and then sets POSITION_INDEPENDENT_CODE to that value on
+        # libqpdf_object; libqpdf.a is archived straight from those objects). Charta links
+        # libqpdf.a into okularGenerator_poppler, which kcoreaddons_add_plugin() builds as a
+        # MODULE -- a shared object -- so without PIC the final link fails with
+        # "relocation ... can not be used when making a shared object; recompile with -fPIC".
+        # Forcing the property here overrides what qpdf set a few lines earlier. On GCC/Linux
+        # this needs none of qpdf's libqpdf_EXPORTS define, which only matters for __declspec
+        # on Windows (include/qpdf/DLL.h).
+        set_target_properties(libqpdf_object PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
+    if (TARGET libqpdf)
+        target_compile_options(libqpdf PRIVATE -fexceptions -w)
+        # Belt and braces: qpdf compiles the static library from the object library above, but
+        # if that ever changes to compiling the sources itself it would lose PIC again.
+        set_target_properties(libqpdf PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set(QPDF_LINK_TARGET libqpdf)
+    endif()
+
+    # Restore Charta's own defaults for everything configured after this block (generators, part,
+    # shell, autotests). BUILD_SHARED_LIBS normally comes from KDECMakeSettings.cmake, which does
+    # set(BUILD_SHARED_LIBS TRUE CACHE BOOL ...) without FORCE, i.e. it is stored once per build
+    # directory and still honours -DBUILD_SHARED_LIBS=... on the command line -- so echo the saved
+  [exit 0]
+
+##############################################################################
+# SECTION 7 - WORKING-TREE DRIFT OBSERVED DURING THE PHASE
+##############################################################################
+Another agent worked in this checkout while Phase 2 ran. At phase start
+(19:56-20:00 IST) the working tree still matched the baseline SHA for every
+SPDX-relevant path. Between 20:00 and 20:10 IST that agent added
+LICENSES/CC0-1.0.txt, LICENSES/LGPL-2.1-only.txt,
+LICENSES/LicenseRef-Okular-upstream-terms.txt, LICENSE, CONTRIBUTING.md,
+REUSE.toml and docs/THIRD-PARTY-NOTICES.md, and started editing tracked files.
+All Phase 2 numbers above are pinned to 73ee06351c30501c9aa990c7d976f8e604ef0c06 and are unaffected.
+
+$ git grep -l 'SPDX-License-Identifier' -- | wc -l; git grep -l 'SPDX-FileCopyrightText' -- | wc -l
+  [cwd: /home/workstation/tools/project/Charta]
+505
+767
+  [exit 0]
+
+$ git status --short
+  [cwd: /home/workstation/tools/project/Charta]
+ M .flatpak-manifest.json
+ D .flatpak-patches/okular-mimetypes.patch
+ M CMakeLists.txt
+ M README.md
+ M aboutdata.h
+ M autotests/annotationcolorhistorytest.cpp
+ M autotests/annotationpersistencetest.cpp
+ M autotests/annotationrotationtest.cpp
+ M autotests/blankpageswritertest.cpp
+ M autotests/documentbuildermodeltest.cpp
+ M autotests/documentbuilderparttest.cpp
+ M autotests/untitleddocumenttest.cpp
+ M autotests/widthpresetstest.cpp
+ M core/document.cpp
+ M docs/README-VERIFICATION.md
+ M generators/CMakeLists.txt
+ M generators/comicbook/org.kde.okular-comicbook.metainfo.xml
+ M generators/djvu/org.kde.okular-djvu.metainfo.xml
+ M generators/dvi/org.kde.okular-dvi.metainfo.xml
+ M generators/epub/org.kde.okular-epub.metainfo.xml
+ M generators/fax/org.kde.okular-fax.metainfo.xml
+ M generators/fictionbook/org.kde.okular-fb.metainfo.xml
+ M generators/kimgio/org.kde.okular-kimgio.metainfo.xml
+ M generators/markdown/org.kde.okular-md.metainfo.xml
+ M generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml
+ M generators/poppler/org.kde.okular-poppler.metainfo.xml
+ M generators/spectre/org.kde.okular-spectre.metainfo.xml
+ M generators/tiff/org.kde.okular-tiff.metainfo.xml
+ M generators/txt/org.kde.okular-txt.metainfo.xml
+ M generators/xps/org.kde.okular-xps.metainfo.xml
+ M mobile/app/org.kde.okular.kirigami.appdata.xml
+ M mobile/components/okularsingleton.cpp
+ M okular_part.json
+ M part/actionbar.cpp
+ M part/actionbar.h
+ M part/annotationcolorhistory.cpp
+ M part/annotationcolorhistory.h
+ M part/annotationtools.cpp
+ M part/blankpageswriter.cpp
+ M part/blankpageswriter.h
+ M part/documentbuilder.cpp
+ M part/documentbuilder.h
+ M part/documentbuilderconfig.h
+ M part/documentbuilderexport.cpp
+ M part/documentbuilderexport.h
+ M part/documentbuildermodel.cpp
+ M part/documentbuildermodel.h
+ M part/documentbuildersource.cpp
+ M part/documentbuildersource.h
+ M part/imagepagesettingsdialog.cpp
+ M part/imagepagesettingsdialog.h
+ M part/magnifierview.cpp
+ M part/pagerangeinputdialog.cpp
+ M part/pagerangeinputdialog.h
+ M part/widthpresetutils.h
+ M patches/poppler-annotation-rotation.patch
+ M patches/poppler-ink-appearance.patch
+ M shell/CMakeLists.txt
+ M shell/org.charta.reader.desktop
+ M shell/org.charta.reader.metainfo.xml
+?? .githooks/
+?? .github/
+?? CONTRIBUTING.md
+?? LICENSE
+?? LICENSES/Apache-2.0.txt
+?? LICENSES/Artistic-2.0.txt
+?? LICENSES/CC0-1.0.txt
+?? LICENSES/LGPL-2.1-only.txt
+?? LICENSES/LicenseRef-Okular-upstream-terms.txt
+?? REUSE.toml
+?? docs/QPDF-NOTICE.md
+?? docs/THIRD-PARTY-NOTICES.md
+?? docs/images/
+?? docs/licensing/
+?? patches/poppler-annotation-followup.patch
+  [exit 0]

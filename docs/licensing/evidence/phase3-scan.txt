@@ -1,0 +1,812 @@
+====================================================================================================
+PHASE 3 - Okular lineage pin and modified-file ledger - raw scan evidence
+====================================================================================================
+generated            : 2026-10-21T22:00:28.483014+05:30
+charta repo          : /home/workstation/tools/project/Charta
+charta HEAD          : 73ee06351c30501c9aa990c7d976f8e604ef0c06
+upstream clone       : /tmp/opencode/okular
+upstream remote      : https://invent.kde.org/graphics/okular.git
+upstream master HEAD : 60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9
+upstream master date : 2026-10-13 09:42:05 +0200
+upstream master subj : MacOS: Look for kleopatra in applicationDirPath(), too
+shallow boundary     : c6a40a0ee66d1df0a5073623da45c795b40056bd
+commits in range     : 153
+partial clone filter : blob:none (promisor=true)
+
+----------------------------------------------------------------------------------------------------
+1. EXACT COMMANDS RUN
+----------------------------------------------------------------------------------------------------
+
+  # upstream clone (plan Appendix C, P3-01)
+  git clone --filter=blob:none https://invent.kde.org/graphics/okular.git /tmp/opencode/okular
+  git -C /tmp/opencode/okular fetch --shallow-since=2026-08-01 origin master
+
+  # (extra, for speed only: pull the blobs of the shallow range into the local pack so that
+  #  'git show <commit>:<path>' does not need one HTTP round-trip per blob)
+  git -C /tmp/opencode/okular fetch --refetch --filter=blob:limit=20m origin master
+
+  # per-commit match sweep (plan Appendix C procedure)
+  for c in $(git -C /tmp/opencode/okular rev-list --reverse origin/master); do
+    matches=0; total=0
+    while read -r f; do
+      [ -f "/home/workstation/tools/project/Charta/$f" ] || continue
+      total=$((total+1))
+      l=$(sha256sum "/home/workstation/tools/project/Charta/$f" | cut -d' ' -f1)
+      u=$(git -C /tmp/opencode/okular show "$c:$f" 2>/dev/null | sha256sum | cut -d' ' -f1)
+      [ "$l" = "$u" ] && matches=$((matches+1))
+    done < samples.txt
+    echo "$c $matches/$total"
+  done | sort -k2 -t' ' -r | head
+
+  # the sweep above was executed for ALL 1935 tracked Charta files (not a 60-file sample):
+  #   local side  = sha256 of the file content committed at Charta HEAD 73ee063
+  #   upstream    = sha256 of `git show <commit>:<path>` in the upstream clone
+  # the per-file verification below re-runs the literal `git show | sha256sum` pipeline.
+
+----------------------------------------------------------------------------------------------------
+2. PER-COMMIT MATCH SWEEP (all 1935 tracked Charta files vs every commit in the shallow range)
+----------------------------------------------------------------------------------------------------
+commit                                     date                       matches    subject
+c6a40a0ee66d1df0a5073623da45c795b40056bd   2026-08-02 01:54:19 +0000  1297/1935  GIT_SILENT Sync po/docbooks with svn
+dabbbbef2833b2683aaebc9907a31fdc62b0142a   2026-08-07 14:30:17 +0200  1297/1935  Block some actions for signature fields
+026f487a9cbf318b73ad57bfb2f2de682924e671   2026-08-07 14:30:53 +0200  1297/1935  Don't execute load-scripts on signed documents
+93f89f972b29a6490eb011b8ab75381a3f8c06fe   2026-08-07 14:30:53 +0200  1297/1935  Notify the user about possible changes at printing
+4d75aefa3f25134a5aaae75d1631ce4c46576330   2026-08-08 01:45:46 +0000  1297/1935  GIT_SILENT Sync po/docbooks with svn
+eb47f2f02f3108c941dbefd59964166b510d3b58   2026-08-09 01:45:16 +0000  1297/1935  GIT_SILENT Sync po/docbooks with svn
+7e5df64ee8f11490f9018c4aa5f1bf8dfbe2e9e2   2026-08-09 08:08:18 -0400  1297/1935  .krazy - update to current source
+b842785f5b0940d3ad326cb34b20d0e6bea69003   2026-08-10 01:46:30 +0000  1297/1935  GIT_SILENT Sync po/docbooks with svn
+d320b8a5ed0593a89d933d0899eb7c27d699fe0c   2026-08-11 01:49:31 +0000  1297/1935  GIT_SILENT Sync po/docbooks with svn
+493e912b3baa51c4a576de49c4c7e3aaab0b6ba0   2026-08-11 13:20:06 +0930  1297/1935  GIT_SILENT CI - Flatpak - Update Versions
+cd5999507de93b20c9c2c2bf5f3402c841523e80   2026-08-12 01:57:48 +0000  1297/1935  GIT_SILENT Sync po/docbooks with svn
+74d3650dee474c96f32381f54f59067805b1764b   2026-08-12 14:21:46 +0000  1297/1935  Accept invalid data in DOM (restore pre-qt6.12 default)
+9a5f7dba18fc5cd796fe5fc581433a6a7e37a8d7   2026-08-12 16:46:50 +0200  1297/1935  GIT_SILENT Update Appstream for new release
+d35c7d03a6c430a5efbd8e5c880dbb7eefc539b1   2026-08-14 01:47:20 +0000  1297/1935  GIT_SILENT Sync po/docbooks with svn
+2e1c5f8e181debfbb2da4f253e7f9d2101894720   2026-08-14 12:50:40 +0000  1297/1935  Add F11 as an alternative fullscreen shortcut
+169c43de408dde3906b3bf157b9eaee8bad8c516   2026-08-14 14:30:50 +0000  1298/1935  Add context to translatable strings, fix typo
+e2db4c232b4e87363be51710c86013b32d7eabe9   2026-08-15 01:41:35 +0000  1298/1935  SVN_SILENT made messages (.desktop file) - always resolve ou
+a3c6effca34ac8d799d58fd419d12e6fb9127773   2026-08-15 01:50:34 +0000  1298/1935  GIT_SILENT Sync po/docbooks with svn
+4db403b96a0a66ca311be012892381d001dd42cd   2026-08-16 01:46:34 +0000  1298/1935  GIT_SILENT Sync po/docbooks with svn
+698350846abed9c0910eb06aa8ce42c11797c141   2026-08-17 01:46:13 +0000  1298/1935  GIT_SILENT Sync po/docbooks with svn
+4b51aa54fd99202bdb627b7007b73ad8cb67c609   2026-08-17 07:35:12 +0000  1298/1935  Do not hardcode the fullscreen shorcuts
+77f2f4728a41edabeab3bf05d42e20db012f7c14   2026-08-17 08:06:57 +0000  1298/1935  Drop custom non-functioning console logger; just debug dump 
+074ad44c3fd134ead39ea1ce6c7711a45cf531df   2026-08-17 08:06:57 +0000  1299/1935  Wrap some pdf specific javascript console functions to conso
+7dcd1767785839682ae332762154c39aa2d1d44b   2026-08-17 09:27:28 +0000  1301/1935  Backport a synctex security fix
+1d7bbe79730f0051b7d985f02db827978e7f6c7e   2026-08-17 12:29:37 +0200  1302/1935  Signing: Use KPasswordDialog for NSS instead QInputDialog
+0752d76db88a1677dbeb79d153e77b4416b0b830   2026-08-17 12:45:30 +0200  1304/1935  Deprecate the error-less saveChanges in document
+00d57565c7048fd0c5434b646345a5337206bf80   2026-08-18 01:46:54 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+562312ccf15d32c26f938966d67882a47682091a   2026-08-19 01:48:26 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+8a5595df7665aa9bc0786d6c2d10aed96eac7c78   2026-08-19 17:06:18 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+51d610206f679ff223b8e5700a2313c0ac4bad45   2026-08-20 01:44:02 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+d2a244ff8e5fdfbf92016f562e474ae540725851   2026-08-20 14:15:34 +0930  1304/1935  GIT_SILENT CI - Flatpak - Update Versions
+83a0c9350841c431d9bc63ace82569ace91e7877   2026-08-21 01:45:06 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+32544042498b9f7f899aa29bb0211dc4ac2ab7c9   2026-08-21 12:33:57 +0200  1304/1935  Initialize m_pasteAnnotation
+c6388e894e1914f778d1600b52dc648f387bae2d   2026-08-22 01:45:33 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+67fc3e9df1277ff40823298e7dcfdf78e79616da   2026-08-22 06:58:13 -0400  1304/1935  Markdown: uncapitalize document anchors to match internal li
+b0acd8fabf361aad6e8f97c721aa005c49256e2f   2026-08-25 01:49:03 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+5136c3fd29312297f089aff32f9cb684e3c77b7b   2026-08-26 01:52:49 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+df5f45aa3a010c98b3c2762e6fea7386f54d9e16   2026-08-27 15:31:35 +0200  1304/1935  Use KPasswordDialog for certificate pin/password
+cde1c1e23871f6e40f1ea3ae0e3c09d1c96199bd   2026-08-28 01:46:52 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+074acc095cdfe5f91f313cf5e01e48714217f0a7   2026-08-29 01:47:49 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+564394110cc8a382e746631ec7c1fe994db09620   2026-08-30 01:47:21 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+92b3d3d2578a04dfc3af064fbb1fd744f597c701   2026-08-31 01:45:06 +0000  1304/1935  GIT_SILENT Sync po/docbooks with svn
+98e20e853fb174f30696129da1fd01420bc9252d   2026-08-31 05:50:43 -0400  1305/1935  Markdown - allow multiple in-page links pointing the same an
+37ec715183893cd86f514df019c4096477ad4100   2026-08-31 09:53:34 +0000  1305/1935  Show filename when asking for password
+2544a6d75c8fd54e24fb360bfebdec9c9a575d3d   2026-09-01 01:47:31 +0000  1305/1935  GIT_SILENT Sync po/docbooks with svn
+1ae13a4201835dd6c7eba37e78fdb3e48f4dad38   2026-09-01 06:03:40 -0400  1305/1935  Markdown - fix multiple in-page links pointing the same anch
+7fd85b3361def1860155806dc71c48d237411298   2026-08-30 21:31:26 +0200  1308/1935  Fix dangling form field page pointers after saving
+ff4d2713525cd99790c2a10a9503afd810b36d34   2026-09-02 01:45:45 +0000  1360/1935  GIT_SILENT Sync po/docbooks with svn
+e625e917965a64a4199baa1aa02e60ba949882a7   2026-09-02 13:37:29 +0000  1360/1935  Fix visibility of pdf overprint setting
+af38e32d34b5247ca51e2b8156d2f399c13fe0bf   2026-09-03 01:58:03 +0000  1366/1935  GIT_SILENT Sync po/docbooks with svn
+2a29bd87280b5aa5164eef36904cb422a26bda72   2026-09-04 01:45:35 +0000  1366/1935  GIT_SILENT Sync po/docbooks with svn
+14ec0c096416584033ea8054c453c22868d1713e   2026-09-04 08:17:04 +0200  1366/1935  GIT_SILENT Update Appstream for new release
+1c3c51ad939de04daa83fdb7331ecb8839c798cc   2026-09-04 07:21:46 +0000  1368/1935  Fix crash on broken dvi files
+3151b0b862ccf67e8be365abce0c1b05a31fd94a   2026-09-05 01:47:45 +0000  1368/1935  GIT_SILENT Sync po/docbooks with svn
+b6cc939184d3695fb7a1cf5e22215df8977a8220   2026-09-06 02:02:19 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+830fd214b42e2a510cf88768f8f491c16ca975b1   2026-09-07 01:52:06 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+f391874728689bf0560add70a5aacfced6358e24   2026-09-08 01:50:28 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+a9cc1f03fb96dbb32afb51267270b5c5b0603713   2026-09-08 14:19:55 +0200  1374/1935  Dont shadow variable name
+afcf518a547dc8cf8716f934d897f51a9727dad6   2026-09-08 13:05:21 +0000  1374/1935  Remove redundant check
+f99c0d540bcfc2f50b6165c7bd793d69dc2355e5   2026-09-09 01:55:19 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+8578b2f7476d30d5f1967cacd98c78477577948b   2026-09-10 01:50:16 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+b9a5786fc939330808b7aa8e795dc31c4cf9dd1e   2026-09-11 01:48:35 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+63e3a6d0fdd04c78771299db783ebfd56f5f82b1   2026-09-14 01:43:40 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+79b88804803737575aecec619192cbfb2d3ab764   2026-09-15 01:45:25 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+daf2d982d62b7d6dd981d9fc7ec74b67537b8ac8   2026-09-16 01:46:24 +0000  1374/1935  GIT_SILENT Sync po/docbooks with svn
+81dafdf9efef18df1d1b65fd5921d25a9b598c85   2026-09-16 11:21:29 +0930  1374/1935  CI - Flatpak - Update Versions
+953ca924b6536e80fb2b77e6d176244496691154   2026-09-16 12:39:46 +0000  1379/1935  Memory-safety: Dont let raw pointers out
+792f80fb8a02becc0771d626272c61ff4959cf7a   2026-09-16 14:56:01 +0000  1379/1935  Fix signature panel crash on document refresh
+311c08e8c171e6225108a06d4ac3da50732271e2   2026-09-17 01:46:16 +0000  1379/1935  GIT_SILENT Sync po/docbooks with svn
+8fbcea56904211443c7aaae2b49a4bd538298f89   2026-09-17 11:58:41 +0400  1379/1935  add Arabic Percent Sign to parseZoomString()
+8662e426f4b8d3ad7807fc705c6ab1789fb2c993   2026-09-18 01:45:45 +0000  1379/1935  GIT_SILENT Sync po/docbooks with svn
+ff06526c0153c7b454386bb07f514c88b13d9380   2026-09-20 01:46:54 +0000  1379/1935  GIT_SILENT Sync po/docbooks with svn
+3dd78b3cdc2ec1d31244618ae1d9daf933304b11   2026-09-20 12:02:07 +0200  1380/1935  Remove clazy:exclude statements which were already fixed in 
+e915b78262c758f59a9bf1e9f3c9d85543f276c6   2026-09-20 12:02:07 +0200  1382/1935  Use typedef instead of define for RenderedDviPagePixmap/Rend
+1516ed57ed192548c2bd082542c5be372806c170   2026-09-20 12:02:07 +0200  1382/1935  utilite NOLINGBEGIN/NOLINTEND for blocks of old-style connec
+e4c52ef072c3288c2c34e0dc7a290f878ea90851   2026-09-20 12:04:31 +0200  1383/1935  Add i18n context
+94dc53a268fd3202ab897e2dd414559b11a5043b   2026-09-20 11:35:50 +0000  1384/1935  Signing: Key missing is not internal error
+fae9fcc4adae1250f5f9a975c405be59443f6068   2026-09-20 12:41:12 +0000  1384/1935  Add more links to appstream metadata, fix warning
+9b545d6d5789e3f03c76813a7246e7bfb599dc33   2026-09-20 13:51:38 +0000  1434/1935  GIT_SILENT Sync po/docbooks with svn
+c3f198a829d270edb1d49496471bdae21b5f5bd9   2026-09-20 17:13:30 +0000  1436/1935  GIT_SILENT Sync po/docbooks with svn
+005409eecf1edb184562e17b4d2f7802669a65c8   2026-09-21 01:42:59 +0000  1440/1935  GIT_SILENT Sync po/docbooks with svn
+4a19dae47fcba2bde99b2a68e8bfb10ebb48ddc7   2026-09-21 13:19:10 +0000  1440/1935  Import changes from upstream/work/whiting/removephononvideo
+89b2df2b7e62835e1d27df117b61305287c65538   2026-09-21 13:19:10 +0000  1440/1935  Port VideoWidget and AudioPlayer to Qt6
+f9408dfac6739a20907764554a35d8ecd1f54ddd   2026-09-21 13:19:10 +0000  1440/1935  Add back the horizontal seek slider to VideoWidget
+c82d467477711ba3167f7b3a6aac36374877bcd3   2026-09-21 13:19:10 +0000  1441/1935  Enable seeking by clicking on position in slider
+ab70f081e18ace9c47d52372284fbc2de952387c   2026-09-21 13:19:10 +0000  1441/1935  fix typo in CMakeLists.txt for multimedia widgets
+f6268b73b5eec220bc83fa1e6ed0d4abfb4b1ff6   2026-09-21 13:19:10 +0000  1440/1935  Remove resizeEvent method from VideoWidget
+784d92750a8622ee278954fefa3346af3eeafadd   2026-09-21 13:19:10 +0000  1440/1935  Fix formatting in audioplayer.cpp
+1729d5cab303d78c673fea0a2df785ec952e2a7f   2026-09-21 13:19:10 +0000  1441/1935  videowidget: Switch from QVideoWidget to QGraphicsVideoItem
+3f02a987de19fea450a72c74655f16561912d026   2026-09-21 15:44:27 +0000  1441/1935  flatpak: We do not use phonon anymore
+458b7c699f4566bcbee61cbce7bd1be53983491d   2026-09-22 01:48:38 +0000  1449/1935  GIT_SILENT Sync po/docbooks with svn
+4e5ba89bb11f7cff1a034e2e9be38cb10c3f3311   2026-09-22 10:33:38 +0200  1454/1935  Run clazy modernizations for overloaded signals and list ini
+ce380d7676575151d2909ad35170f930aa9cbc4a   2026-09-22 10:33:38 +0200  1454/1935  Remove unused typedef
+6d48776bd2ee2001e9c2b5d49d0d551a02c0e036   2026-09-22 10:40:20 +0200  1454/1935  Explicitly add some more list initialization that clazy did 
+a353c031deea852a7b26b61b6802dda9d3dfa019   2026-09-22 13:38:46 +0200  1463/1935  Remove leftover statements for kate tab replacements
+96f9ab2f90ec482976e565b5ae5343ab258e7539   2026-09-22 13:38:47 +0200  1543/1935  Add explicit moc include for better inlining and compilation
+aad99fe0ef53cf3d61a544f8a360237c5ed914a5   2026-09-22 13:38:47 +0200  1544/1935  Exclude moc files header filter, define source filter rather
+2865f0c28e8cc55a33da552da806dac3f606ee11   2026-09-22 13:38:47 +0200  1544/1935  Run clang-tidy in CI as quiet to avoid long being cluttered
+916e40cef38c6bc2707e8a3626d0eb006452bd13   2026-09-22 17:05:12 +0000  1544/1935  SVN_SILENT made messages (.desktop file) - always resolve ou
+a4a9283ebe1fd88a01a17ae24515dc9a16262976   2026-09-22 17:39:23 +0000  1682/1935  GIT_SILENT Sync po/docbooks with svn
+98304bc46955fbef46e1799ed5c2a23c0b5dad76   2026-09-23 00:48:07 +0000  1682/1935  GIT_SILENT made messages (after extraction)
+458f507015fe8149d09eb25cda81fc771a09fcac   2026-09-23 01:54:36 +0000  1696/1935  SVN_SILENT made messages (.desktop file) - always resolve ou
+0e4c2d994e842c54e41d08f3b22c41fe821bdb40   2026-09-23 02:24:24 +0000  1724/1935  GIT_SILENT Sync po/docbooks with svn
+b2ce9f22c18ed689f2c9e29ce2470f1e846bd7f2   2026-09-23 13:35:40 +0000  1724/1935  Update "Mac OS X" -> "macOS"
+1589852104786d214b6bd1246ef76dc2bae34303   2026-09-24 00:43:17 +0000  1724/1935  GIT_SILENT made messages (after extraction)
+a525c38dce07483093fab36398a8d9dacfc1965e   2026-09-24 01:48:50 +0000  1727/1935  GIT_SILENT Sync po/docbooks with svn
+e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886   2026-09-24 17:32:36 +0200  1727/1935  Add Plasma/6.8 union to the development flatpak
+b6f1eccb04b912684533f4120b6c82395271a736   2026-09-25 11:11:08 +0000  1721/1935  Adapt to newer clang-format
+4a2e30e94895a65b8f2417475f6a37a4ad4d2d65   2026-09-25 12:15:00 +0000  1714/1935  Basic support for creating eIDAS signatures
+8179294eda1f78e9e5d406afd665c665cecddc45   2026-09-25 14:17:51 +0200  1713/1935  Signing-with-nss: keep callback around
+83dc2dd51c6bc2218c91efb7899e15a1810ac277   2026-09-26 00:43:46 +0000  1713/1935  GIT_SILENT made messages (after extraction)
+5621ea858693d657cf53d5b6749fade9e05efb4c   2026-09-26 01:53:31 +0000  1560/1935  GIT_SILENT Sync po/docbooks with svn
+da83783a0b29363e10b3719f7040eb4043426c8c   2026-09-26 16:04:41 +0200  1559/1935  Enable KCrash crash handling in the mobile version as well
+5571a64504ca03c83e67edef78fed14c326aed2b   2026-09-26 17:51:50 +0200  1559/1935  Update Android build system
+bd826bb8b821f6ef89596ee46ff145d91410be08   2026-09-27 00:43:03 +0000  1559/1935  GIT_SILENT made messages (after extraction)
+0d4762e3a77c3d56a36eb2d75dc59b654e0da0dc   2026-09-28 00:43:32 +0000  1559/1935  GIT_SILENT made messages (after extraction)
+662c786749aabac9d6fd56f055cbd0f3a83081d9   2026-09-28 01:51:09 +0000  1559/1935  GIT_SILENT Sync po/docbooks with svn
+798e8e544ae848c06951838f3305e608fa5d9ed0   2026-09-28 16:06:26 +0000  1559/1935  Use non-deprecated Kirigami CMake package name
+cbf00a001e1a43600a0329a56b8c0deed2a24dd1   2026-09-28 16:06:26 +0000  1558/1935  Consider SafeArea margins for the global drawer
+b8ce62b051b12ac7b99b833bd15c2d8638634649   2026-09-29 00:43:25 +0000  1558/1935  GIT_SILENT made messages (after extraction)
+44dc8b9e2ee11faae9232e70d8ffa7ef8f14cb4a   2026-09-29 01:50:10 +0000  1557/1935  GIT_SILENT Sync po/docbooks with svn
+118d9bfced8e10f82f76c892839227b5b7317968   2026-09-30 00:44:04 +0000  1557/1935  GIT_SILENT made messages (after extraction)
+77d824c16a9fb3e5a36992224386ba4a9a286d84   2026-09-30 01:49:00 +0000  1557/1935  GIT_SILENT Sync po/docbooks with svn
+ddd16264142f875aaab5ff6434f479c6d6b6ab49   2026-10-01 00:43:33 +0000  1557/1935  GIT_SILENT made messages (after extraction)
+896d7114db2278ce01bb854eac588dd720682cb9   2026-10-01 01:47:44 +0000  1557/1935  GIT_SILENT Sync po/docbooks with svn
+c620604005f536a54d1b51c4744b2816f930c06d   2026-10-01 06:49:37 +0000  1557/1935  Check action is of type Script before static casting to it
+fe5617dfde9510a763a7de22f0e603ed63709e88   2026-10-01 07:39:09 +0000  1550/1935  Switch DocumentSynopsis from internal xml to a structure
+78341cdf8375392e44e5922211ba63846c42d9ef   2026-10-01 09:49:39 +0200  1546/1935  Bump SOVERSION; drop deprecated functions
+6ab39cd98936a959d802fd95421f24693581c904   2026-10-01 08:34:43 +0000  1546/1935  Revert "Accept invalid data in DOM (restore pre-qt6.12 defau
+4dd7b41dd99a060df30e789134b319968833fc08   2026-10-01 11:50:44 +0000  1545/1935  JS: Ensure timers dont outlive the app
+71d1b2c7fcc5f2ae7a4670a1dea5f133490d6325   2026-10-01 11:50:44 +0000  1544/1935  JS: Ensure global objects are c++ owned
+d1d79936b928774e5f0399409f9ba71fc35764db   2026-10-01 11:50:44 +0000  1543/1935  JS: Make all bridge-object cppowned
+5fa87159b6d7ea09e8411c899f85dbc5a46fe008   2026-10-01 11:50:44 +0000  1539/1935  JS: move field cache to document scope
+c87b4a4be3a183af63bc79e86c8d33bc7066dcb3   2026-10-01 11:50:44 +0000  1538/1935  JS: move interval timers to document scope
+7f5a3d79a445cf06c7bb175dff03b600f1256620   2026-10-01 11:50:44 +0000  1538/1935  JS: Scope interval timer lifetime more narrow
+95f06a30236f2dec221151c99d0ebfb3e6465646   2026-10-01 11:50:44 +0000  1538/1935  JS: Ensure interval timers dont outlive the app
+7549e43db499aa86fb2655909e50c3ff9c2126ac   2026-10-01 17:38:45 +0000  1538/1935  GIT_SILENT made messages (after extraction)
+a45fb43af64e878422e9df44bf56f9ac4d1d7588   2026-10-01 18:41:22 +0000  1394/1935  GIT_SILENT Sync po/docbooks with svn
+a266e2e2f1ca54431da3fb3621ad20af2a3f3607   2026-10-02 01:44:00 +0000  1393/1935  GIT_SILENT Sync po/docbooks with svn
+2b9938cc47f82adf056f4c2d825af46cb2204ebf   2026-10-02 14:12:33 +0000  1392/1935  Convert HDR to sRGB in kimgio generator
+b3c203a6d02bd226aaf61acafa4bff562e4c3895   2026-10-03 00:43:11 +0000  1392/1935  GIT_SILENT made messages (after extraction)
+11c85792c0668918c5d23e76aced3ba8c81db733   2026-10-03 01:51:49 +0000  1320/1935  GIT_SILENT Sync po/docbooks with svn
+6d77ff605de8dfbbc5102ced336b51ff97d248fe   2026-10-05 01:46:45 +0000  1320/1935  SVN_SILENT made messages (.desktop file) - always resolve ou
+d55db3812274e5c9dd1f590d5b007b6bac854b0a   2026-10-05 02:04:45 +0000  1317/1935  GIT_SILENT Sync po/docbooks with svn
+c13972d370a68c0eb0a2ef9e98aadda809741c7e   2026-10-05 09:13:46 +0000  1317/1935  Use QRegularExpression::anchoredPattern
+0ed759de1ea2b6446511057ec082f6bb9a6b4170   2026-10-05 22:40:09 +0200  1317/1935  GIT_SILENT Update Appstream for new release
+a27de2df90963720b89f3f12e80b6157130d9f91   2026-10-06 01:27:55 +0200  1314/1935  Make the PrintOptionsWidget API clearer
+1fa05e5390024a20d7a90e7bbaaef33474bab080   2026-10-06 00:44:17 +0000  1314/1935  GIT_SILENT made messages (after extraction)
+5bed9b58db6503d6bbb7e1216824363a52a5a8e6   2026-10-06 02:03:37 +0000  1314/1935  GIT_SILENT Sync po/docbooks with svn
+4c14e6de16222d0695e3a792269e748b642aa891   2026-10-07 15:24:04 +0200  1314/1935  Fix built without multimedia
+913f985b94eb2a27a5d6b4f3582fd71bb5af93de   2026-10-12 02:23:46 +0000  1314/1935  GIT_SILENT Sync po/docbooks with svn
+31cdd44495af358eb201b05622c92dfb634ce6ad   2026-10-12 15:10:53 +0000  1314/1935  Force QQC2 Breeze style on Android
+60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9   2026-10-13 09:42:05 +0200  1313/1935  MacOS: Look for kleopatra in applicationDirPath(), too
+
+----------------------------------------------------------------------------------------------------
+3. BASE DETERMINATION
+----------------------------------------------------------------------------------------------------
+maximum match count : 1727 / 1935  (89.25 %)
+commits achieving it: 2
+    a525c38dce07483093fab36398a8d9dacfc1965e  2026-09-24 01:48:50 +0000  GIT_SILENT Sync po/docbooks with svn
+    e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886  2026-09-24 17:32:36 +0200  Add Plasma/6.8 union to the development flatpak
+
+Lower bound: the newest content that Charta carries was introduced upstream at the first
+plateau commit, so the fork is at or after it.
+Upper bound: the oldest content that Charta carries was removed upstream by the commit
+right after the last plateau commit, so the fork is at or before it.
+
+files whose content FIRST appears at the first plateau commit (a525c38dce07483093fab36398a8d9dacfc1965e):
+    po/ar/okular.po
+    po/ar/okular_poppler.po
+    po/lt/okular.po
+
+files whose content STOPS matching at the last plateau commit (e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886):
+    .clang-tidy
+    core/bookmarkmanager.cpp
+    generators/djvu/kdjvu.cpp
+    generators/dvi/TeXFont_PK.cpp
+    generators/dvi/dvisourcesplitter.cpp
+    part/DistinguishedNameParser.h
+
+=> OKULAR_BASE = e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886   (newest commit that explains the tree)
+   date: 2026-09-24 17:32:36 +0200   subject: Add Plasma/6.8 union to the development flatpak
+
+----------------------------------------------------------------------------------------------------
+4. LITERAL VERIFICATION - `sha256sum <local file>` vs `git show <base>:<path> | sha256sum`
+----------------------------------------------------------------------------------------------------
+4a. against the WORKING TREE (literal Appendix C procedure)
+
+files checked                       : 1935
+identical (local sha256 == upstream) : 1720
+different                           : 144
+absent upstream at the base commit  : 71
+
+4b. against the CONTENT COMMITTED AT CHARTA HEAD 73ee063 (the ledger basis)
+   The five files listed below are modified in the working tree by a concurrent job;
+   the ledger and the CSV are built from the committed content, not from the worktree.
+
+identical (local sha256 == upstream) : 1727
+different                           : 137
+absent upstream at the base commit  : 71
+
+working tree differs from the committed content for 31 tracked file(s):
+    .flatpak-manifest.json
+    .flatpak-patches/okular-mimetypes.patch
+    CMakeLists.txt
+    LICENSES/GPL-3.0-or-later.txt
+    README.md
+    aboutdata.h
+    core/document.cpp
+    generators/CMakeLists.txt
+    generators/comicbook/org.kde.okular-comicbook.metainfo.xml
+    generators/djvu/org.kde.okular-djvu.metainfo.xml
+    generators/dvi/org.kde.okular-dvi.metainfo.xml
+    generators/epub/org.kde.okular-epub.metainfo.xml
+    generators/fax/org.kde.okular-fax.metainfo.xml
+    generators/fictionbook/org.kde.okular-fb.metainfo.xml
+    generators/kimgio/org.kde.okular-kimgio.metainfo.xml
+    generators/markdown/org.kde.okular-md.metainfo.xml
+    generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml
+    generators/poppler/org.kde.okular-poppler.metainfo.xml
+    generators/spectre/org.kde.okular-spectre.metainfo.xml
+    generators/tiff/org.kde.okular-tiff.metainfo.xml
+    generators/txt/org.kde.okular-txt.metainfo.xml
+    generators/xps/org.kde.okular-xps.metainfo.xml
+    mobile/android/icon-playstore.png
+    mobile/app/org.kde.okular.kirigami.appdata.xml
+    mobile/components/okularsingleton.cpp
+    okular_part.json
+    part/actionbar.cpp
+    part/actionbar.h
+    part/annotationtools.cpp
+    part/magnifierview.cpp
+    shell/CMakeLists.txt
+
+first 20 identical rows (path sha256):
+    .clang-tidy                                                      204d788e2909e8b64e94cb560ec097f41619387f4b17b80981d69b6fec993cbb
+    .git-blame-ignore-revs                                           7b3f0ca3a85d888d01052c910c8afab68a3cff8c13191b6f2fbb5c54b685a7cc
+    LICENSES/BSD-2-Clause.txt                                        24a7109c41c79a79ecfc245fa0c63d60b5a3bc0a08d88a33250a22e8445c2a70
+    LICENSES/BSD-3-Clause.txt                                        42639b2e5507163d35069be166e37a784f48a5f17e3577c16eb48fab215247cd
+    LICENSES/GFDL-1.2-or-later.txt                                   1118a91a3290bc8981f922dfcffc1a619592c007aa31b7a98cee694d933c86ce
+    LICENSES/GPL-2.0-only.txt                                        b58671fb4d9e9efeb9a6af1bdba02e61ac69af654855b45a372efe8f52413f83
+    LICENSES/GPL-2.0-or-later.txt                                    b58671fb4d9e9efeb9a6af1bdba02e61ac69af654855b45a372efe8f52413f83
+    LICENSES/GPL-3.0-only.txt                                        c7120bba88c79b87ca40eacc1cf4ac95bcb2e96b8a00dd91886ef81dbad87f33
+    LICENSES/LGPL-2.0-only.txt                                       e2eb0591a1bd9f9d49bb8c0dbbdae232b6ee9e1b2f5584617b0f2d6072464afe
+    LICENSES/LGPL-2.0-or-later.txt                                   e2eb0591a1bd9f9d49bb8c0dbbdae232b6ee9e1b2f5584617b0f2d6072464afe
+    LICENSES/LicenseRef-KDE-Accepted-GPL.txt                         ef839531eb65b0168f9aed14047c84be13e9ea38801a73bc18abe24dc93e6ac9
+    LICENSES/MIT.txt                                                 b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0
+    LICENSES/X11.txt                                                 e1963c9958b93bc2578b34f8ae22cfe205e8c0e7d5be7235cfdbdefbf92a5423
+    Messages.sh                                                      05d672086a74cd61e658d3da4e8429d308d99081ecfcf9cc6aa945a96f3f3e74
+    Okular6Config.cmake.in                                           09a8f54b25ff719e692db78f4e1bb69c844cd972eab19ef0dcfe629774e634a4
+    OkularConfigureChecks.cmake                                      0e7aca319b8517b6c76b0ebb1e9043719c27f8fa99614a66c78b7d2ebb97c276
+    _clang-format                                                    ccf9050fdd5453f33eafdb6158268d1462992490181dd5aa5c3e4f51b3501716
+    autotests/annotationclipboardtest.cpp                            0fb631f4511219a0bb6e1b5e763eb5c52cd59dc22bd8c5676ee541c0da65c2e3
+    autotests/annotationstest.cpp                                    350d32214d3c00d6aa3deb777111d298394c886c33bc431aabc266843848d4ba
+    autotests/calculatetexttest.cpp                                  7ebf4fb2b299cbee220bd9da32b3f0aac50eecb41d36c75168858ad748c1fa48
+
+the complete sha256 pair list for all 1935 files is reproduced by re-running:
+    git -C /tmp/opencode/okular show e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886:<path> | sha256sum   # upstream
+    sha256sum <path>                                          # local
+
+----------------------------------------------------------------------------------------------------
+5. FILES NOT EXPLAINED BY THE BASE COMMIT
+   144 files differ from the upstream base commit in the WORKING TREE (the committed-content
+   count at Charta HEAD 73ee063 is 137 'modified' + 71 'absent-upstream' = 208; the extra
+   working-tree differences are the concurrent edits listed in section 4b).
+----------------------------------------------------------------------------------------------------
+For every modified file, the best matching upstream commit in the scanned range is given
+(the newest commit whose content still equals the local content, if any).
+
+path                                                       +/- lines   best matching upstream commit (if any)
+.flatpak-manifest.json                                     +14/-22     NO MATCHING UPSTREAM COMMIT in the scanned range
+.flatpak-patches/okular-mimetypes.patch                    -           60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 (2026-10-13) MacOS: Look for kleopatra in application
+.gitignore                                                 +15/-0      NO MATCHING UPSTREAM COMMIT in the scanned range
+CMakeLists.txt                                             +134/-22    NO MATCHING UPSTREAM COMMIT in the scanned range
+LICENSES/GPL-3.0-or-later.txt                              -           60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 (2026-10-13) MacOS: Look for kleopatra in application
+README.md                                                  +264/-51    NO MATCHING UPSTREAM COMMIT in the scanned range
+aboutdata.h                                                +6/-6       NO MATCHING UPSTREAM COMMIT in the scanned range
+autotests/CMakeLists.txt                                   +51/-5      NO MATCHING UPSTREAM COMMIT in the scanned range
+autotests/addremoveannotationtest.cpp                      +793/-0     NO MATCHING UPSTREAM COMMIT in the scanned range
+autotests/annotationtoolbartest.cpp                        +160/-2     NO MATCHING UPSTREAM COMMIT in the scanned range
+autotests/parttest.cpp                                     +39/-72     NO MATCHING UPSTREAM COMMIT in the scanned range
+autotests/translateannotationtest.cpp                      +109/-1     NO MATCHING UPSTREAM COMMIT in the scanned range
+conf/okular.kcfg                                           +34/-2      NO MATCHING UPSTREAM COMMIT in the scanned range
+config-okular.h.cmake                                      +6/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+core/annotations.cpp                                       +660/-6     NO MATCHING UPSTREAM COMMIT in the scanned range
+core/annotations.h                                         +122/-1     NO MATCHING UPSTREAM COMMIT in the scanned range
+core/annotations_p.h                                       +24/-0      NO MATCHING UPSTREAM COMMIT in the scanned range
+core/area.cpp                                              +6/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+core/audioplayer.cpp                                       +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+core/document.cpp                                          +929/-27    NO MATCHING UPSTREAM COMMIT in the scanned range
+core/document.h                                            +164/-1     NO MATCHING UPSTREAM COMMIT in the scanned range
+core/document_p.h                                          +35/-1      NO MATCHING UPSTREAM COMMIT in the scanned range
+core/documentcommands.cpp                                  +192/-15    NO MATCHING UPSTREAM COMMIT in the scanned range
+core/documentcommands_p.h                                  +87/-2      NO MATCHING UPSTREAM COMMIT in the scanned range
+core/generator.cpp                                         +6/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+core/generator.h                                           +1/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+core/generator_p.h                                         +1/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+core/observer.cpp                                          +10/-0      NO MATCHING UPSTREAM COMMIT in the scanned range
+core/observer.h                                            +8/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+core/page.cpp                                              +133/-6     NO MATCHING UPSTREAM COMMIT in the scanned range
+core/page.h                                                +38/-1      NO MATCHING UPSTREAM COMMIT in the scanned range
+core/page_p.h                                              +9/-4       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/CMakeLists.txt                                  -           60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 (2026-10-13) MacOS: Look for kleopatra in application
+generators/comicbook/okularApplication_comicbook.desktop   +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/comicbook/org.kde.mobile.okular_comicbook.desktop +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/comicbook/org.kde.okular-comicbook.metainfo.xml +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/djvu/okularApplication_djvu.desktop             +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/djvu/org.kde.mobile.okular_djvu.desktop         +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/djvu/org.kde.okular-djvu.metainfo.xml           +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/dvi/dviFile.cpp                                 +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/dvi/dviRenderer.cpp                             +2/-2       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/dvi/dviexport.cpp                               +4/-4       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/dvi/fontpool.cpp                                +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/dvi/okularApplication_dvi.desktop               +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/dvi/org.kde.mobile.okular_dvi.desktop           +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/dvi/org.kde.okular-dvi.metainfo.xml             +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/epub/okularApplication_epub.desktop             +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/epub/org.kde.mobile.okular_epub.desktop         +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/epub/org.kde.okular-epub.metainfo.xml           +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/fax/okularApplication_fax.desktop               +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/fax/org.kde.mobile.okular_fax.desktop           +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/fax/org.kde.okular-fax.metainfo.xml             +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/fictionbook/hi32-app-okular-fb2.svg             +0/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/fictionbook/okularApplication_fb.desktop        +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/fictionbook/org.kde.mobile.okular_fb.desktop    +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/fictionbook/org.kde.okular-fb.metainfo.xml      +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/kimgio/okularApplication_kimgio.desktop         +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/kimgio/org.kde.mobile.okular_kimgio.desktop     +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/kimgio/org.kde.okular-kimgio.metainfo.xml       +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/markdown/okularApplication_md.desktop           +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/markdown/org.kde.mobile.okular_md.desktop       +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/markdown/org.kde.okular-md.metainfo.xml         +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/mobipocket/okularApplication_mobi.desktop       +70/-70     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/mobipocket/org.kde.mobile.okular_mobi.desktop   +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/CMakeLists.txt                          +4/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/annots.cpp                              +349/-42    NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/annots.h                                +10/-2      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/generator_pdf.cpp                       +368/-8     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/generator_pdf.h                         +1/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/okularApplication_pdf.desktop           +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/org.kde.mobile.okular_pdf.desktop       +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/org.kde.okular-poppler.metainfo.xml     +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/poppler/pdfsettingswidget.cpp                   +2/-2       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/spectre/okularApplication_ghostview.desktop     +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/spectre/org.kde.mobile.okular_ghostview.desktop +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/spectre/org.kde.okular-spectre.metainfo.xml     +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/tiff/okularApplication_tiff.desktop             +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/tiff/org.kde.mobile.okular_tiff.desktop         +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/tiff/org.kde.okular-tiff.metainfo.xml           +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/txt/okularApplication_txt.desktop               +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/txt/org.kde.mobile.okular_txt.desktop           +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/txt/org.kde.okular-txt.metainfo.xml             +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/xps/okularApplication_xps.desktop               +69/-69     NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/xps/org.kde.mobile.okular_xps.desktop           +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+generators/xps/org.kde.okular-xps.metainfo.xml             +3/-38      NO MATCHING UPSTREAM COMMIT in the scanned range
+gui/guiutils.cpp                                           +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+gui/pagepainter.cpp                                        +151/-45    NO MATCHING UPSTREAM COMMIT in the scanned range
+icons/CMakeLists.txt                                       +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+interfaces/saveinterface.h                                 +28/-0      NO MATCHING UPSTREAM COMMIT in the scanned range
+mobile/android/AndroidManifest.xml                         +3/-3       NO MATCHING UPSTREAM COMMIT in the scanned range
+mobile/android/icon-playstore.png                          -           60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 (2026-10-13) MacOS: Look for kleopatra in application
+mobile/android/src/OpenFileActivity.java                   +4/-4       NO MATCHING UPSTREAM COMMIT in the scanned range
+mobile/app/main.cpp                                        +3/-3       NO MATCHING UPSTREAM COMMIT in the scanned range
+mobile/app/org.kde.okular.kirigami.appdata.xml             +56/-113    NO MATCHING UPSTREAM COMMIT in the scanned range
+mobile/app/package/metadata.desktop                        +67/-67     NO MATCHING UPSTREAM COMMIT in the scanned range
+mobile/app/ui/Main.qml                                     +3/-3       NO MATCHING UPSTREAM COMMIT in the scanned range
+mobile/components/okularsingleton.cpp                      -           60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 (2026-10-13) MacOS: Look for kleopatra in application
+okular.categories                                          +15/-15     NO MATCHING UPSTREAM COMMIT in the scanned range
+okular_part.json                                           +44/-44     NO MATCHING UPSTREAM COMMIT in the scanned range
+part/actionbar.cpp                                         -           60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 (2026-10-13) MacOS: Look for kleopatra in application
+part/actionbar.h                                           -           60fd9fbcf5315c7d931d60f7d5270e7d1c0cc7b9 (2026-10-13) MacOS: Look for kleopatra in application
+part/annotationactionhandler.cpp                           +1968/-77   NO MATCHING UPSTREAM COMMIT in the scanned range
+part/annotationactionhandler.h                             +24/-0      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/annotationmodel.cpp                                   +23/-7      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/annotationpopup.cpp                                   +187/-10    NO MATCHING UPSTREAM COMMIT in the scanned range
+part/annotationpopup.h                                     +3/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/annotationpropertiesdialog.cpp                        +39/-0      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/annotationtools.cpp                                   +320/-62    NO MATCHING UPSTREAM COMMIT in the scanned range
+part/annotationtools.h                                     +58/-2      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/annotationwidgets.cpp                                 +11/-6      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/data/tools.xml                                        +6/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/dlgannotations.cpp                                    +104/-1     NO MATCHING UPSTREAM COMMIT in the scanned range
+part/dlgeditor.cpp                                         +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/dlggeneral.cpp                                        +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/editannottooldialog.cpp                               +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/editdrawingtooldialog.cpp                             +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/magnifierview.cpp                                     +48/-12     NO MATCHING UPSTREAM COMMIT in the scanned range
+part/pageview.cpp                                          +708/-787   NO MATCHING UPSTREAM COMMIT in the scanned range
+part/pageview.h                                            +15/-8      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/pageviewannotator.cpp                                 +1365/-89   NO MATCHING UPSTREAM COMMIT in the scanned range
+part/pageviewannotator.h                                   +63/-5      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/pageviewmouseannotation.cpp                           +1659/-118  NO MATCHING UPSTREAM COMMIT in the scanned range
+part/pageviewmouseannotation.h                             +84/-6      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/part-viewermode.rc                                    +1/-3       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/part.cpp                                              +1169/-55   NO MATCHING UPSTREAM COMMIT in the scanned range
+part/part.h                                                +130/-1     NO MATCHING UPSTREAM COMMIT in the scanned range
+part/part.rc                                               +3/-10      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/preferencesdialog.cpp                                 +3/-3       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/presentationwidget.cpp                                +1/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/thumbnaillist.cpp                                     +596/-260   NO MATCHING UPSTREAM COMMIT in the scanned range
+part/thumbnaillist.h                                       +24/-0      NO MATCHING UPSTREAM COMMIT in the scanned range
+part/videowidget.cpp                                       +2/-2       NO MATCHING UPSTREAM COMMIT in the scanned range
+part/widgetdrawingtools.cpp                                +1/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/CMakeLists.txt                                       +16/-20     NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/main.cpp                                             +14/-1      NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/okular_main.cpp                                      +2/-2       NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/shell.cpp                                            +204/-16    NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/shell.h                                              +26/-1      NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/shell.qrc                                            +3/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/shell.rc                                             +2/-0       NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/welcomescreen.cpp                                    +3/-2       NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/welcomescreen.h                                      +2/-1       NO MATCHING UPSTREAM COMMIT in the scanned range
+shell/welcomescreen.ui                                     +41/-82     NO MATCHING UPSTREAM COMMIT in the scanned range
+
+absent upstream (Charta-original set, 71 files):
+    CMakeFiles/CMakeSystem.cmake                                     e6dd9890a5f68bed86fe6a79a06176a48a0d2a9c39c50313df0f1cdafe697e47
+    autotests/annotationcolorhistorytest.cpp                         5dd244ed816a521fa0df3ac98439f6b39f99720c9b1ab3595924df717cbfb3b7
+    autotests/annotationpersistencetest.cpp                          ef5bc3f7b6a32006b3c0ad6e947b665553b85dd83c7b3cc5bd0aa18d77565085
+    autotests/annotationrotationtest.cpp                             3e888d1dbecc93f4e89390faefcfa2993bf6bb43c22c00891238fb8d0a7bb580
+    autotests/blankpageswritertest.cpp                               a81d7514be4b71eae237557e7519fea658d3fe869d37d95acb0c9b04b253f2c3
+    autotests/documentbuildermodeltest.cpp                           e9896aaa502e4a7777b10f107c1b9d72bccaec96e4c6ff88a40abff5e7c69dd3
+    autotests/documentbuilderparttest.cpp                            313b9c913e38dc1f7101443a76107ae87a46d75c412d2cbb7c813c3b01679bbd
+    autotests/untitleddocumenttest.cpp                               76ad457e07cc54e63add3960f3a65da2374d7592c3574f764607059d1c67b3c2
+    autotests/widthpresetstest.cpp                                   537f9d3775bb693149f0612b7a6a63bc9a4e1a8b8cf08ddc0af1b7fde841a81b
+    charta_logo_package/README.md                                    c74cbb2db5728c79976f4da652f5efa9502015e5d2ea29b3e06f1e8066dd6895
+    charta_logo_package/app-icon/charta-app-icon-desktop-1024.png    4a27a52f59157907537717915422de009c723b7b0c0990fa981c26f928624961
+    charta_logo_package/app-icon/charta-app-icon-desktop-512.png     34e838f50098985c8d328e1eb0b0055274b324eb8a45a68fa48bd116fce1ef8f
+    charta_logo_package/app-icon/charta-app-icon-padded-transparent-1024.png 1f675fd7d600ea5f0c07a70473537be00834cd0f927d2fbd615afc876743ead9
+    charta_logo_package/app-icon/charta-app-icon-padded-transparent-512.png 1fc471796e2f55da862d0685e98fa8f28f7886a4b87a92f82c7a9b7014a9d6b1
+    charta_logo_package/app-icon/charta-app-icon-transparent-1024.png c1ef7f21350bad7e0b29d4374e9d71ff779ce9e74a21d42b0a1662a497b10572
+    charta_logo_package/app-icon/charta-app-icon-transparent-512.png 5507cd201d52c26d9bf35f504a094f866ed6864e330706b283ef29988b5c8065
+    charta_logo_package/charta-logo-color-white-background.svg       55a4a451fc28ce6070c5e4f2b4a3841fe18b351be43d4043237706e04b636bc9
+    charta_logo_package/favicon/favicon-16.png                       19c53ff142b05dbf5955a5c1f319a6d3c73e8d5c0c942790d9242c5acc77aa82
+    charta_logo_package/favicon/favicon-32.png                       88977243c121058f38e4205f63e29facbfa5c26672dfec48397b255c748069fd
+    charta_logo_package/favicon/favicon-48.png                       ad74d4c52a942172b24698d9c5b238328cc8fa851b0e57546a01aa416aee06a4
+    charta_logo_package/favicon/favicon.svg                          3a6fe398170818b0a97e3efaedb5b29d06e95fec1885313519f32b09d74f27e7
+    charta_logo_package/png/charta-logo-1024.png                     c1ef7f21350bad7e0b29d4374e9d71ff779ce9e74a21d42b0a1662a497b10572
+    charta_logo_package/png/charta-logo-128.png                      f34c3bff4c96df161c7cdff43555a1ed0cf2e1aaef10f077030247f0a607ed5d
+    charta_logo_package/png/charta-logo-16.png                       19c53ff142b05dbf5955a5c1f319a6d3c73e8d5c0c942790d9242c5acc77aa82
+    charta_logo_package/png/charta-logo-24.png                       c8a8bead457ff0c99d5a75c0c6cca3766ef3812b4f4befc066093ba20150bea2
+    charta_logo_package/png/charta-logo-256.png                      d8a58f8860a23c644f18949496e4616e092688dbc4d9cd21d1d395b01628663d
+    charta_logo_package/png/charta-logo-32.png                       88977243c121058f38e4205f63e29facbfa5c26672dfec48397b255c748069fd
+    charta_logo_package/png/charta-logo-48.png                       ad74d4c52a942172b24698d9c5b238328cc8fa851b0e57546a01aa416aee06a4
+    charta_logo_package/png/charta-logo-512.png                      5507cd201d52c26d9bf35f504a094f866ed6864e330706b283ef29988b5c8065
+    charta_logo_package/png/charta-logo-64.png                       ecfc92cdec88d11182ce32b391621bdc74a8be4c9a47c676586b828bec46249b
+    charta_logo_package/print/charta-logo-color.eps                  cca5a50ad1ec5568b2e52459e3f71e9b3d892470a194703bd7933df5f225dfe5
+    charta_logo_package/print/charta-logo-color.pdf                  b63bfe479d516fe6610afa9117be42865920e6479b6aaf965caab5a4d4f8fd93
+    charta_logo_package/print/charta-logo-monochrome.eps             9310a715d79cd3fb47abeb258d5cd0fb87dff092710abb5f6ce9693b84559158
+    charta_logo_package/print/charta-logo-monochrome.pdf             b412e2d93036412ed291e2c7a49c8e94fae636a7b4eec1d9278b09cb6ea2cafa
+    charta_logo_package/svg/charta-logo-color-padded-background.svg  9df1392d1d976a0c6e290180a64a51fb84ba83df7daba010ff75f31bb8bf7797
+    charta_logo_package/svg/charta-logo-color-padded.svg             0b3a36356711d0e89dd56a0febe58ab2bdab3255bdcc45c7dd2e08bdcdb70c4f
+    charta_logo_package/svg/charta-logo-color.svg                    3a6fe398170818b0a97e3efaedb5b29d06e95fec1885313519f32b09d74f27e7
+    charta_logo_package/svg/charta-logo-monochrome-padded.svg        6407188b0176af7351dbf3fdc6add5b2f3307fe23c44583cfc8f979d58361585
+    charta_logo_package/svg/charta-logo-monochrome.svg               61a126e1589d7627d9251649c4c17d8a7dc06b2f9a444c632d3f0d74c7898ba3
+    core/document.cpp.backup                                         c7dfe6e4c47aaecaf70a4542574e840b5405bff129f3617683d73a002877e5f4
+    docs/README-VERIFICATION.md                                      579ef0e6c5399f57184bd4c45a8307af72cc01a75307f12b7d5f71e0c38c7f91
+    docs/architecture.md                                             cf55043196746fd2315c1d921149925af9ee334b4f5fa5660dfd19de9e22c7e2
+    icons/charta.svg                                                 55a4a451fc28ce6070c5e4f2b4a3841fe18b351be43d4043237706e04b636bc9
+    mobile/android/res/drawable/charta.xml                           5dfbf673512be352118e3f7c4f4cbfd777ab69aab4835a062263e31fb011ef5c
+    part/annotationcolorhistory.cpp                                  e08b6fc51712e66076cb6f8830f7a92b7e049b04014108011fdf57edfc25ef10
+    part/annotationcolorhistory.h                                    9a1e5a338fe816ec13b1f7ac47e5c296a53944bce9b49eab0827dcbf80e11058
+    part/blankpageswriter.cpp                                        d107f47e8f5a4bffa879f9af20fb38f4decfbec70753dcd437b1ef6e34b69bf4
+    part/blankpageswriter.h                                          e250483762fb29390fe3d1026fcaa038992ad42d74b51f7601034f3585d64c7b
+    part/documentbuilder.cpp                                         5c7641f13dcee591166f4b2da34497784a314451d6483b3a4f10d3d81448ec7d
+    part/documentbuilder.h                                           659b21b98904903fd59a4e7f2951886e86584b0315c8db9ad071f83b76ff7f99
+    part/documentbuilderconfig.h                                     8b3a662a502e60b553693db0fd86c1a8c783f9ce0b85c976dc12558c0774542d
+    part/documentbuilderexport.cpp                                   1e9642bf82a73a6e9ec7a9aa02925b638f2c0c05890b171f19bb98830cd00b4b
+    part/documentbuilderexport.h                                     cd3ac556c702c68ba53c3999095f2364bfc62e0c7b12df215094733ba58f0e5e
+    part/documentbuildermodel.cpp                                    3916905a5c44da5a6c4e5dd06fa47e68fd6820b4f46fe8cc9872479cb70b62a3
+    part/documentbuildermodel.h                                      df51f9d3a224cdbc2fcd50b4378677824bd1d954dc40cea777940583a003c07c
+    part/documentbuildersource.cpp                                   b1d94e9848e14748cbcc51d95f9e94159c89c70bbff604eab6e187ed3a7bf8c6
+    part/documentbuildersource.h                                     4bd9cbfcef6a59c569576a0525bc569a9656c17a8186e5234810f899ad4f8977
+    part/imagepagesettingsdialog.cpp                                 b4d51795af5cf964846766467a0629ada9bb53f475ccf75ee5784a433700f4df
+    part/imagepagesettingsdialog.h                                   c36de55af6c543e5a049bfd644c2701d707591eb2213cc5d458477de4d5f38b1
+    part/newpagedialog.cpp                                           bb6d975eb671c5cec964425a45fc611c5de84f855d67ec8cbc22fc78b28675de
+    part/newpagedialog.h                                             e64de3c18b2beff9f9851cacf662e6b64d27a8ad8a0efd5fae4f47f9ddd98db5
+    part/pagerangeinputdialog.cpp                                    2f2de2838e70d2f64c3559f11af7a152e22b926c31404756bcae5ea21200b2bc
+    part/pagerangeinputdialog.h                                      ef0f423ab6aa65f4280dafd708cff7f90b21aa3440f85ab68568b7b32da3e472
+    part/widthpresetutils.h                                          f01271af7b5340e33e36b02012f92f1c05a6ea05eee448cb656bb86893b7790b
+    patches/poppler-annotation-rotation.patch                        451b0addacebcbe4e7d28577a02f13b0e3cc2b56d31cd33709829ade0fde8107
+    patches/poppler-ink-appearance.patch                             e5ce470baab1e3429d9923b443e9d59b4ae77200f13accab756960408de4b7f4
+    shell/org.charta.reader.desktop                                  8a000dc9faf2cfc0977519f5463f6d3bdac35f7a57fcd1b32fc8188f9e7952f7
+    shell/org.charta.reader.metainfo.xml                             87dcd7722bae08cf84e2ed20c48d6addd7d6f1d5b8007c427089e31bbf593583
+    test_savedepth.cpp                                               3651273718355595fc757782d2e8ef76608d9f96e3eaf695646e3f240f805f3c
+    test_savedepth_simple                                            ad046137adf69eb64c79b109559210f9768ba165b8670c783cda980f09f33ee7
+    test_savedepth_simple.cpp                                        a27d99cb81247582e62eec689700577f5ed9f6f4eb23e2650a0284061b03e3c9
+
+----------------------------------------------------------------------------------------------------
+6. UPSTREAM SPDX GAPS - inherited files that are byte-identical to upstream AND have no
+   SPDX-License-Identifier in the upstream file either (upstream gaps, not Charta defects)
+----------------------------------------------------------------------------------------------------
+identical to upstream, no upstream SPDX identifier, source file: 92
+    Messages.sh
+    Okular6Config.cmake.in
+    OkularConfigureChecks.cmake
+    autotests/closedialoghelper.cpp
+    autotests/closedialoghelper.h
+    cmake/modules/FindDjVuLibre.cmake
+    conf/okular_core.kcfg
+    conf/settings.kcfgc
+    conf/settings_core.kcfgc
+    conf/settings_mobile.kcfgc
+    core/chooseenginewidget.ui
+    core/script/builtin.qrc
+    core/stamps.svg
+    core/synctex/synctex_parser_version.txt
+    core/textdocumentsettings.ui
+    generators/CMakeLists.txt
+    generators/comicbook/CMakeLists.txt
+    generators/comicbook/Messages.sh
+    generators/comicbook/libokularGenerator_comicbook.json
+    generators/djvu/CMakeLists.txt
+    generators/djvu/Messages.sh
+    generators/djvu/libokularGenerator_djvu.json
+    generators/dvi/CMakeLists.txt
+    generators/dvi/Messages.sh
+    generators/dvi/TeXFont.cpp
+    generators/dvi/TeXFontDefinition.cpp
+    generators/dvi/TeXFontDefinition.h
+    generators/dvi/TeXFont_PK.h
+    generators/dvi/config.h
+    generators/dvi/dvi.h
+    generators/dvi/dviexport.h
+    generators/dvi/dvisourcesplitter.cpp
+    generators/dvi/dvisourcesplitter.h
+    generators/dvi/glyph.cpp
+    generators/dvi/glyph.h
+    generators/dvi/libokularGenerator_dvi.json
+    generators/dvi/psheader.cpp
+    generators/dvi/special.cpp
+    generators/dvi/xdvi.h
+    generators/epub/CMakeLists.txt
+    generators/epub/Messages.sh
+    generators/epub/libokularGenerator_epub.json
+    generators/fax/CMakeLists.txt
+    generators/fax/Messages.sh
+    generators/fax/libokularGenerator_fax.json
+    generators/fictionbook/CMakeLists.txt
+    generators/fictionbook/Messages.sh
+    generators/fictionbook/libokularGenerator_fb.json
+    generators/kimgio/CMakeLists.txt
+    generators/kimgio/Messages.sh
+    generators/kimgio/libokularGenerator_kimgio.json
+    generators/markdown/CMakeLists.txt
+    generators/markdown/Messages.sh
+    generators/markdown/libokularGenerator_md.json
+    generators/mobipocket/CMakeLists.txt
+    generators/mobipocket/Messages.sh
+    generators/mobipocket/libokularGenerator_mobi.json
+    generators/poppler/Messages.sh
+    generators/poppler/conf/CMakeLists.txt
+    generators/poppler/conf/pdfsettings.kcfg
+    generators/poppler/conf/pdfsettings.kcfgc
+    generators/poppler/conf/pdfsettingswidget.ui
+    generators/poppler/libokularGenerator_poppler.json
+    generators/spectre/CMakeLists.txt
+    generators/spectre/Messages.sh
+    generators/spectre/conf/CMakeLists.txt
+    generators/spectre/conf/gssettings.kcfg
+    generators/spectre/conf/gssettings.kcfgc
+    generators/spectre/conf/gssettingswidget.ui
+    generators/spectre/libokularGenerator_ghostview.json
+    generators/tiff/CMakeLists.txt
+    generators/tiff/Messages.sh
+    generators/tiff/libokularGenerator_tiff.json
+    generators/txt/CMakeLists.txt
+    generators/txt/Messages.sh
+    generators/txt/libokularGenerator_txt.json
+    generators/xps/CMakeLists.txt
+    generators/xps/Messages.sh
+    generators/xps/libokularGenerator_xps.json
+    mobile/CMakeLists.txt
+    mobile/app/CMakeLists.txt
+    mobile/app/Messages.sh
+    mobile/components/Messages.sh
+    mobile/components/settings.h
+    part/CMakeLists.txt
+    part/actionbar.cpp
+    part/actionbar.h
+    part/part.qrc
+    part/selectcertificatedialog.ui
+    part/signingcertificatelistmodel.cpp
+    part/signingcertificatelistmodel.h
+    shell/MacOSXBundleInfo.plist.in
+
+modified by Charta, no upstream SPDX identifier either: 60
+    .flatpak-manifest.json
+    CMakeLists.txt
+    autotests/CMakeLists.txt
+    conf/okular.kcfg
+    config-okular.h.cmake
+    generators/comicbook/okularApplication_comicbook.desktop
+    generators/comicbook/org.kde.mobile.okular_comicbook.desktop
+    generators/comicbook/org.kde.okular-comicbook.metainfo.xml
+    generators/djvu/okularApplication_djvu.desktop
+    generators/djvu/org.kde.mobile.okular_djvu.desktop
+    generators/djvu/org.kde.okular-djvu.metainfo.xml
+    generators/dvi/dviexport.cpp
+    generators/dvi/okularApplication_dvi.desktop
+    generators/dvi/org.kde.mobile.okular_dvi.desktop
+    generators/dvi/org.kde.okular-dvi.metainfo.xml
+    generators/epub/okularApplication_epub.desktop
+    generators/epub/org.kde.mobile.okular_epub.desktop
+    generators/epub/org.kde.okular-epub.metainfo.xml
+    generators/fax/okularApplication_fax.desktop
+    generators/fax/org.kde.mobile.okular_fax.desktop
+    generators/fax/org.kde.okular-fax.metainfo.xml
+    generators/fictionbook/hi32-app-okular-fb2.svg
+    generators/fictionbook/okularApplication_fb.desktop
+    generators/fictionbook/org.kde.mobile.okular_fb.desktop
+    generators/fictionbook/org.kde.okular-fb.metainfo.xml
+    generators/kimgio/okularApplication_kimgio.desktop
+    generators/kimgio/org.kde.mobile.okular_kimgio.desktop
+    generators/kimgio/org.kde.okular-kimgio.metainfo.xml
+    generators/markdown/okularApplication_md.desktop
+    generators/markdown/org.kde.mobile.okular_md.desktop
+    generators/markdown/org.kde.okular-md.metainfo.xml
+    generators/mobipocket/okularApplication_mobi.desktop
+    generators/mobipocket/org.kde.mobile.okular_mobi.desktop
+    generators/mobipocket/org.kde.okular-mobipocket.metainfo.xml
+    generators/poppler/CMakeLists.txt
+    generators/poppler/okularApplication_pdf.desktop
+    generators/poppler/org.kde.mobile.okular_pdf.desktop
+    generators/poppler/org.kde.okular-poppler.metainfo.xml
+    generators/spectre/okularApplication_ghostview.desktop
+    generators/spectre/org.kde.mobile.okular_ghostview.desktop
+    generators/spectre/org.kde.okular-spectre.metainfo.xml
+    generators/tiff/okularApplication_tiff.desktop
+    generators/tiff/org.kde.mobile.okular_tiff.desktop
+    generators/tiff/org.kde.okular-tiff.metainfo.xml
+    generators/txt/okularApplication_txt.desktop
+    generators/txt/org.kde.mobile.okular_txt.desktop
+    generators/txt/org.kde.okular-txt.metainfo.xml
+    generators/xps/okularApplication_xps.desktop
+    generators/xps/org.kde.mobile.okular_xps.desktop
+    generators/xps/org.kde.okular-xps.metainfo.xml
+    icons/CMakeLists.txt
+    mobile/android/AndroidManifest.xml
+    mobile/app/org.kde.okular.kirigami.appdata.xml
+    mobile/app/package/metadata.desktop
+    okular_part.json
+    part/part-viewermode.rc
+    part/part.rc
+    shell/CMakeLists.txt
+    shell/shell.qrc
+    shell/shell.rc
+
+all 1069 tracked po/ files are byte-identical to upstream and have no upstream SPDX
+identifier either (upstream licence unresolved - plan item P6-04, not a Phase 3 result).
+
+----------------------------------------------------------------------------------------------------
+7. THE SIX FILES THE PLAN ASKED TO BE CHECKED INDIVIDUALLY - upstream header verbatim
+----------------------------------------------------------------------------------------------------
+
+--- part/actionbar.cpp   (Charta status vs upstream: identical)
+    upstream licence identifier: none
+    upstream file head (git show e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886:part/actionbar.cpp):
+        /***************************************************************************
+         *   Copyright (C) 2020 by Simone Gaiarin <simgunz@gmail.com>              *
+         *                                                                         *
+         *   This program is free software; you can redistribute it and/or modify  *
+         *   it under the terms of the GNU General Public License as published by  *
+         *   the Free Software Foundation; either version 2 of the License, or     *
+         *   (at your option) any later version.                                   *
+         ***************************************************************************/
+        
+        #include <QAction>
+        #include <QHBoxLayout>
+        #include <QLabel>
+        #include <QLayout>
+        #include <QList>
+
+--- part/signingcertificatelistmodel.cpp   (Charta status vs upstream: identical)
+    upstream licence identifier: none
+    upstream file head (git show e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886:part/signingcertificatelistmodel.cpp):
+        #include "signingcertificatelistmodel.h"
+        #include <KLocalizedString>
+        #include <QRegularExpression>
+        
+        SigningCertificateListModel::SigningCertificateListModel(const QList<Okular::CertificateInfo> &certs, QObject *parent)
+            : QAbstractListModel {parent}
+            , m_certs {certs}
+        {
+            for (const auto &cert : m_certs) {
+                switch (cert.keyLocation()) {
+                case Okular::CertificateInfo::KeyLocation::Computer:
+                case Okular::CertificateInfo::KeyLocation::HardwareToken:
+                    m_hasIcons = true;
+                    break;
+
+--- part/ktreeviewsearchline.cpp   (Charta status vs upstream: identical)
+    upstream licence identifier: LGPL-2.0-only
+    upstream file head (git show e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886:part/ktreeviewsearchline.cpp):
+        /*
+            SPDX-FileCopyrightText: 2003 Scott Wheeler <wheeler@kde.org>
+            SPDX-FileCopyrightText: 2005 Rafal Rzepecki <divide@users.sourceforge.net>
+            SPDX-FileCopyrightText: 2006 Hamish Rodda <rodda@kde.org>
+            SPDX-FileCopyrightText: 2007 Pino Toscano <pino@kde.org>
+        
+            SPDX-License-Identifier: LGPL-2.0-only
+        */
+        
+        #include "ktreeviewsearchline.h"
+        
+        #include <QApplication>
+        #include <QContextMenuEvent>
+        #include <QHBoxLayout>
+
+--- part/okmenutitle.cpp   (Charta status vs upstream: identical)
+    upstream licence identifier: LGPL-2.0-only
+    upstream file head (git show e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886:part/okmenutitle.cpp):
+        /* This file was part of the KDE libraries (copied partially from kmenu.cpp)
+        
+            SPDX-License-Identifier: LGPL-2.0-only
+        */
+        
+        #include "okmenutitle.h"
+        
+        #include <QApplication>
+        #include <QEvent>
+        #include <QKeyEvent>
+        #include <QMenu>
+        #include <QToolButton>
+        
+        OKMenuTitle::OKMenuTitle(QMenu *menu, const QString &text, const QIcon &icon)
+
+--- part/magnifierview.cpp   (Charta status vs upstream: modified)
+    upstream licence identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+    upstream file head (git show e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886:part/magnifierview.cpp):
+        /*
+            SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+        
+        */
+        
+        #include "magnifierview.h"
+        
+        #include <QPainter>
+        
+        #include "core/document.h"
+        #include "core/generator.h"
+        #include "gui/pagepainter.h"
+        #include "gui/priorities.h"
+        
+
+--- generators/comicbook/qnatsort.cpp   (Charta status vs upstream: identical)
+    upstream licence identifier: GPL-2.0-only OR GPL-3.0-only
+    upstream file head (git show e0fdfed749e8b4e83b9e788d559f5f2f8bfa5886:generators/comicbook/qnatsort.cpp):
+        /*
+            Natural order sorting of strings which contains numbers.
+        
+            SPDX-FileCopyrightText: 2007 Tobias Koenig <tokoe@kde.org>
+            SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only
+            based on the natural order code by Martin Pool <mbp sourcefrog net>
+        */
+        
+        #include "qnatsort.h"
+        
+        static int compare_right(const QString &leftStr, int left, const QString &rightStr, int right)
+        {
+            int bias = 0;
+        
+

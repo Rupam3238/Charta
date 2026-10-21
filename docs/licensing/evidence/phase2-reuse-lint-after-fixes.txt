@@ -1,0 +1,14 @@
+# SUMMARY
+
+* Bad licenses: 0
+* Deprecated licenses: 0
+* Licenses without file extension: 0
+* Missing licenses: 0
+* Unused licenses: 0
+* Used licenses: Apache-2.0, BSD-2-Clause, BSD-3-Clause, CC0-1.0, GFDL-1.2-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LicenseRef-KDE-Accepted-GPL, LicenseRef-Okular-upstream-terms, MIT, X11
+* Read errors: 0
+* Invalid SPDX License Expressions: 0
+* Files with copyright information: 1965 / 1965
+* Files with license information: 1965 / 1965
+
+Congratulations! Your project is compliant with version 3.3 of the REUSE Specification :-)

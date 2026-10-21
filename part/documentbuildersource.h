@@ -1,5 +1,6 @@
 /*
     SPDX-License-Identifier: GPL-2.0-or-later
+    SPDX-FileCopyrightText: 2026 Charta contributors (licensing party; AI-assisted)
 
     Document Builder: one imported source file (a PDF) and everything the builder knows about it.
 
