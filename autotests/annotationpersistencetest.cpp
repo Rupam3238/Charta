@@ -230,6 +230,56 @@ void verifyPopplerMetadata(Poppler::Page *page, const QString &uniqueName, Poppl
 }
 }
 
+
+QList<double> shapeSignature(const Okular::Annotation *annotation, const Okular::Page *page)
+{
+    QList<double> signature;
+    const double width = page->width();
+    const double height = page->height();
+    const auto appendPointDistances = [&](const QList<QList<Okular::NormalizedPoint>> &paths) {
+        for (const QList<Okular::NormalizedPoint> &path : paths) {
+            for (qsizetype i = 1; i < path.size(); ++i) {
+                const double dx = (path[i].x - path[i - 1].x) * width;
+                const double dy = (path[i].y - path[i - 1].y) * height;
+                signature.append(std::hypot(dx, dy));
+            }
+        }
+    };
+
+    if (annotation->subType() == Okular::Annotation::ALine) {
+        const auto *line = static_cast<const Okular::LineAnnotation *>(annotation);
+        appendPointDistances({line->linePoints()});
+    } else if (annotation->subType() == Okular::Annotation::AInk) {
+        const auto *ink = static_cast<const Okular::InkAnnotation *>(annotation);
+        appendPointDistances(ink->inkPaths());
+    } else if (annotation->subType() == Okular::Annotation::AText) {
+        const auto *text = static_cast<const Okular::TextAnnotation *>(annotation);
+        QList<Okular::NormalizedPoint> callout;
+        for (int i = 0; i < 3; ++i) {
+            callout.append(text->inplaceCallout(i));
+        }
+        appendPointDistances({callout});
+    }
+
+    const QSizeF frameSize = Okular::AnnotationUtils::annotationFrameSizeInPagePoints(annotation);
+    signature.append(frameSize.width());
+    signature.append(frameSize.height());
+    return signature;
+}
+
+bool signaturesEqual(const QList<double> &first, const QList<double> &second)
+{
+    if (first.size() != second.size()) {
+        return false;
+    }
+    for (qsizetype i = 0; i < first.size(); ++i) {
+        if (std::fabs(first[i] - second[i]) > 1e-4) {
+            return false;
+        }
+    }
+    return true;
+}
+
 class AnnotationPersistenceTest : public QObject
 {
     Q_OBJECT
@@ -247,6 +297,9 @@ private Q_SLOTS:
     void fixedRotationAndDenyWriteBlockRotation();
     void rendersRotatedGeomAtExpectedPosition_data();
     void rendersRotatedGeomAtExpectedPosition();
+    void freshRotationMatchesReopened_data();
+    void freshRotationMatchesReopened();
+    void customAppearanceInkRotationStaysInsideFrame();
 };
 
 void AnnotationPersistenceTest::initTestCase()
@@ -525,6 +578,143 @@ void AnnotationPersistenceTest::propertyChangeAfterRotationKeepsFrame()
     const Okular::AnnotationFrame reopenedFrame = reopenedAnnotation->frame();
     QVERIFY2(angleDistance(frameAngleDegrees(reopenedFrame), frameAngleDegrees(rotatedFrame)) < 0.01, "reopened angle changed after property edit");
     QCOMPARE(reopenedAnnotation->style().color(), QColor(20, 40, 230));
+}
+
+
+void AnnotationPersistenceTest::freshRotationMatchesReopened_data()
+{
+    QTest::addColumn<QString>("type");
+    for (const QString &type : {QStringLiteral("text"), QStringLiteral("stamp"), QStringLiteral("geom"), QStringLiteral("line"), QStringLiteral("ink")}) {
+        QTest::newRow(qPrintable(type)) << type;
+    }
+}
+
+void AnnotationPersistenceTest::freshRotationMatchesReopened()
+{
+    QFETCH(QString, type);
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString source = directory.filePath(QStringLiteral("source.pdf"));
+    const QString unrotated = directory.filePath(QStringLiteral("unrotated.pdf"));
+    writePdf(source, 0);
+
+    std::unique_ptr<Okular::Document> freshDocument = openDocument(source);
+    QVERIFY(freshDocument);
+    Okular::Annotation *fresh = makeAnnotation(type, QStringLiteral("fresh"));
+    freshDocument->addPageAnnotation(0, fresh);
+    const QList<double> freshBefore = shapeSignature(fresh, freshDocument->page(0));
+    rotateAnnotation(freshDocument.get(), fresh, 30.0);
+    const Okular::AnnotationFrame freshFrame = fresh->frame();
+    const QList<double> freshAfter = shapeSignature(fresh, freshDocument->page(0));
+
+    std::unique_ptr<Okular::Document> unrotatedDocument = openDocument(source);
+    QVERIFY(unrotatedDocument);
+    Okular::Annotation *saved = makeAnnotation(type, QStringLiteral("saved"));
+    unrotatedDocument->addPageAnnotation(0, saved);
+    const QString saveError = saveDocument(unrotatedDocument.get(), unrotated);
+    QVERIFY2(saveError.isEmpty(), qPrintable(saveError));
+    unrotatedDocument.reset();
+
+    std::unique_ptr<Okular::Document> reopenedDocument = openDocument(unrotated);
+    QVERIFY(reopenedDocument);
+    Okular::Annotation *reopened = findAnnotation(reopenedDocument->page(0), QStringLiteral("saved"));
+    QVERIFY(reopened);
+    const QList<double> reopenedBefore = shapeSignature(reopened, reopenedDocument->page(0));
+    rotateAnnotation(reopenedDocument.get(), reopened, 30.0);
+    const Okular::AnnotationFrame reopenedFrame = reopened->frame();
+    const QList<double> reopenedAfter = shapeSignature(reopened, reopenedDocument->page(0));
+
+    QVERIFY2(signaturesEqual(freshBefore, freshAfter), "fresh rotation changed geometry");
+    QVERIFY2(signaturesEqual(reopenedBefore, reopenedAfter), "reopened rotation changed geometry");
+    QVERIFY2(signaturesEqual(freshAfter, reopenedAfter), "fresh and reopened rotations differ");
+    QVERIFY2(std::fabs(freshFrame.center.x - reopenedFrame.center.x) < 1e-5, "center x differs");
+    QVERIFY2(std::fabs(freshFrame.center.y - reopenedFrame.center.y) < 1e-5, "center y differs");
+    QVERIFY2(std::fabs(freshFrame.size.width() - reopenedFrame.size.width()) < 1e-5, "width differs");
+    QVERIFY2(std::fabs(freshFrame.size.height() - reopenedFrame.size.height()) < 1e-5, "height differs");
+}
+
+void AnnotationPersistenceTest::customAppearanceInkRotationStaysInsideFrame()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString source = directory.filePath(QStringLiteral("source.pdf"));
+    const QString output = directory.filePath(QStringLiteral("custom-ink-rotated.pdf"));
+    writePdf(source, 0);
+
+    const double localWidth = 100.0;
+    const double localHeight = 60.0;
+
+    std::unique_ptr<Okular::Document> document = openDocument(source);
+    QVERIFY(document);
+    const Okular::Page *page = document->page(0);
+    QVERIFY(page);
+    const double pageWidth = page->width();
+    const double pageHeight = page->height();
+
+    auto *ink = new Okular::InkAnnotation();
+    ink->setUniqueName(QStringLiteral("custom-ink-rotation"));
+    ink->style().setColor(QColor(230, 20, 20));
+    ink->style().setWidth(2.0);
+    ink->setInkPaths({{Okular::NormalizedPoint(0.3, 0.3), Okular::NormalizedPoint(0.4, 0.4)}});
+
+    const double left = 0.25;
+    const double top = 0.25;
+    const double right = left + localWidth / page->width();
+    const double bottom = top + localHeight / page->height();
+    ink->setBoundingRectangle(Okular::NormalizedRect(left, top, right, bottom));
+
+    // A custom appearance that fills its whole local box.  Rotating it must
+    // keep it inside the rotated frame AABB; a centre-less rotation shifts the
+    // stream outside the box and clips it.
+    const QByteArray appearance = QByteArrayLiteral("q\n1 0 0 rg\n0 0 100 60 re\nf\nQ\n");
+    ink->setAppearanceStream(appearance, QRectF(0, 0, localWidth, localHeight));
+
+    document->addPageAnnotation(0, ink);
+    rotateAnnotation(document.get(), ink, 30.0);
+
+    const QPolygonF outline = Okular::AnnotationUtils::annotationOutline(ink, page->width(), page->height());
+    QVERIFY(outline.size() >= 4);
+    QVERIFY(!outline.boundingRect().isEmpty());
+
+    const QString saveError = saveDocument(document.get(), output);
+    QVERIFY2(saveError.isEmpty(), qPrintable(saveError));
+    document.reset();
+
+    std::unique_ptr<Poppler::Document> popplerDocument(Poppler::Document::load(output));
+    QVERIFY(popplerDocument);
+    std::unique_ptr<Poppler::Page> popplerPage(popplerDocument->page(0));
+    QVERIFY(popplerPage);
+
+    // Render at 72 dpi so one pixel equals one PDF point.
+    const QImage image = popplerPage->renderToImage(72, 72);
+    QVERIFY(!image.isNull());
+
+    // annotationOutline() works in Okular page units, while the Poppler render
+    // is in PDF points; convert the expected bounds into render pixels.
+    const double scaleX = image.width() / pageWidth;
+    const double scaleY = image.height() / pageHeight;
+    const QRectF expectedBounds(outline.boundingRect().left() * scaleX,
+                                outline.boundingRect().top() * scaleY,
+                                outline.boundingRect().width() * scaleX,
+                                outline.boundingRect().height() * scaleY);
+
+    QRect redBounds;
+    int redPixels = 0;
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            const QColor color = image.pixelColor(x, y);
+            if (color.red() > 150 && color.green() < 120 && color.blue() < 120) {
+                redBounds |= QRect(x, y, 1, 1);
+                ++redPixels;
+            }
+        }
+    }
+
+    QVERIFY2(redPixels > 0, "rotated custom ink appearance did not render");
+    QVERIFY2(std::fabs(redBounds.left() - expectedBounds.left()) <= 3, qPrintable(QStringLiteral("red left %1 expected %2").arg(redBounds.left()).arg(expectedBounds.left())));
+    QVERIFY2(std::fabs(redBounds.top() - expectedBounds.top()) <= 3, qPrintable(QStringLiteral("red top %1 expected %2").arg(redBounds.top()).arg(expectedBounds.top())));
+    QVERIFY2(std::fabs(redBounds.right() - expectedBounds.right()) <= 3, qPrintable(QStringLiteral("red right %1 expected %2").arg(redBounds.right()).arg(expectedBounds.right())));
+    QVERIFY2(std::fabs(redBounds.bottom() - expectedBounds.bottom()) <= 3, qPrintable(QStringLiteral("red bottom %1 expected %2").arg(redBounds.bottom()).arg(expectedBounds.bottom())));
 }
 
 void AnnotationPersistenceTest::fixedRotationAndDenyWriteBlockRotation()

@@ -556,18 +556,20 @@ static void setInkAppearanceStream(const Okular::InkAnnotation *okularAnnotation
         const double radians = -frameRotation; // Okular clockwise -> PDF counter-clockwise
         const double c = std::cos(radians);
         const double s = std::sin(radians);
-        const QPointF center = boundingBox.center();
 
+        // The custom appearance is drawn in absolute PDF coordinates whose
+        // origin is the bounding box top-left, so derive the rotated bounds
+        // from the absolute corners.  Subtracting the centre first and then
+        // applying only -min would omit the centre rotation and shift (and
+        // clip) the whole stroke on every rotation.
         const QPointF corners[] = { boundingBox.topLeft(), boundingBox.topRight(), boundingBox.bottomRight(), boundingBox.bottomLeft() };
         double minX = std::numeric_limits<double>::max();
         double minY = std::numeric_limits<double>::max();
         double maxX = std::numeric_limits<double>::lowest();
         double maxY = std::numeric_limits<double>::lowest();
         for (const QPointF &corner : corners) {
-            const double x = corner.x() - center.x();
-            const double y = corner.y() - center.y();
-            const double rx = c * x - s * y;
-            const double ry = s * x + c * y;
+            const double rx = c * corner.x() - s * corner.y();
+            const double ry = s * corner.x() + c * corner.y();
             minX = std::min(minX, rx);
             minY = std::min(minY, ry);
             maxX = std::max(maxX, rx);
