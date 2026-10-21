@@ -25,7 +25,7 @@ extern Poppler::Annotation *createPopplerAnnotationFromOkularAnnotation(const Ok
 
 // Restores the oriented frame from the patched Poppler metadata. Must be
 // called after the Okular annotation has been attached to its page.
-extern void applyPopplerUserRotationToOkularAnnotation(Okular::Annotation *okularAnnotation, Poppler::Annotation *popplerAnnotation, const Okular::Page *page);
+extern void applyPopplerUserRotationToOkularAnnotation(Okular::Annotation *okularAnnotation, Poppler::Annotation *popplerAnnotation, const Okular::Page *page, const Poppler::Page *popplerPage);
 
 class PopplerAnnotationProxy : public Okular::AnnotationProxy, public Okular::AnnotationOrderProxy
 {

@@ -1,5 +1,5 @@
 diff --git a/poppler/Annot.cc b/poppler/Annot.cc
-index db09166..58071a9 100644
+index db09166..d130d53 100644
 --- a/poppler/Annot.cc
 +++ b/poppler/Annot.cc
 @@ -74,6 +74,7 @@
@@ -37,7 +37,7 @@ index db09166..58071a9 100644
  {
      if (x1 < x2) {
          rect->x1 = x1;
-@@ -1467,7 +1481,171 @@ void Annot::setRect(double x1, double y1, double x2, double y2)
+@@ -1467,7 +1481,173 @@ void Annot::setRect(double x1, double y1, double x2, double y2)
      a->add(Object(rect->y2));
  
      update("Rect", Object(std::move(a)));
@@ -47,17 +47,20 @@ index db09166..58071a9 100644
 +{
 +    annotLocker();
 +
-+    const bool rotated = std::isfinite(degreesCounterClockwise) && std::isfinite(localWidth) && std::isfinite(localHeight) && localWidth > 0 && localHeight > 0
-+        && std::abs(std::remainder(degreesCounterClockwise, 360.0)) > 1e-9;
++    const bool hasLocalSize = std::isfinite(localWidth) && std::isfinite(localHeight) && localWidth > 0 && localHeight > 0;
++    const bool rotated = hasLocalSize && std::isfinite(degreesCounterClockwise) && std::abs(std::remainder(degreesCounterClockwise, 360.0)) > 1e-9;
 +
 +    // Keep the metadata even for line/ink annotations, whose native geometry
 +    // already carries the rotation. It lets the editor restore the oriented
-+    // frame after reopening.
++    // frame after reopening.  A zero /ChartaRotate is meaningful when the
++    // frame angle equals the page orientation: without the local size the
++    // importer could not distinguish it from an annotation that was never
++    // rotated.
 +    userRotation = rotated ? degreesCounterClockwise : 0;
 +    userLocalWidth = localWidth;
 +    userLocalHeight = localHeight;
 +
-+    if (rotated) {
++    if (hasLocalSize) {
 +        update("ChartaRotate", Object(userRotation));
 +        update("ChartaLocalW", Object(userLocalWidth));
 +        update("ChartaLocalH", Object(userLocalHeight));
@@ -145,17 +148,18 @@ index db09166..58071a9 100644
 +        }
 +    }
 +
-+    // Transform the four BBox corners through the appearance Matrix. The
-+    // wrapper rotates those already-transformed corners around their centre.
++    // Transform the four BBox corners through the appearance Matrix.  The
++    // wrapper rotates those already-transformed corners around the origin;
++    // the translation below then moves the rotated bounding box to (0, 0).
++    // Rotating around the bbox centre and then applying a translation derived
++    // from the centre-relative corners would draw the appearance offset by the
++    // original centre (only a quarter of the appearance stayed inside the
++    // wrapper BBox).
 +    const double corners[4][2] = { { bbox[0], bbox[1] }, { bbox[2], bbox[1] }, { bbox[2], bbox[3] }, { bbox[0], bbox[3] } };
 +    double transformed[4][2];
-+    double centerX = 0;
-+    double centerY = 0;
 +    for (int i = 0; i < 4; ++i) {
 +        transformed[i][0] = matrix[0] * corners[i][0] + matrix[2] * corners[i][1] + matrix[4];
 +        transformed[i][1] = matrix[1] * corners[i][0] + matrix[3] * corners[i][1] + matrix[5];
-+        centerX += transformed[i][0] / 4.0;
-+        centerY += transformed[i][1] / 4.0;
 +    }
 +
 +    const double radians = degreesCounterClockwise * M_PI / 180.0;
@@ -167,10 +171,8 @@ index db09166..58071a9 100644
 +    double maxX = std::numeric_limits<double>::lowest();
 +    double maxY = std::numeric_limits<double>::lowest();
 +    for (int i = 0; i < 4; ++i) {
-+        const double x = transformed[i][0] - centerX;
-+        const double y = transformed[i][1] - centerY;
-+        const double rx = c * x - s * y;
-+        const double ry = s * x + c * y;
++        const double rx = c * transformed[i][0] - s * transformed[i][1];
++        const double ry = s * transformed[i][0] + c * transformed[i][1];
 +        minX = std::min(minX, rx);
 +        minY = std::min(minY, ry);
 +        maxX = std::max(maxX, rx);
@@ -209,7 +211,7 @@ index db09166..58071a9 100644
  }
  
  bool Annot::inRect(double x, double y) const
-@@ -1613,6 +1791,7 @@ void Annot::setAppearanceState(const char *state)
+@@ -1613,6 +1793,7 @@ void Annot::setAppearanceState(const char *state)
  void Annot::invalidateAppearance()
  {
      annotLocker();
@@ -217,7 +219,7 @@ index db09166..58071a9 100644
      updatedAppearanceStream = Ref::INVALID();
      if (appearStreams) { // Remove existing appearance streams
          appearStreams->removeAllStreams();
-@@ -6095,61 +6274,68 @@ void AnnotGeometry::setInteriorColor(std::unique_ptr<AnnotColor> &&new_color)
+@@ -6095,61 +6276,68 @@ void AnnotGeometry::setInteriorColor(std::unique_ptr<AnnotColor> &&new_color)
      invalidateAppearance();
  }
  
@@ -421,7 +423,7 @@ index 3fd903a..6c37177 100644
      Annotation::Style style;
      Annotation::Popup popup;
 diff --git a/qt6/src/poppler-annotation.cc b/qt6/src/poppler-annotation.cc
-index 1830d53..657f123 100644
+index 1830d53..ac18509 100644
 --- a/qt6/src/poppler-annotation.cc
 +++ b/qt6/src/poppler-annotation.cc
 @@ -162,6 +162,11 @@ void AnnotationPrivate::tieToNativeAnnot(std::shared_ptr<Annot> ann, ::Page *pag
@@ -436,20 +438,23 @@ index 1830d53..657f123 100644
  }
  
  /* This method is called when a new annotation is created, after pdfAnnot and
-@@ -791,6 +796,12 @@ void AnnotationPrivate::addAnnotationToPage(::Page *pdfPage, DocumentData *doc,
+@@ -791,6 +796,15 @@ void AnnotationPrivate::addAnnotationToPage(::Page *pdfPage, DocumentData *doc,
      }
  
      pdfPage->addAnnot(nativeAnnot);
 +
 +#ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
-+    if (!qFuzzyIsNull(ann->d_ptr->userRotation) && !ann->d_ptr->userLocalSize.isEmpty()) {
++    // Zero is a valid stored rotation when the frame angle equals the page
++    // orientation; the local size is what tells the importer that the
++    // Charta metadata is present.
++    if (!ann->d_ptr->userLocalSize.isEmpty()) {
 +        nativeAnnot->setUserRotation(ann->d_ptr->userRotation, ann->d_ptr->userLocalSize.width(), ann->d_ptr->userLocalSize.height());
 +    }
 +#endif
  }
  
  void AnnotationPrivate::removeAnnotationFromPage(::Page *pdfPage, const Annotation *ann)
-@@ -1322,6 +1333,34 @@ void Annotation::setBoundary(const QRectF &boundary)
+@@ -1322,6 +1336,34 @@ void Annotation::setBoundary(const QRectF &boundary)
      d->pdfAnnot->setRect(rect);
  }
  

@@ -85,6 +85,9 @@ private Q_SLOTS:
     void testRotateFrameRotatesContent();
     void testGeometryXmlRoundTrip();
     void testRotatedHitTestUsesOutline();
+    void testRotatedOutlineAtZoomLevels_data();
+    void testRotatedOutlineAtZoomLevels();
+    void testRotateUndoRedoStress();
     void testLegacySetterResetsWithWarning();
 
 private:
@@ -322,6 +325,80 @@ void AnnotationRotationTest::testRotatedHitTestUsesOutline()
     // The AABB corner is outside the diamond-shaped rotated outline.
     const Okular::NormalizedRect aabb = line->boundingRectangle();
     QVERIFY(!objectRect.contains(aabb.left + 0.001, aabb.top + 0.001, width, height));
+}
+
+
+void AnnotationRotationTest::testRotatedOutlineAtZoomLevels_data()
+{
+    QTest::addColumn<double>("scale");
+    for (double scale : {0.5, 1.0, 2.0, 8.0}) {
+        const QByteArray name = QStringLiteral("%1").arg(scale).toLatin1();
+        QTest::newRow(name.constData()) << scale;
+    }
+}
+
+void AnnotationRotationTest::testRotatedOutlineAtZoomLevels()
+{
+    QFETCH(double, scale);
+
+    auto *line = addLine({Okular::NormalizedPoint(0.4, 0.5), Okular::NormalizedPoint(0.6, 0.5)}, Okular::NormalizedRect(0.4, 0.4, 0.6, 0.6));
+    Okular::AnnotationFrame frame;
+    frame.center = Okular::NormalizedPoint(0.5, 0.5);
+    frame.size = QSizeF(0.2, 0.1);
+    frame.rotation = qDegreesToRadians(30.0);
+    QVERIFY(line->setFrame(frame));
+
+    const QPolygonF outline = Okular::AnnotationUtils::annotationOutline(line, m_page->width() * scale, m_page->height() * scale);
+    QCOMPARE(outline.size(), 4);
+    QVERIFY(outline.containsPoint(QPointF(0.5 * m_page->width() * scale, 0.5 * m_page->height() * scale), Qt::WindingFill));
+
+    const QTransform frameTransform = Okular::AnnotationUtils::annotationFrameTransform(line, m_page->width() * scale, m_page->height() * scale);
+    const QPointF center = frameTransform.map(QPointF(0.0, 0.0));
+    QVERIFY2(std::fabs(center.x() - 0.5 * m_page->width() * scale) < 1e-6, "zoom center x");
+    QVERIFY2(std::fabs(center.y() - 0.5 * m_page->height() * scale) < 1e-6, "zoom center y");
+
+    const QRectF bounds = outline.boundingRect();
+    const double expectedWidth = (0.2 * m_page->width() * std::cos(frame.rotation) + 0.1 * m_page->height() * std::sin(frame.rotation)) * scale;
+    const double expectedHeight = (0.2 * m_page->width() * std::sin(frame.rotation) + 0.1 * m_page->height() * std::cos(frame.rotation)) * scale;
+    QVERIFY2(std::fabs(bounds.width() - expectedWidth) < 1e-6, "zoom outline width");
+    QVERIFY2(std::fabs(bounds.height() - expectedHeight) < 1e-6, "zoom outline height");
+}
+
+void AnnotationRotationTest::testRotateUndoRedoStress()
+{
+    QList<Okular::Annotation *> annotations;
+    for (int i = 0; i < 20; ++i) {
+        const double offset = i * 0.001;
+        auto *line = addLine({Okular::NormalizedPoint(0.2 + offset, 0.5), Okular::NormalizedPoint(0.4 + offset, 0.5)},
+                             Okular::NormalizedRect(0.2 + offset, 0.45, 0.4 + offset, 0.55));
+        annotations.append(line);
+    }
+
+    const double delta = qDegreesToRadians(15.0);
+    for (Okular::Annotation *annotation : std::as_const(annotations)) {
+        const Okular::Document::AnnotationRotationItem item {0, annotation, delta, annotation->frame().center};
+        m_document->rotateAnnotationsLive({item}, delta);
+        m_document->commitAnnotationRotation({item});
+    }
+    for (Okular::Annotation *annotation : std::as_const(annotations)) {
+        QVERIFY2(std::fabs(annotation->frame().rotation - delta) < tolerance, "stress rotate angle");
+    }
+
+    for (int i = 0; i < annotations.size(); ++i) {
+        QVERIFY(m_document->canUndo());
+        m_document->undo();
+    }
+    for (Okular::Annotation *annotation : std::as_const(annotations)) {
+        QVERIFY2(qFuzzyIsNull(annotation->frame().rotation), "stress undo restored angle");
+    }
+
+    for (int i = 0; i < annotations.size(); ++i) {
+        QVERIFY(m_document->canRedo());
+        m_document->redo();
+    }
+    for (Okular::Annotation *annotation : std::as_const(annotations)) {
+        QVERIFY2(std::fabs(annotation->frame().rotation - delta) < tolerance, "stress redo angle");
+    }
 }
 
 void AnnotationRotationTest::testLegacySetterResetsWithWarning()

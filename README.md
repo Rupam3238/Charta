@@ -43,7 +43,7 @@ in-place PDF page editing, a visual Document Builder, and a "Create a PDF" flow.
 | Freehand ink, freeform highlighter, eraser | Implemented | Pressure is session-only |
 | Shapes: line, arrow, rectangle, ellipse, polygon | Implemented | |
 | Select, move, resize annotations | Implemented | Click and lasso selection |
-| Annotation rotation | Not exposed in the UI | No rotation gesture |
+| Annotation rotation | Implemented | Text, stamp, shapes, line and ink; linked text, highlight and caret stay unrotated |
 | PDF page insert / delete / reorder | Implemented | Poppler only; no dedicated test |
 | Autosave | Implemented, guarded | No dedicated test |
 | Document Builder | Implemented | Model and part-integration tests exist |
@@ -129,13 +129,15 @@ Linux (X11/Wayland) only; the build uses Qt private GUI headers.
 ## Building from source
 
 ### Patched Poppler
-Charta needs two things stock Poppler does not offer: a way to attach a custom appearance
-stream (`/AP`) to an annotation (used for pressure-shaped ink), and annotation-order access
-(`moveAnnotation`). Both live in
+Charta needs three things stock Poppler does not offer: a way to attach a custom appearance
+stream (`/AP`) to an annotation (used for pressure-shaped ink), annotation-order access
+(`moveAnnotation`), and persistence for oriented annotation frames. The fork lives in
 <https://github.com/Rupam3238/poppler-patch-for-charta-26.08.0> (GPL-2.0, like upstream).
-[`patches/poppler-ink-appearance.patch`](patches/poppler-ink-appearance.patch) covers only the
-ink-appearance part and is not sufficient on its own for the current tree. The fork repository
-contains a committed `build/` directory, so build it out of tree:
+[`patches/poppler-ink-appearance.patch`](patches/poppler-ink-appearance.patch) covers the ink
+appearance, and [`patches/poppler-annotation-rotation.patch`](patches/poppler-annotation-rotation.patch)
+covers `ChartaRotate`/`ChartaLocalW`/`ChartaLocalH` metadata and the rotated `/AP` wrapper.
+Neither patch is sufficient on its own for the current tree. The fork repository contains a
+committed `build/` directory, so build it out of tree:
 
 ```bash
 git clone https://github.com/Rupam3238/poppler-patch-for-charta-26.08.0.git "$HOME/poppler-charta-src"
@@ -227,7 +229,9 @@ The Document Builder accepts PDFs and images readable by Qt's `QImageReader`.
 - Tablet pressure is session-only. Saved PDFs carry the pressure-shaped outline only through the
   custom `/AP` stream (patched Poppler); reopened strokes use ordinary PDF ink. Behaviour with
   stock Poppler was not verified.
-- Annotation rotation is not exposed; layer flattening is not implemented.
+- Annotation rotation covers text, stamps, shapes, line and ink. Linked text, highlight and caret
+  annotations are deliberately kept unrotated, as are signatures and other action annotations.
+  Layer flattening is not implemented.
 - `Ctrl+Shift+B` is bound both to Document Builder (shell) and "add to quick tools" (part).
 - Page editing is Poppler-only. After a page edit, the original is removed and replaced, which is
   not guaranteed atomic. Links and named destinations may point to deleted pages.

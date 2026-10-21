@@ -128,7 +128,7 @@ if(Poppler_Qt6_FOUND)
 
     ecm_add_test(annotationpersistencetest.cpp
         TEST_NAME "annotationpersistencetest"
-        LINK_LIBRARIES Qt6::Test Qt6::Gui Poppler::Qt6
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Gui Qt6::Xml okularcore okularpart Poppler::Qt6
     )
 endif()
 

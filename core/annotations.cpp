@@ -1219,7 +1219,7 @@ void Annotation::store(QDomNode &annNode, QDomDocument &document) const
 
     // store -other- attributes
     if (d->m_flags) { // Strip internal flags
-        e.setAttribute(QStringLiteral("flags"), d->m_flags & ~(External | ExternallyDrawn | BeingMoved | BeingResized));
+        e.setAttribute(QStringLiteral("flags"), d->m_flags & ~(External | ExternallyDrawn | BeingMoved | BeingResized | BeingRotated));
     }
     if (d->m_style.color().isValid()) {
         e.setAttribute(QStringLiteral("color"), d->m_style.color().name(QColor::HexArgb));
@@ -1314,7 +1314,7 @@ void Annotation::setAnnotationProperties(const QDomNode &node)
     // Save off internal properties that aren't contained in node
     Okular::PagePrivate *p = d_ptr->m_page;
     QVariant nativeID = d_ptr->m_nativeId;
-    const int internalFlags = d_ptr->m_flags & (External | ExternallyDrawn | BeingMoved | BeingResized);
+    const int internalFlags = d_ptr->m_flags & (External | ExternallyDrawn | BeingMoved | BeingResized | BeingRotated);
     Annotation::DisposeDataFunction disposeFunc = d_ptr->m_disposeFunc;
 
     // Replace AnnotationPrivate object with a fresh copy

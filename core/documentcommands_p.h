@@ -13,12 +13,13 @@
 #include <QDomNode>
 #include <QUndoCommand>
 
+#include "annotations.h"
 #include "area.h"
 
 namespace Okular
 {
-class Document;
 class Annotation;
+class Document;
 class DocumentPrivate;
 class FormFieldText;
 class FormFieldButton;
@@ -146,6 +147,42 @@ private:
     Okular::NormalizedPoint m_delta1;
     Okular::NormalizedPoint m_delta2;
     bool m_completeDrag;
+};
+
+class RotateAnnotationCommand : public OkularUndoCommand
+{
+public:
+    RotateAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber, const Okular::NormalizedPoint &center, double delta);
+
+    void undo() override;
+    void redo() override;
+
+    bool refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector) override;
+
+private:
+    Okular::DocumentPrivate *m_docPriv;
+    Okular::Annotation *m_annotation;
+    int m_pageNumber;
+    Okular::NormalizedPoint m_center;
+    double m_delta;
+};
+
+class ResizeAnnotationFrameCommand : public OkularUndoCommand
+{
+public:
+    ResizeAnnotationFrameCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber, const Okular::AnnotationFrame &startFrame, const Okular::AnnotationFrame &targetFrame);
+
+    void undo() override;
+    void redo() override;
+
+    bool refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector) override;
+
+private:
+    Okular::DocumentPrivate *m_docPriv;
+    Okular::Annotation *m_annotation;
+    int m_pageNumber;
+    Okular::AnnotationFrame m_startFrame;
+    Okular::AnnotationFrame m_targetFrame;
 };
 
 class EditTextCommand : public OkularUndoCommand

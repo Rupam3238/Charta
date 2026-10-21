@@ -11,6 +11,7 @@
 #ifndef _OKULAR_DOCUMENT_H_
 #define _OKULAR_DOCUMENT_H_
 
+#include "annotations.h"
 #include "area.h"
 #include "global.h"
 #include "okularcore_export.h"
@@ -657,6 +658,38 @@ public:
      */
     void adjustAnnotationsLive(const QList<AnnotationAdjustItem> &steps);
     void commitAnnotationAdjust(const QList<AnnotationAdjustItem> &totals);
+
+    /** One annotation of an interactive rotation. */
+    struct AnnotationRotationItem {
+        int page = -1;
+        Annotation *annotation = nullptr;
+        double delta = 0.0;
+        NormalizedPoint center;
+    };
+
+    /**
+     * Interactive rotation. beginAnnotationLiveMove() hides native annotations once, then
+     * rotateAnnotationsLive() applies a step around each annotation's pivot and
+     * commitAnnotationRotation() pushes one undo command per annotation. Pass a total delta of
+     * zero to commit after cancelling the gesture, which only restores the native rendering.
+     */
+    void rotateAnnotationsLive(const QList<AnnotationRotationItem> &items, double stepDelta);
+    void commitAnnotationRotation(const QList<AnnotationRotationItem> &items);
+
+    /** One annotation of an interactive frame resize. */
+    struct AnnotationFrameResizeItem {
+        int page = -1;
+        Annotation *annotation = nullptr;
+        AnnotationFrame startFrame;
+        AnnotationFrame targetFrame;
+    };
+
+    /**
+     * Interactive resize of already-rotated annotations. The target frame is absolute, so
+     * repeated calls compose correctly through Annotation::resizeFrame().
+     */
+    void resizeAnnotationFramesLive(const QList<AnnotationFrameResizeItem> &items);
+    void commitAnnotationFrameResize(const QList<AnnotationFrameResizeItem> &items);
 
     /** Temporarily suppress automatic viewport repositioning during annotation interaction. */
     void beginAnnotationViewportMovementBlock();

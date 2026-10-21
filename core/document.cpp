@@ -4169,6 +4169,99 @@ void Document::commitAnnotationAdjust(const QList<AnnotationAdjustItem> &totals)
     d->endAnnotationPixmapRefreshBatch();
 }
 
+void Document::rotateAnnotationsLive(const QList<AnnotationRotationItem> &items, double stepDelta)
+{
+    if (qFuzzyIsNull(stepDelta)) {
+        return;
+    }
+
+    QSet<int> pages;
+    for (const AnnotationRotationItem &item : items) {
+        if (item.annotation) {
+            item.annotation->rotateFrame(stepDelta, item.center);
+            pages.insert(item.page);
+        }
+    }
+    for (const int page : std::as_const(pages)) {
+        d->notifyAnnotationChanges(page);
+    }
+}
+
+void Document::commitAnnotationRotation(const QList<AnnotationRotationItem> &items)
+{
+    d->beginAnnotationPixmapRefreshBatch();
+    d->beginAnnotationChangeBatch();
+    bool undoMacroOpen = false;
+    for (const AnnotationRotationItem &item : items) {
+        if (!item.annotation || !d->m_pagesVector.value(item.page, nullptr)) {
+            continue;
+        }
+        if (!qFuzzyIsNull(item.delta)) {
+            if (items.size() > 1 && !undoMacroOpen) {
+                d->m_undoStack->beginMacro(i18n("rotate annotations"));
+                undoMacroOpen = true;
+            }
+            // The live preview has already applied the whole rotation. Take it back so redo()
+            // applies it exactly once and undo/redo stay symmetric.
+            item.annotation->rotateFrame(-item.delta, item.center);
+            d->m_undoStack->push(new Okular::RotateAnnotationCommand(d, item.annotation, item.page, item.center, item.delta));
+        } else {
+            d->performModifyPageAnnotation(item.page, item.annotation, true);
+        }
+    }
+    if (undoMacroOpen) {
+        d->m_undoStack->endMacro();
+    }
+    d->endAnnotationChangeBatch();
+    d->endAnnotationPixmapRefreshBatch();
+}
+
+void Document::resizeAnnotationFramesLive(const QList<AnnotationFrameResizeItem> &items)
+{
+    QSet<int> pages;
+    for (const AnnotationFrameResizeItem &item : items) {
+        if (item.annotation) {
+            item.annotation->resizeFrame(item.targetFrame);
+            pages.insert(item.page);
+        }
+    }
+    for (const int page : std::as_const(pages)) {
+        d->notifyAnnotationChanges(page);
+    }
+}
+
+void Document::commitAnnotationFrameResize(const QList<AnnotationFrameResizeItem> &items)
+{
+    d->beginAnnotationPixmapRefreshBatch();
+    d->beginAnnotationChangeBatch();
+    bool undoMacroOpen = false;
+    for (const AnnotationFrameResizeItem &item : items) {
+        if (!item.annotation || !d->m_pagesVector.value(item.page, nullptr)) {
+            continue;
+        }
+        const bool changed = !qFuzzyCompare(item.startFrame.center.x + 1.0, item.targetFrame.center.x + 1.0) || !qFuzzyCompare(item.startFrame.center.y + 1.0, item.targetFrame.center.y + 1.0)
+            || !qFuzzyCompare(item.startFrame.size.width() + 1.0, item.targetFrame.size.width() + 1.0) || !qFuzzyCompare(item.startFrame.size.height() + 1.0, item.targetFrame.size.height() + 1.0)
+            || !qFuzzyCompare(item.startFrame.rotation + 1.0, item.targetFrame.rotation + 1.0);
+        if (changed) {
+            if (items.size() > 1 && !undoMacroOpen) {
+                d->m_undoStack->beginMacro(i18n("resize annotations"));
+                undoMacroOpen = true;
+            }
+            // The live preview is already at targetFrame. Return to the start frame before
+            // pushing the command, exactly like the move and rotate commit paths.
+            item.annotation->resizeFrame(item.startFrame);
+            d->m_undoStack->push(new Okular::ResizeAnnotationFrameCommand(d, item.annotation, item.page, item.startFrame, item.targetFrame));
+        } else {
+            d->performModifyPageAnnotation(item.page, item.annotation, true);
+        }
+    }
+    if (undoMacroOpen) {
+        d->m_undoStack->endMacro();
+    }
+    d->endAnnotationChangeBatch();
+    d->endAnnotationPixmapRefreshBatch();
+}
+
 void Document::beginAnnotationViewportMovementBlock()
 {
     d->beginAnnotationViewportMovementBlock();

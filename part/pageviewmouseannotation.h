@@ -20,9 +20,11 @@
 #ifndef _OKULAR_PAGEVIEWMOUSEANNOTATION_H_
 #define _OKULAR_PAGEVIEWMOUSEANNOTATION_H_
 
+#include <QCursor>
 #include <QObject>
 #include <QPolygonF>
 #include <QTimer>
+#include <QTransform>
 
 #include "core/annotations.h"
 #include "core/document.h"
@@ -122,11 +124,12 @@ public:
     bool isMoved() const;
 
     bool isResized() const;
+    bool isRotating() const;
 
     bool isModified() const;
     bool isDragInProgress() const;
 
-    Qt::CursorShape cursor() const;
+    QCursor cursor() const;
 
     /* Forward DocumentObserver::notifyPageChanged to this method. */
     void notifyAnnotationChanged(int pageNumber);
@@ -134,7 +137,7 @@ public:
     /* Forward DocumentObserver::notifySetup to this method. */
     void updateAnnotationPointers();
 
-    enum MouseAnnotationState { StateInactive, StateFocused, StateMoving, StateResizing };
+    enum MouseAnnotationState { StateInactive, StateFocused, StateMoving, StateResizing, StateRotating };
 
     enum ResizeHandleFlag {
         RH_None = 0,
@@ -147,6 +150,7 @@ public:
         RH_TopRight = RH_Top | RH_Right,
         RH_BottomRight = RH_Bottom | RH_Right,
         RH_Content = 16,
+        RH_Rotate = 32,
         RH_AllHandles = RH_Top | RH_Right | RH_Bottom | RH_Left
     };
     Q_DECLARE_FLAGS(ResizeHandle, ResizeHandleFlag)
@@ -170,8 +174,18 @@ private:
     QRect getHandleRect(ResizeHandle handle, const QRect &boundingRect) const;
     QRect getHandleHitRect(ResizeHandle handle, const AnnotationDescription &ad) const;
     QRect getHandleHitRect(ResizeHandle handle, const QRect &boundingRect) const;
+    QPolygonF focusedAnnotationOutline() const;
+    QRect getRotateHandleRect(ResizeHandle corner, const AnnotationDescription &ad) const;
+    QRect getRotateHandleHitRect(ResizeHandle corner, const AnnotationDescription &ad) const;
+    QList<Okular::Document::AnnotationRotationItem> rotationItems() const;
+    void applyLiveRotation(double totalDelta);
+    Okular::AnnotationFrame frameAfterResize(const QPointF &localMouse, bool preserveAspectRatio) const;
     Okular::NormalizedRect resizedRect(const Okular::NormalizedRect &startRect, const QPointF &delta1, const QPointF &delta2, bool preserveAspectRatio) const;
     bool selectionCanBeResized() const;
+    bool selectionCanBeRotated() const;
+    QRect getGroupRotateHandleRect(ResizeHandle corner) const;
+    QRect getGroupRotateHandleHitRect(ResizeHandle corner) const;
+    Okular::NormalizedPoint displayPointToFramePoint(const QPointF &pageItemPoint) const;
     static void handleToAdjust(const QPointF dIn, QPointF &dOut1, QPointF &dOut2, MouseAnnotation::ResizeHandle handle, Okular::Rotation rotation);
     static QPointF rotateInRect(const QPointF rotated, Okular::Rotation rotation);
     static ResizeHandle rotateHandle(ResizeHandle handle, Okular::Rotation rotation);
@@ -205,7 +219,31 @@ private:
     bool m_liveResizeStarted = false;
     QList<Okular::Document::AnnotationAdjustItem> m_resizeTotals;
     void applyLiveResize(const QList<Okular::Document::AnnotationAdjustItem> &steps);
+    void applyLiveFrameResize(const AnnotationDescription &description, const Okular::AnnotationFrame &targetFrame);
     Okular::NormalizedPoint m_moveTotalDelta;
+
+    /* Rotation gesture state. */
+    ResizeHandle m_rotateCorner = RH_None;
+    QPointF m_rotationCenterDisplay;
+    double m_rotationStartMouseAngle = 0.0;
+    double m_rotationApplied = 0.0;
+    double m_rotationDisplayAngle = 0.0;
+    bool m_rotationCancelRequested = false;
+
+    /* Rotated frame resize state. */
+    bool m_frameResizeActive = false;
+    bool m_liveFrameResizeStarted = false;
+    Okular::AnnotationFrame m_resizeStartFrame;
+    QTransform m_resizeStartTransform;
+    QPointF m_resizeStartLocalMouse;
+
+    /* Group frame resize state. */
+    bool m_groupFrameResizeActive = false;
+    bool m_liveGroupFrameResizeStarted = false;
+    QList<Okular::AnnotationFrame> m_groupResizeStartFrames;
+    QList<QPointF> m_groupResizeStartCenters;
+    Okular::NormalizedPoint m_groupCenter;
+    void applyLiveGroupFrameResize(const QRectF &targetGroupRect, bool uniform);
 
     QList<ResizeHandle> m_resizeHandleList;
 };

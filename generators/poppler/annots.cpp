@@ -67,26 +67,6 @@ static QRectF normRectToRectF(const Okular::NormalizedRect &rect)
     return QRectF(QPointF(rect.left, rect.top), QPointF(rect.right, rect.bottom));
 }
 
-static QTransform rotationMatrixFor(Okular::Rotation rotation)
-{
-    QTransform matrix;
-    matrix.rotate(static_cast<int>(rotation) * 90);
-    switch (rotation) {
-    case Okular::Rotation90:
-        matrix.translate(0, -1);
-        break;
-    case Okular::Rotation180:
-        matrix.translate(-1, -1);
-        break;
-    case Okular::Rotation270:
-        matrix.translate(-1, 0);
-        break;
-    default:
-        break;
-    }
-    return matrix;
-}
-
 static QSizeF pdfDisplayPageSizePoints(const Poppler::Page *page)
 {
     // Poppler exposes the page in its displayed (already /Rotate'd) orientation.
@@ -122,9 +102,13 @@ static void applyFrameRotationToPopplerAnnotation(const Okular::Annotation *okul
     const double displayHeight = frame.size.height() * pageSize.height();
 
     const int orientation = pageOrientationDegrees(page->orientation());
-    const bool rotatedPage = (orientation % 180) != 0;
-    const double localWidth = rotatedPage ? displayHeight : displayWidth;
-    const double localHeight = rotatedPage ? displayWidth : displayHeight;
+    // The frame is normalized against the displayed page size.  Its local
+    // width/height are therefore already expressed along the frame axes; the
+    // page /Rotate is handled by converting the angle to PDF user space.  Do
+    // not swap the dimensions here: the wrapper rotates the local appearance,
+    // and the page rotation then maps it back to the display orientation.
+    const double localWidth = displayWidth;
+    const double localHeight = displayHeight;
 
     // Okular's frame angle is clockwise in the displayed page. Convert it to
     // the PDF user-space direction after undoing the page /Rotate.
@@ -1621,38 +1605,41 @@ Okular::Annotation *createAnnotationFromPopplerAnnotation(Poppler::Annotation *p
     return okularAnnotation;
 }
 
-void applyPopplerUserRotationToOkularAnnotation(Okular::Annotation *okularAnnotation, Poppler::Annotation *popplerAnnotation, const Okular::Page *page)
+void applyPopplerUserRotationToOkularAnnotation(Okular::Annotation *okularAnnotation, Poppler::Annotation *popplerAnnotation, const Okular::Page *page, const Poppler::Page *popplerPage)
 {
 #ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
-    if (!okularAnnotation || !popplerAnnotation || !page) {
+    if (!okularAnnotation || !popplerAnnotation || !page || !popplerPage) {
         return;
     }
 
     const double pdfRotation = popplerAnnotation->userRotation();
     const QSizeF localSize = popplerAnnotation->userLocalSize();
-    if (qFuzzyIsNull(pdfRotation) || localSize.isEmpty()) {
+    if (localSize.isEmpty()) {
         return;
     }
 
-    const int orientation = static_cast<int>(page->orientation()) * 90;
-    const bool rotatedPage = (orientation % 180) != 0;
-    const double displayWidth = rotatedPage ? localSize.height() : localSize.width();
-    const double displayHeight = rotatedPage ? localSize.width() : localSize.height();
+    // The frame is normalized against the page-orientation display size, not
+    // against Okular's device-pixel page size.  The user's view rotation is
+    // applied on top of the frame, so it must not enter this conversion.
+    const int pageOrientation = (static_cast<int>(page->orientation()) - static_cast<int>(page->rotation()) + 4) % 4;
+    const int orientation = pageOrientation * 90;
+    // localSize is stored in the frame's local axes.  The page /Rotate is
+    // already encoded in frame.rotation, so the local width/height map
+    // directly to the displayed frame size.
+    const double displayWidth = localSize.width();
+    const double displayHeight = localSize.height();
 
-    const bool userSwapped = (static_cast<int>(page->rotation()) % 2) != 0;
-    const double pageWidth = userSwapped ? page->height() : page->width();
-    const double pageHeight = userSwapped ? page->width() : page->height();
-    if (pageWidth <= 0 || pageHeight <= 0) {
+    const QSizeF pageSize = pdfDisplayPageSizePoints(popplerPage);
+    if (pageSize.width() <= 0 || pageSize.height() <= 0) {
         return;
     }
 
     const Okular::NormalizedRect boundary = okularAnnotation->boundingRectangle();
-    Okular::NormalizedPoint center((boundary.left + boundary.right) / 2.0, (boundary.top + boundary.bottom) / 2.0);
-    center.transform(rotationMatrixFor(page->rotation()).inverted());
+    const Okular::NormalizedPoint center((boundary.left + boundary.right) / 2.0, (boundary.top + boundary.bottom) / 2.0);
 
     Okular::AnnotationFrame frame;
     frame.center = center;
-    frame.size = QSizeF(displayWidth / pageWidth, displayHeight / pageHeight);
+    frame.size = QSizeF(displayWidth / pageSize.width(), displayHeight / pageSize.height());
     frame.rotation = qDegreesToRadians(orientation - pdfRotation);
 
     okularAnnotation->setFrame(frame);
@@ -1660,5 +1647,6 @@ void applyPopplerUserRotationToOkularAnnotation(Okular::Annotation *okularAnnota
     Q_UNUSED(okularAnnotation)
     Q_UNUSED(popplerAnnotation)
     Q_UNUSED(page)
+    Q_UNUSED(popplerPage)
 #endif
 }

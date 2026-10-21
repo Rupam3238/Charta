@@ -376,6 +376,72 @@ bool AdjustAnnotationCommand::refreshInternalPageReferences(const QList<Page *> 
     return true;
 }
 
+RotateAnnotationCommand::RotateAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber, const Okular::NormalizedPoint &center, double delta)
+    : m_docPriv(docPriv)
+    , m_annotation(annotation)
+    , m_pageNumber(pageNumber)
+    , m_center(center)
+    , m_delta(delta)
+{
+    setText(i18nc("Rotate an annotation", "rotate annotation"));
+}
+
+void RotateAnnotationCommand::undo()
+{
+    m_annotation->rotateFrame(-m_delta, m_center);
+    m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
+}
+
+void RotateAnnotationCommand::redo()
+{
+    m_annotation->rotateFrame(m_delta, m_center);
+    m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
+}
+
+bool RotateAnnotationCommand::refreshInternalPageReferences(const QList<Page *> &newPagesVector)
+{
+    auto annotation = newPagesVector[m_pageNumber]->annotation(m_annotation->uniqueName());
+    if (annotation) {
+        m_annotation = annotation;
+    }
+    return true;
+}
+
+ResizeAnnotationFrameCommand::ResizeAnnotationFrameCommand(Okular::DocumentPrivate *docPriv,
+                                                           Okular::Annotation *annotation,
+                                                           int pageNumber,
+                                                           const Okular::AnnotationFrame &startFrame,
+                                                           const Okular::AnnotationFrame &targetFrame)
+    : m_docPriv(docPriv)
+    , m_annotation(annotation)
+    , m_pageNumber(pageNumber)
+    , m_startFrame(startFrame)
+    , m_targetFrame(targetFrame)
+{
+    setText(i18nc("Resize an annotation", "resize annotation"));
+}
+
+void ResizeAnnotationFrameCommand::undo()
+{
+    m_annotation->resizeFrame(m_startFrame);
+    m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
+}
+
+void ResizeAnnotationFrameCommand::redo()
+{
+    m_annotation->resizeFrame(m_targetFrame);
+    m_docPriv->performModifyPageAnnotation(m_pageNumber, m_annotation, true);
+}
+
+bool ResizeAnnotationFrameCommand::refreshInternalPageReferences(const QList<Page *> &newPagesVector)
+{
+    auto annotation = newPagesVector[m_pageNumber]->annotation(m_annotation->uniqueName());
+    if (annotation) {
+        m_annotation = annotation;
+    }
+    return true;
+}
+
 EditTextCommand::EditTextCommand(const QString &newContents, int newCursorPos, const QString &prevContents, int prevCursorPos, int prevAnchorPos)
     : m_newContents(newContents)
     , m_newCursorPos(newCursorPos)

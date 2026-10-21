@@ -1940,7 +1940,7 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
         Okular::Annotation *newann = createAnnotationFromPopplerAnnotation(a.get(), *popplerPage, &doDelete);
         if (newann) {
             page->addAnnotation(newann);
-            applyPopplerUserRotationToOkularAnnotation(newann, a.get(), page);
+            applyPopplerUserRotationToOkularAnnotation(newann, a.get(), page, popplerPage);
 
             if (a->subType() == Poppler::Annotation::AScreen) {
                 Poppler::ScreenAnnotation *annotScreen = static_cast<Poppler::ScreenAnnotation *>(a.get());
