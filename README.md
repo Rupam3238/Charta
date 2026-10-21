@@ -117,8 +117,10 @@ CoreAddons, I18n, KIO, ThreadWeaver, WindowSystem, XmlGui, IconThemes; for the d
 Parts, ColorScheme, Crash, TextWidgets, WidgetsAddons); Extra CMake Modules; zlib.
 
 **Poppler Qt6 ≥ 24.08** is declared optional in CMake, but it provides the PDF backend and is
-effectively required. Stock Poppler **cannot write the `/AP` appearance streams Charta needs**,
-so the [patched fork](#patched-poppler) is the supported choice.
+effectively required. The Poppler generator (`generators/poppler/annots.cpp`) calls
+`setAppearanceStream`, `moveAnnotation` and `setUserRotation` without any feature guard. These
+are not part of stock Poppler, so the [patched fork](#patched-poppler) is the supported choice
+and a build against stock Poppler is not expected to compile (not tested).
 
 **Optional:** QPDF (fetched as v11.9.1 if absent; otherwise page saving falls back to
 `pdfseparate`/`pdfunite`), Qt6 DBus/Qml/TextToSpeech/MultimediaWidgets, KF6 Wallet/Purpose,
@@ -176,15 +178,17 @@ the build-tree plugins are used rather than a stale installed copy.
 
 ### Flatpak
 `.flatpak-manifest.json` (app ID `org.charta.reader`, runtime `org.kde.Platform` 6.11) builds
-upstream Poppler 26.08.0 with only the local ink-appearance patch, so it does **not** yet use the
-full fork.
+upstream Poppler 26.08.0 with only `patches/poppler-ink-appearance.patch`. It does **not** apply
+`patches/poppler-annotation-rotation.patch` and does not use the full fork. Because the generator
+calls the patched APIs unconditionally, this manifest is not expected to build until it is
+updated (not tested). Treat the Flatpak as a work in progress.
 
 ```bash
 flatpak-builder --user --install --force-clean build-dir .flatpak-manifest.json
 flatpak run org.charta.reader
 ```
 
-> **Verification:** these commands follow the current CMake files and manifest. A clean build,
+> **Verification:** these commands follow the CMake files and manifest at commit `0f13a44`. A clean build,
 > install, and Flatpak build were **not** run for this documentation.
 
 ## Running Charta
@@ -208,8 +212,10 @@ cd build && xvfb-run ctest --output-on-failure
 The registered set in [`autotests/CMakeLists.txt`](autotests/CMakeLists.txt) depends on optional
 features, so no fixed count is claimed. Charta-specific tests: `documentbuildermodeltest`,
 `documentbuilderparttest`, `blankpageswritertest`, `untitleddocumenttest`, `widthpresetstest`,
-`annotationcolorhistorytest`, `annotationtoolbartest`, `mainshelltest`. **The suite was not run
-for this update.** Page editing, autosave, and the exporter's replacement rules have no dedicated
+`annotationcolorhistorytest`, `annotationtoolbartest`, `mainshelltest`, `annotationrotationtest`
+(frame geometry, undo/redo, XML round trip), `annotationpersistencetest` (save and reopen through
+Poppler; registered only when Poppler Qt6 is found) and `annotationclipboardtest` (desktop UI
+only). **The suite was not run for this update.** Page editing, autosave, and the exporter's replacement rules have no dedicated
 unit test.
 
 ## Supported formats
@@ -288,4 +294,5 @@ Poppler, QPDF, Qt and KDE Frameworks communities.
 | Version | `26.11.70` (`CMakeLists.txt`) |
 | Application ID / executable | `org.charta.reader` / `charta` |
 | Core library | `Okular6Core` |
+| Poppler dependency | Patched fork (see [Patched Poppler](#patched-poppler)) |
 | Stack | C++20, CMake 3.22+ with ECM, Qt 6.6+, KDE Frameworks 6 |
