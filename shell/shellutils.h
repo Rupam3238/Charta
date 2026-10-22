@@ -37,8 +37,8 @@ QString find(const QString &serializedOptions);
 QString editorCmd(const QString &serializedOptions);
 
 #if HAVE_DBUS
-// Must be a subname of "org.kde.okular" due to Flatpak not supporting wildcard D-Bus permissions.
-inline constexpr QLatin1StringView kPerProcessDbusPrefix("org.kde.okular.Instance_");
+// Must be a subname of "org.charta.reader" due to Flatpak not supporting wildcard D-Bus permissions.
+inline constexpr QLatin1StringView kPerProcessDbusPrefix("org.charta.reader.Instance_");
 
 QString currentProcessDbusName();
 #endif // HAVE_DBUS

@@ -7,7 +7,7 @@
 #ifndef _OKULAR_PAGETRANSITION_H_
 #define _OKULAR_PAGETRANSITION_H_
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 namespace Okular
 {
@@ -18,7 +18,7 @@ namespace Okular
  * a page transition. It supports mainly the transition effects as
  * defined in PDF specification 1.6.
  */
-class OKULARCORE_EXPORT PageTransition
+class CHARTACORE_EXPORT PageTransition
 {
 public:
     /**

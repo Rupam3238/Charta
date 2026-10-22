@@ -7,7 +7,7 @@
 #ifndef _OKULAR_SAVEINTERFACE_H_
 #define _OKULAR_SAVEINTERFACE_H_
 
-#include "../core/okularcore_export.h"
+#include "../core/chartacore_export.h"
 
 #include <QObject>
 
@@ -34,7 +34,7 @@ class Page;
  * @endcode
  * and - of course - implementing its methods.
  */
-class OKULARCORE_EXPORT SaveInterface
+class CHARTACORE_EXPORT SaveInterface
 {
 public:
     /**
@@ -112,7 +112,7 @@ public:
 
 }
 
-Q_DECLARE_INTERFACE(Okular::SaveInterface, "org.kde.okular.SaveInterface/0.3")
+Q_DECLARE_INTERFACE(Okular::SaveInterface, "org.charta.reader.SaveInterface/0.3")
 Q_DECLARE_OPERATORS_FOR_FLAGS(Okular::SaveInterface::SaveOptions)
 
 #endif

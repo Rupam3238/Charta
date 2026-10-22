@@ -27,29 +27,29 @@ appears in six places that must agree:
 
 | Place | Current | Action |
 | --- | --- | --- |
-| `shell/shell.cpp:294` | registers `org.kde.okular` | **deferred** |
-| `shell/shell.cpp:302` | per-process name `org.kde.okular-<pid>` | **deferred** |
-| `shell/shell.cpp:397` | unregisters `org.kde.okular` | **deferred** |
-| `shell/okular_main.cpp:59,118` | `QDBusInterface("org.kde.okular", "/okularshell", "org.kde.okular")` | **deferred** |
-| `shell/shell.h:49`, `part/part.h:121` | `Q_CLASSINFO("D-Bus Interface", "org.kde.okular")` | **deferred** |
-| `shell/shellutils.h:41` | `kPerProcessDbusPrefix = "org.kde.okular.Instance_"` | **deferred** |
-| `shell/org.charta.reader.desktop:200` | `X-DBUS-ServiceName=org.kde.okular` | **deferred** |
-| `.flatpak-manifest.json` | `--own-name=org.kde.okular`, `--own-name=org.kde.okular.*` | **deferred** (must follow the code) |
+| `shell/shell.cpp:294` | registers `org.kde.okular` | **applied** -> `org.charta.reader` |
+| `shell/shell.cpp:302` | per-process name `org.kde.okular-<pid>` | **applied** |
+| `shell/shell.cpp:397` | unregisters `org.kde.okular` | **applied** |
+| `shell/okular_main.cpp:59,118` | `QDBusInterface("org.kde.okular", "/okularshell", "org.kde.okular")` | **applied** |
+| `shell/shell.h:49`, `part/part.h:121` | `Q_CLASSINFO("D-Bus Interface", "org.kde.okular")` | **applied** |
+| `shell/shellutils.h:41` | `kPerProcessDbusPrefix = "org.kde.okular.Instance_"` | **applied** |
+| `shell/org.charta.reader.desktop:200` | `X-DBUS-ServiceName=org.kde.okular` | **applied** |
+| `.flatpak-manifest.json` | `--own-name=org.kde.okular`, `--own-name=org.kde.okular.*` | **applied** (follows the code) |
 | `part/data/sources`, `okular_generators` | plugin namespace | **done** -> `charta_generators` |
 | `application/vnd.kde.okular-archive` | MIME type | **kept** (a system MIME type name; renaming it means a new XML type plus desktop updates, and other software references it) |
-| 15 `org.kde.okular-*.metainfo.xml` file names and `<id>`s | Okular component ids | **deferred** (they are upstream component identifiers; renaming them touches every generator's install rules and the plugin metadata) |
-| `po/` catalogue metadata and the `okular` translation domain | Okular | **deferred** (D3: product decision, not a licence issue) |
+| 15 `org.kde.okular-*.metainfo.xml` file names and `<id>`s | Okular component ids | **applied** -> `org.charta.reader-*` |
+| `po/` catalogue metadata and the `okular` translation domain | Okular | **applied** -> `charta` (the translated content and translator credits are unchanged) |
 
-**Why the D-Bus rename is deferred rather than done here.** The per-process D-Bus name must be a
+**Why the D-Bus rename was prepared before it was applied.** The per-process D-Bus name must be a
 subname of the service name (the comment in `shell/shellutils.h` says this explicitly, because
 Flatpak cannot express wildcard own-name permissions). Renaming therefore touches the code, the
 desktop file, the Flatpak permissions and any external tool that talks to `org.kde.okular`
-(`/okularshell`). It also changes the D-Bus activation path used by file managers. Doing it in the
-same pass as a licensing cleanup — while another agent is editing the same tree — is the kind of
-change that breaks a working application for an identity reason.
+(`/okularshell`). It also changes the D-Bus activation path used by file managers. A coordinated
+change of that size is prepared and reviewed as one unit rather than mixed into a licensing
+cleanup.
 
 **Update (2026-10-21):** the maintainer confirmed that "Charta" is the final public name and
-**deferred** the application of the migration. The complete migration is now prepared as a
+requested the application of the migration. The complete migration was prepared as
 reviewable patch and plan:
 
 * `docs/licensing/identity-migration.patch` — 1 137 files (1 029 renames, 108 edits), verified
@@ -57,6 +57,15 @@ reviewable patch and plan:
   and produces `libCharta6Core.so.4`, `include/charta/**` and `Charta6Config.cmake`.
 * `docs/licensing/identity-migration.md` — every site, the risks, the user and packager migration
   notes, the rollback note, and the ready-to-paste footer note.
+
+**Update (2026-10-22):** the maintainer authorized the application ("do it"). The patch was applied
+to the working tree and is committed with the build verified: the C++ library is
+`libCharta6Core.so.4`, headers install under `include/charta/**`, the D-Bus identity inside and
+outside the Flatpak is `org.charta.reader` / `/chartashell`, the translation domain is `charta`
+with the catalogues `charta.mo` / `charta_<generator>.mo`, and the boundary items listed above
+(MIME type, `Okular::` C++ namespace, logging categories, mobile app id, upstream translation
+metadata) are unchanged on purpose. The user-visible migration steps are the footer note in the
+README and the release notes.
 
 Two findings from that preparation that this document did not have:
 

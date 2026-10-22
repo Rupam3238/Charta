@@ -13,7 +13,7 @@
 
 #include <QList>
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 namespace Okular
 {
@@ -25,7 +25,7 @@ class Page;
  * Inherit this class and call Document->addObserver( yourClass ) to get
  * notified of asynchronous events (new pixmap generated, or changed, etc..).
  */
-class OKULARCORE_EXPORT DocumentObserver
+class CHARTACORE_EXPORT DocumentObserver
 {
 public:
     DocumentObserver();

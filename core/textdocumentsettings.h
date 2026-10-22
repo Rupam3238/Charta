@@ -7,7 +7,7 @@
 #ifndef _OKULAR_TEXTDOCUMENTSETTINGS_H_
 #define _OKULAR_TEXTDOCUMENTSETTINGS_H_
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 #include <KConfigSkeleton>
 #include <QFont>
@@ -74,7 +74,7 @@ class TextDocumentSettingsPrivate;
  *
  * @since 0.17 (KDE 4.11)
  */
-class OKULARCORE_EXPORT TextDocumentSettingsWidget : public QWidget
+class CHARTACORE_EXPORT TextDocumentSettingsWidget : public QWidget
 {
     Q_OBJECT
 
@@ -100,7 +100,7 @@ private:
  *
  * @since 0.17 (KDE 4.11)
  */
-class OKULARCORE_EXPORT TextDocumentSettings : public KConfigSkeleton
+class CHARTACORE_EXPORT TextDocumentSettings : public KConfigSkeleton
 {
     Q_OBJECT
 

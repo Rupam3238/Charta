@@ -10,7 +10,7 @@
 #include "annotations.h"
 #include "area.h"
 #include "document.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 #include "signatureutils.h"
 
 #include <QStringList>
@@ -36,7 +36,7 @@ class FormFieldSignaturePrivate;
  * This is not meant to be used as a direct base for the form fields in a
  * document, but its abstract subclasses are.
  */
-class OKULARCORE_EXPORT FormField
+class CHARTACORE_EXPORT FormField
 {
     /// @cond PRIVATE
     friend class Page;
@@ -243,7 +243,7 @@ private:
  *
  * @since 0.7 (KDE 4.1)
  */
-class OKULARCORE_EXPORT FormFieldButton : public FormField
+class CHARTACORE_EXPORT FormFieldButton : public FormField
 {
 public:
     /**
@@ -306,7 +306,7 @@ private:
  * This is the base interface to reimplement to represent a text field, ie a
  * field where the user insert text.
  */
-class OKULARCORE_EXPORT FormFieldText : public FormField
+class CHARTACORE_EXPORT FormFieldText : public FormField
 {
 public:
     /**
@@ -417,7 +417,7 @@ private:
  * field where the user can select one (of more) element(s) among a set of
  * choices.
  */
-class OKULARCORE_EXPORT FormFieldChoice : public FormField
+class CHARTACORE_EXPORT FormFieldChoice : public FormField
 {
 public:
     /**
@@ -556,7 +556,7 @@ private:
  *
  * This is the base interface to reimplement to represent a signature field.
  */
-class OKULARCORE_EXPORT FormFieldSignature : public FormField
+class CHARTACORE_EXPORT FormFieldSignature : public FormField
 {
 public:
     /**

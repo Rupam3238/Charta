@@ -17,7 +17,7 @@ inline KAboutData okularAboutData()
 {
     KAboutData about(QStringLiteral("charta"),
                      i18n("Charta"),
-                     QStringLiteral(OKULAR_VERSION_STRING),
+                     QStringLiteral(CHARTA_VERSION_STRING),
                      i18n("Charta, a document reader and annotator"),
                      KAboutLicense::GPL,
                      i18n("(C) 2002 Wilco Greven, Christophe Devriese\n"

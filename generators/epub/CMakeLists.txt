@@ -1,5 +1,5 @@
-remove_definitions(-DTRANSLATION_DOMAIN="okular")
-add_definitions(-DTRANSLATION_DOMAIN="okular_epub")
+remove_definitions(-DTRANSLATION_DOMAIN="charta")
+add_definitions(-DTRANSLATION_DOMAIN="charta_epub")
 
 add_subdirectory(data)
 
@@ -14,7 +14,7 @@ set(okularGenerator_epub_PART_SRCS
 okular_add_generator(okularGenerator_epub ${okularGenerator_epub_PART_SRCS})
 
 target_include_directories(okularGenerator_epub PRIVATE ${EPUB_INCLUDE_DIR})
-target_link_libraries(okularGenerator_epub okularcore ${EPUB_LIBRARIES} KF6::I18n Qt6::Widgets Qt6::Xml)
+target_link_libraries(okularGenerator_epub chartacore ${EPUB_LIBRARIES} KF6::I18n Qt6::Widgets Qt6::Xml)
 
 
 ########### autotests ###############
@@ -23,7 +23,7 @@ if(BUILD_TESTING)
     add_definitions( -DKDESRCDIR="${CMAKE_CURRENT_SOURCE_DIR}/" )
     ecm_add_test(autotests/epubgeneratortest.cpp
         TEST_NAME "epubgeneratortest"
-        LINK_LIBRARIES Qt6::Test KF6::CoreAddons okularcore
+        LINK_LIBRARIES Qt6::Test KF6::CoreAddons chartacore
     )
 endif()
 
@@ -34,5 +34,5 @@ endif()
 if (BUILD_MOBILE)
   install( PROGRAMS org.kde.mobile.okular_epub.desktop DESTINATION ${KDE_INSTALL_APPDIR} )
 endif()
-install( FILES org.kde.okular-epub.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )
+install( FILES org.charta.reader-epub.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )
 

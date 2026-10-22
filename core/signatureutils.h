@@ -7,7 +7,7 @@
 #ifndef OKULAR_SIGNATUREUTILS_H
 #define OKULAR_SIGNATUREUTILS_H
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 #include <QDateTime>
 #include <QFlag>
@@ -22,7 +22,7 @@ namespace Okular
  * @short A helper class to store information about x509 certificate
  */
 class CertificateInfoPrivate;
-class OKULARCORE_EXPORT CertificateInfo
+class CHARTACORE_EXPORT CertificateInfo
 {
 public:
     /** The certificate backend is mostly
@@ -337,7 +337,7 @@ private:
  * @short A helper class to store information about digital signature
  */
 class SignatureInfoPrivate;
-class OKULARCORE_EXPORT SignatureInfo
+class CHARTACORE_EXPORT SignatureInfo
 {
 public:
     /**
@@ -538,7 +538,7 @@ private:
 /**
  * @short A helper class to store information about x509 certificate
  */
-class OKULARCORE_EXPORT CertificateStore
+class CHARTACORE_EXPORT CertificateStore
 {
 public:
     // TODO: BIC please add QWidget* parent's to the methods for showing a dialog
@@ -593,7 +593,7 @@ enum SigningResult {
  * \since 25.04
  */
 
-OKULARCORE_EXPORT QString errorString(SigningResult result, const QVariant &additionalMessage);
+CHARTACORE_EXPORT QString errorString(SigningResult result, const QVariant &additionalMessage);
 }
 
 #endif

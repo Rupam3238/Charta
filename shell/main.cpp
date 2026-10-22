@@ -95,7 +95,7 @@ int main(int argc, char **argv)
      */
     FileOpenEventHandler eventHandler;
     app.installEventFilter(&eventHandler);
-    KLocalizedString::setApplicationDomain("okular");
+    KLocalizedString::setApplicationDomain("charta");
 
 #if HAVE_STYLE_MANAGER
     /**

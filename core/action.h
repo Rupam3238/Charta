@@ -8,7 +8,7 @@
 #define _OKULAR_ACTION_H_
 
 #include "global.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 #include <QString>
 #include <QVariant>
@@ -37,7 +37,7 @@ class DocumentViewport;
  * widgets to reimplement the 'actionType' method and return the type of
  * the action described by the reimplemented class.
  */
-class OKULARCORE_EXPORT Action
+class CHARTACORE_EXPORT Action
 {
 public:
     /**
@@ -85,7 +85,7 @@ public:
      * @deprecated use @ref setNativeHandle
      * @since 0.15 (KDE 4.9)
      */
-    OKULARCORE_DEPRECATED void setNativeId(const QVariant &id);
+    CHARTACORE_DEPRECATED void setNativeId(const QVariant &id);
 
     /**
      * Returns the "native" id of the action.
@@ -93,7 +93,7 @@ public:
      * @since 0.15 (KDE 4.9)
      *
      */
-    OKULARCORE_DEPRECATED QVariant nativeId() const;
+    CHARTACORE_DEPRECATED QVariant nativeId() const;
 
     /**
      * Sets "native" handle for the action
@@ -147,7 +147,7 @@ private:
  * The Goto action changes the viewport to another page
  * or loads an external document.
  */
-class OKULARCORE_EXPORT GotoAction : public Action
+class CHARTACORE_EXPORT GotoAction : public Action
 {
 public:
     /**
@@ -213,7 +213,7 @@ private:
 /**
  * The Execute action executes an external application.
  */
-class OKULARCORE_EXPORT ExecuteAction : public Action
+class CHARTACORE_EXPORT ExecuteAction : public Action
 {
 public:
     /**
@@ -258,7 +258,7 @@ private:
  * The Browse action browses an url by opening a web browser or
  * email client, depending on the url protocol (e.g. http, mailto, etc.).
  */
-class OKULARCORE_EXPORT BrowseAction : public Action
+class CHARTACORE_EXPORT BrowseAction : public Action
 {
 public:
     /**
@@ -297,7 +297,7 @@ private:
  * The DocumentAction action contains an action that is performed on
  * the current document.
  */
-class OKULARCORE_EXPORT DocumentAction : public Action
+class CHARTACORE_EXPORT DocumentAction : public Action
 {
 public:
     /**
@@ -355,7 +355,7 @@ private:
 /**
  * The Sound action plays a sound on activation.
  */
-class OKULARCORE_EXPORT SoundAction : public Action
+class CHARTACORE_EXPORT SoundAction : public Action
 {
 public:
     /**
@@ -419,7 +419,7 @@ private:
  *
  * @since 0.7 (KDE 4.1)
  */
-class OKULARCORE_EXPORT ScriptAction : public Action
+class CHARTACORE_EXPORT ScriptAction : public Action
 {
 public:
     /**
@@ -465,7 +465,7 @@ private:
  *
  * @since 0.15 (KDE 4.9)
  */
-class OKULARCORE_EXPORT MovieAction : public Action
+class CHARTACORE_EXPORT MovieAction : public Action
 {
 public:
     /**
@@ -519,7 +519,7 @@ private:
  *
  * @since 0.16 (KDE 4.10)
  */
-class OKULARCORE_EXPORT RenditionAction : public Action
+class CHARTACORE_EXPORT RenditionAction : public Action
 {
 public:
     /**
@@ -593,7 +593,7 @@ private:
     Q_DISABLE_COPY(RenditionAction)
 };
 
-class OKULARCORE_EXPORT BackendOpaqueAction : public Action
+class CHARTACORE_EXPORT BackendOpaqueAction : public Action
 {
 public:
     enum OpaqueActionResult {

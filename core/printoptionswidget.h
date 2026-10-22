@@ -9,7 +9,7 @@
 
 #include <QWidget>
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 class QComboBox;
 
@@ -18,7 +18,7 @@ namespace Okular
 /**
  * @short Abstract base class for an extra print options widget in the print dialog.
  */
-class OKULARCORE_EXPORT PrintOptionsWidget : public QWidget
+class CHARTACORE_EXPORT PrintOptionsWidget : public QWidget
 {
     Q_OBJECT
 public:
@@ -35,7 +35,7 @@ public:
  * It just implements the required method 'ignorePrintMargins()' from
  * the base class 'PrintOptionsWidget'.
  */
-class OKULARCORE_EXPORT DefaultPrintOptionsWidget : public PrintOptionsWidget
+class CHARTACORE_EXPORT DefaultPrintOptionsWidget : public PrintOptionsWidget
 {
     Q_OBJECT
 

@@ -53,9 +53,9 @@ consensus in those documents, which is what matters here:
 
 1. **"Charta" is the final public application name.** The identity migration is therefore
    approved in principle.
-2. **The migration is deferred, not cancelled.** The D-Bus service/interface rename (Q2) and the
-   core library / header path / AppStream component id rename (Q9) are **not applied yet**. The
-   complete migration has been prepared as a reviewable patch instead:
+2. **The migration was prepared first, then applied.** The D-Bus service/interface rename (Q2) and the
+   core library / header path / AppStream component id rename (Q9) were prepared as a reviewable patch,
+   and applied from it (2026-10-22):
    * `docs/licensing/identity-migration.patch` — a unified diff that applies to the current tree
    * `docs/licensing/identity-migration.md` — every site, the risks, the user-facing and
      packager-facing migration notes, the rollback note, and the ready-to-paste footer note

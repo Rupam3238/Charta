@@ -40,7 +40,7 @@ public:
     /**
      * @short Reads the settings for the current annotation and rebuild the quick annotations menu
      *
-     * This method is called each time okularpartrc is modified. This happens in the following
+     * This method is called each time chartapartrc is modified. This happens in the following
      * situations (among others): the quick annotations are modified from the KCM settings
      * page, a tool is modified using the "advanced settings" action, a quick annotation is
      * selected, an annotation property (line width, colors, opacity, font) is modified.

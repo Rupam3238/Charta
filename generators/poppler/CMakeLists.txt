@@ -1,5 +1,5 @@
-remove_definitions(-DTRANSLATION_DOMAIN="okular")
-add_definitions(-DTRANSLATION_DOMAIN="okular_poppler")
+remove_definitions(-DTRANSLATION_DOMAIN="charta")
+add_definitions(-DTRANSLATION_DOMAIN="charta_poppler")
 
 add_subdirectory( conf )
 
@@ -28,7 +28,7 @@ kconfig_add_kcfg_files(okularGenerator_poppler_PART_SRCS GENERATE_MOC conf/pdfse
 
 okular_add_generator(okularGenerator_poppler ${okularGenerator_poppler_PART_SRCS})
 
-target_link_libraries(okularGenerator_poppler okularcore KF6::I18n KF6::Completion KF6::KIOWidgets Poppler::Qt6 Qt6::Xml)
+target_link_libraries(okularGenerator_poppler chartacore KF6::I18n KF6::Completion KF6::KIOWidgets Poppler::Qt6 Qt6::Xml)
 if (HAVE_QPDF)
     target_link_libraries(okularGenerator_poppler ${QPDF_LINK_TARGET})
     target_compile_options(okularGenerator_poppler PRIVATE -fexceptions)
@@ -50,4 +50,4 @@ endif()
 if (BUILD_MOBILE)
   install( PROGRAMS org.kde.mobile.okular_pdf.desktop DESTINATION ${KDE_INSTALL_APPDIR} )
 endif()
-install( FILES org.kde.okular-poppler.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )
+install( FILES org.charta.reader-poppler.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )

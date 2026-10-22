@@ -7,7 +7,7 @@
 #ifndef OKULAR_VIEW_H
 #define OKULAR_VIEW_H
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 #include <QObject>
 class QString;
 class QVariant;
@@ -26,7 +26,7 @@ class ViewPrivate;
  *
  * @since 0.7 (KDE 4.1)
  */
-class OKULARCORE_EXPORT View
+class CHARTACORE_EXPORT View
 {
     /// @cond PRIVATE
     friend class Document;

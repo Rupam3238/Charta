@@ -7,7 +7,7 @@
 #define _OKULAR_TILES_MANAGER_P_H_
 
 #include "area.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 class QPixmap;
 

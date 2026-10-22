@@ -16,7 +16,7 @@
 #include <QTransform>
 
 #include "global.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 class QPolygonF;
 class QRect;
@@ -113,7 +113,7 @@ class NormalizedShape;
  *
  * @see NormalizedRect
  */
-class OKULARCORE_EXPORT NormalizedPoint
+class CHARTACORE_EXPORT NormalizedPoint
 {
 public:
     /**
@@ -185,7 +185,7 @@ public:
  *
  * @see NormalizedPoint, RegularAreaRect, TextEntity
  */
-class OKULARCORE_EXPORT NormalizedRect
+class CHARTACORE_EXPORT NormalizedRect
 {
 public:
     /**
@@ -264,7 +264,7 @@ public:
      *
      * @deprecated use intersects(const NormalizedRect &other)
      */
-    OKULARCORE_DEPRECATED bool intersects(const NormalizedRect *other) const;
+    CHARTACORE_DEPRECATED bool intersects(const NormalizedRect *other) const;
 
     /**
      * Returns whether the normalized rectangle intersects an other normalized
@@ -272,7 +272,7 @@ public:
      *
      * @deprecated use intersects(const NormalizedRect &other)
      */
-    OKULARCORE_DEPRECATED bool intersects(double left, double top, double right, double bottom) const;
+    CHARTACORE_DEPRECATED bool intersects(double left, double top, double right, double bottom) const;
 
     /**
      * Returns the rectangle mapped to a reference area of @p xScale x @p yScale.
@@ -458,7 +458,7 @@ public:
  *
  * @see NormalizedPoint
  */
-class OKULARCORE_EXPORT ObjectRect
+class CHARTACORE_EXPORT ObjectRect
 {
 public:
     /**
@@ -556,7 +556,7 @@ protected:
 /**
  * This class describes the object rectangle for an annotation.
  */
-class OKULARCORE_EXPORT AnnotationObjectRect : public ObjectRect
+class CHARTACORE_EXPORT AnnotationObjectRect : public ObjectRect
 {
 public:
     /**
@@ -599,7 +599,7 @@ private:
 /**
  * This class describes the object rectangle for a source reference.
  */
-class OKULARCORE_EXPORT SourceRefObjectRect : public ObjectRect
+class CHARTACORE_EXPORT SourceRefObjectRect : public ObjectRect
 {
     friend class ObjectRect;
 
@@ -632,7 +632,7 @@ private:
  * This class is an object rect that doesn't own the given pointer, i.e. won't delete it on destruction
  * @since 1.7
  */
-class OKULARCORE_EXPORT NonOwningObjectRect : public ObjectRect
+class CHARTACORE_EXPORT NonOwningObjectRect : public ObjectRect
 {
 public:
     NonOwningObjectRect(double left, double top, double right, double bottom, bool ellipse, ObjectType type, void *object);
@@ -927,7 +927,7 @@ template<class NormalizedShape, class Shape> void RegularArea<NormalizedShape, S
  *
  * @see NormalizedRect, NormalizedPoint
  */
-class OKULARCORE_EXPORT RegularAreaRect : public RegularArea<NormalizedRect, QRect>
+class CHARTACORE_EXPORT RegularAreaRect : public RegularArea<NormalizedRect, QRect>
 {
 public:
     RegularAreaRect();
@@ -962,7 +962,7 @@ public:
      *
      * @deprecated use HighlightAreaRect(const RegularAreaRect &area, const QColor &color, int id)
      */
-    OKULARCORE_DEPRECATED explicit HighlightAreaRect(const RegularAreaRect *area = nullptr);
+    CHARTACORE_DEPRECATED explicit HighlightAreaRect(const RegularAreaRect *area = nullptr);
 
     static constexpr int INVALID_SEARCH_ID = -1;
 
@@ -984,12 +984,12 @@ size_t qHash(const Okular::NormalizedRect &r, size_t seed = 0);
 /**
  * Debug operator for normalized @p point.
  */
-OKULARCORE_EXPORT QDebug operator<<(QDebug debug, const Okular::NormalizedPoint &point);
+CHARTACORE_EXPORT QDebug operator<<(QDebug debug, const Okular::NormalizedPoint &point);
 
 /**
  * Debug operator for normalized @p rect.
  */
-OKULARCORE_EXPORT QDebug operator<<(QDebug debug, const Okular::NormalizedRect &rect);
+CHARTACORE_EXPORT QDebug operator<<(QDebug debug, const Okular::NormalizedRect &rect);
 #endif
 
 #endif

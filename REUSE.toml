@@ -102,7 +102,7 @@ path = [
     "autotests/closedialoghelper.cpp",
     "autotests/closedialoghelper.h",
     "cmake/modules/FindDjVuLibre.cmake",
-    "Okular6Config.cmake.in",
+    "Charta6Config.cmake.in",
     "OkularConfigureChecks.cmake",
     "config-okular.h.cmake",
     "shell/MacOSXBundleInfo.plist.in",
@@ -167,7 +167,7 @@ SPDX-License-Identifier = "GPL-2.0-or-later"
 # metadata_license is CC0-1.0: that is the licence of the METADATA in these files, not of the
 # software they describe. The software licence is declared in the <project_license> element.
 [[annotations]]
-path = ["shell/org.charta.reader.metainfo.xml", "generators/*/org.kde.okular-*.metainfo.xml", "mobile/app/org.kde.okular.kirigami.appdata.xml"]
+path = ["shell/org.charta.reader.metainfo.xml", "generators/*/org.charta.reader-*.metainfo.xml", "mobile/app/org.kde.okular.kirigami.appdata.xml"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Charta contributors"
 SPDX-License-Identifier = "CC0-1.0"

@@ -45,7 +45,7 @@ target_link_libraries(okularplugin PRIVATE
     KF6::Bookmarks
     KF6::I18n
     KF6::Service
-    okularcore
+    chartacore
 )
 
 ecm_finalize_qml_module(okularplugin DESTINATION ${KDE_INSTALL_QMLDIR} EXPORT OkularTargets)

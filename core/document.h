@@ -14,7 +14,7 @@
 #include "annotations.h"
 #include "area.h"
 #include "global.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 #include "pagesize.h"
 #include "signatureutils.h"
 
@@ -74,7 +74,7 @@ class SignatureInfo;
  * The DocumentInfo structure can be filled in by generators to display
  * metadata about the currently opened file.
  */
-class OKULARCORE_EXPORT DocumentInfo
+class CHARTACORE_EXPORT DocumentInfo
 {
     friend class Document;
 
@@ -189,7 +189,7 @@ private:
  *
  * @see DocumentObserver, Page
  */
-class OKULARCORE_EXPORT Document : public QObject
+class CHARTACORE_EXPORT Document : public QObject
 {
     Q_OBJECT
 
@@ -837,7 +837,7 @@ public:
      * @since 1.9
      * @deprecated use processFormatAction(const Action *, Okular::FormField *).
      */
-    OKULARCORE_DEPRECATED void processFormatAction(const Action *action, Okular::FormFieldText *fft);
+    CHARTACORE_DEPRECATED void processFormatAction(const Action *action, Okular::FormFieldText *fft);
 
     /**
      * Processes the given format @p action on a Form Field @p ff.
@@ -852,7 +852,7 @@ public:
      * @since 1.9
      * @deprecated use processKeystrokeAction(const Action *, Okular::FormField *, const QVariant &, int, int)
      */
-    OKULARCORE_DEPRECATED void processKeystrokeAction(const Action *action, Okular::FormFieldText *fft, const QVariant &newValue);
+    CHARTACORE_DEPRECATED void processKeystrokeAction(const Action *action, Okular::FormFieldText *fft, const QVariant &newValue);
 
     /**
      * Processes the given keystroke @p action on @p ff between the two positions @p prevCursorPos and @p prevAnchorPos
@@ -869,7 +869,7 @@ public:
      * @since 22.04
      * @deprecated use processKeystrokeCommitAction(const Action *, Okular::FormField *, bool &).
      */
-    OKULARCORE_DEPRECATED void processKeystrokeCommitAction(const Action *action, Okular::FormFieldText *fft);
+    CHARTACORE_DEPRECATED void processKeystrokeCommitAction(const Action *action, Okular::FormFieldText *fft);
 
     /**
      * Processes the given keystroke @p action on FormField @p ff.
@@ -893,7 +893,7 @@ public:
      * @since 1.9
      * @deprecated use processValidateAction(const Action *, Okular::FormField *, bool &).
      */
-    OKULARCORE_DEPRECATED void processValidateAction(const Action *action, Okular::FormFieldText *fft, bool &returnCode);
+    CHARTACORE_DEPRECATED void processValidateAction(const Action *action, Okular::FormFieldText *fft, bool &returnCode);
 
     /**
      * Validates the input value in the FormField @p ff and sets the @p returnCode for a given validate @p action.
@@ -915,7 +915,7 @@ public:
      * @deprecated use @ref processFormMouseScriptAction
      * @since 23.12
      */
-    OKULARCORE_DEPRECATED void processFormMouseUpScripAction(const Action *action, Okular::FormField *ff);
+    CHARTACORE_DEPRECATED void processFormMouseUpScripAction(const Action *action, Okular::FormField *ff);
 
     enum MouseEventType {
         FieldMouseDown,  /// < This event is the result of a mouse down on a field.
@@ -979,7 +979,7 @@ public:
      *
      * @deprecated since 25.12 use void processSourceReference(const SourceReference &reference)
      */
-    OKULARCORE_DEPRECATED void processSourceReference(const SourceReference *reference);
+    CHARTACORE_DEPRECATED void processSourceReference(const SourceReference *reference);
 
     /**
      * Processes/Executes the given source @p reference.
@@ -1056,7 +1056,7 @@ public:
     /**
      * Returns the number of generators that have a configuration widget.
      */
-    OKULARCORE_DEPRECATED int configurableGenerators() const;
+    CHARTACORE_DEPRECATED int configurableGenerators() const;
 
     /**
      * Returns the list with the supported MIME types.
@@ -1154,7 +1154,7 @@ public:
      *
      * @since 0.7 (KDE 4.1)
      */
-    OKULARCORE_DEPRECATED bool saveChanges(const QString &fileName);
+    CHARTACORE_DEPRECATED bool saveChanges(const QString &fileName);
 
     /**
      * Save the document and the optional changes to it to the specified
@@ -1347,7 +1347,7 @@ public Q_SLOTS:
      * @deprecated use editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents,
      *                          int newCursorPos, int prevCursorPos, int prevAnchorPos, const QString &oldContents)
      */
-    OKULARCORE_DEPRECATED void editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents, int newCursorPos, int prevCursorPos, int prevAnchorPos);
+    CHARTACORE_DEPRECATED void editFormText(int pageNumber, Okular::FormFieldText *form, const QString &newContents, int newCursorPos, int prevCursorPos, int prevAnchorPos);
 
     /**
      * Edit the text contents of the specified @p form on page @p page to be @p newContents where
@@ -1627,7 +1627,7 @@ private:
  * data is broadcasted between observers to synchronize their viewports to get
  * the 'I scroll one view and others scroll too' views.
  */
-class OKULARCORE_EXPORT DocumentViewport
+class CHARTACORE_EXPORT DocumentViewport
 {
 public:
     /**
@@ -1708,7 +1708,7 @@ public:
  * - URL: a URL to be open as destination; if set, no other Destination* or
  *      ExternalFileName entry is used
  */
-class OKULARCORE_EXPORT DocumentSynopsis : public QDomDocument
+class CHARTACORE_EXPORT DocumentSynopsis : public QDomDocument
 {
 public:
     /**
@@ -1732,7 +1732,7 @@ public:
  * about an embedded file, like its name, its description, the date of creation
  * and modification, and the real data of the file.
  */
-class OKULARCORE_EXPORT EmbeddedFile
+class CHARTACORE_EXPORT EmbeddedFile
 {
 public:
     /**
@@ -1788,7 +1788,7 @@ public:
 /**
  * @short An area of a specified page
  */
-class OKULARCORE_EXPORT VisiblePageRect
+class CHARTACORE_EXPORT VisiblePageRect
 {
 public:
     /**
@@ -1815,7 +1815,7 @@ public:
  *
  * @since 21.04
  */
-class OKULARCORE_EXPORT NewSignatureData
+class CHARTACORE_EXPORT NewSignatureData
 {
 public:
     NewSignatureData();

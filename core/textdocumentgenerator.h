@@ -7,7 +7,7 @@
 #ifndef _OKULAR_TEXTDOCUMENTGENERATOR_H_
 #define _OKULAR_TEXTDOCUMENTGENERATOR_H_
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 #include "../interfaces/configinterface.h"
 #include "document.h"
@@ -23,7 +23,7 @@ class TextDocumentConverterPrivate;
 class TextDocumentGenerator;
 class TextDocumentGeneratorPrivate;
 
-class OKULARCORE_EXPORT TextDocumentConverter : public QObject
+class CHARTACORE_EXPORT TextDocumentConverter : public QObject
 {
     Q_OBJECT
 
@@ -142,7 +142,7 @@ private:
  * This generator provides a document in the form of a QTextDocument object,
  * parsed using a specialized TextDocumentConverter.
  */
-class OKULARCORE_EXPORT TextDocumentGenerator : public Generator, public Okular::ConfigInterface
+class CHARTACORE_EXPORT TextDocumentGenerator : public Generator, public Okular::ConfigInterface
 {
     /// @cond PRIVATE
     friend class TextDocumentConverter;

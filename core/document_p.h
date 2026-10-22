@@ -153,7 +153,7 @@ public:
     bool canAddAnnotationsNatively() const;
     bool canModifyExternalAnnotations() const;
     bool canRemoveExternalAnnotations() const;
-    OKULARCORE_EXPORT static QString docDataFileName(const QUrl &url, qint64 document_size);
+    CHARTACORE_EXPORT static QString docDataFileName(const QUrl &url, qint64 document_size);
     bool cancelRenderingBecauseOf(PixmapRequest *executingRequest, PixmapRequest *newRequest);
 
     // Methods that implement functionality needed by undo commands
@@ -241,7 +241,7 @@ public:
     // Fills a pixmap request for a blank page without involving the generator
     void generateBlankPagePixmap(PixmapRequest *request);
 
-    OKULARCORE_EXPORT static QString evaluateKeystrokeEventChange(const QString &oldVal, const QString &newVal, int selStart, int selEnd);
+    CHARTACORE_EXPORT static QString evaluateKeystrokeEventChange(const QString &oldVal, const QString &newVal, int selStart, int selEnd);
 
     /*
      * Executes a ScriptAction with the event passed as parameter.

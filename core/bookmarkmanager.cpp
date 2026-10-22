@@ -118,7 +118,7 @@ public:
         : KBookmarkOwner()
         , q(qq)
         , document(nullptr)
-        , file(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/okular/bookmarks.xml"))
+        , file(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/charta/bookmarks.xml"))
         , manager(KBookmarkManager(file))
     {
     }

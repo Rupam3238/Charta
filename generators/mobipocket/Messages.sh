@@ -1,2 +1,2 @@
 #!/bin/sh
-$XGETTEXT *.cpp -o $podir/okular_mobi.pot
+$XGETTEXT *.cpp -o $podir/charta_mobi.pot

@@ -9,4 +9,4 @@ find_dependency(KF6CoreAddons @KF6_REQUIRED_VERSION@)
 find_dependency(KF6Config @KF6_REQUIRED_VERSION@)
 find_dependency(KF6XmlGui @KF6_REQUIRED_VERSION@)
 
-include("${CMAKE_CURRENT_LIST_DIR}/Okular6Targets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/Charta6Targets.cmake")

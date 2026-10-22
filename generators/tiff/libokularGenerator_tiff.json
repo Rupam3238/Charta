@@ -218,5 +218,5 @@
         "Version": "0.2.4"
     },
     "X-KDE-Priority": 4,
-    "X-KDE-okularAPIVersion": 1
+    "X-KDE-chartaAPIVersion": 1
 }

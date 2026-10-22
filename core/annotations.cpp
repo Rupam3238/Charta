@@ -409,7 +409,7 @@ QPixmap AnnotationUtils::loadStamp(const QString &nameOrPath, QSize size, Qt::As
 
     static std::unique_ptr<QSvgRenderer> svgStampFile;
     if (!svgStampFile.get()) {
-        const QString stampFile = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/stamps.svg"));
+        const QString stampFile = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/stamps.svg"));
         if (!stampFile.isEmpty()) {
             svgStampFile = std::make_unique<QSvgRenderer>(stampFile);
             if (!svgStampFile->isValid()) {

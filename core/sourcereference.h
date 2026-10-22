@@ -7,7 +7,7 @@
 #ifndef OKULAR_SOURCEREFERENCE_H
 #define OKULAR_SOURCEREFERENCE_H
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 #include <QObject>
 
@@ -19,7 +19,7 @@ namespace Okular
  * A source reference is a reference to one of the source(s) of the loaded
  * document.
  */
-class OKULARCORE_EXPORT SourceReference
+class CHARTACORE_EXPORT SourceReference
 {
 public:
     /**

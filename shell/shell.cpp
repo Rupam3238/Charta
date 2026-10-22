@@ -95,7 +95,7 @@ Shell::Shell(const QString &serializedOptions)
     setObjectName(QStringLiteral("okular::Shell#"));
     setContextMenuPolicy(Qt::NoContextMenu);
     // otherwise .rc file won't be found by unit test
-    setComponentName(QStringLiteral("okular"), QString());
+    setComponentName(QStringLiteral("charta"), QString());
     // set the shell's ui resource file
     setXMLFile(QStringLiteral("shell.rc"));
     m_fileformatsscanned = false;
@@ -181,7 +181,7 @@ Shell::Shell(const QString &serializedOptions)
         m_unique = ShellUtils::unique(serializedOptions);
 #if HAVE_DBUS
         if (m_unique) {
-            m_unique = QDBusConnection::sessionBus().registerService(QStringLiteral("org.kde.okular"));
+            m_unique = QDBusConnection::sessionBus().registerService(QStringLiteral("org.charta.reader"));
             if (!m_unique) {
                 KMessageBox::information(this, i18n("There is already a unique Charta instance running. This instance won't be the unique one."));
             }
@@ -189,7 +189,7 @@ Shell::Shell(const QString &serializedOptions)
             // TODO When porting to KF7 Remove
             // PID is not unique in containers and "-" in the name violates D-Bus naming conventions.
             // Was left for compatibility with 3rd-party scripts.
-            QString serviceName = QStringLiteral("org.kde.okular-") + QString::number(qApp->applicationPid());
+            QString serviceName = QStringLiteral("org.charta.reader-") + QString::number(qApp->applicationPid());
             QDBusConnection::sessionBus().registerService(serviceName);
 
             QDBusConnection::sessionBus().registerService(ShellUtils::currentProcessDbusName());
@@ -205,7 +205,7 @@ Shell::Shell(const QString &serializedOptions)
             }
         }
 
-        QDBusConnection::sessionBus().registerObject(QStringLiteral("/okularshell"), this, QDBusConnection::ExportScriptableSlots);
+        QDBusConnection::sessionBus().registerObject(QStringLiteral("/chartashell"), this, QDBusConnection::ExportScriptableSlots);
 #endif // HAVE_DBUS
 
         // Make sure that the welcome scren is visible on startup.
@@ -284,7 +284,7 @@ Shell::~Shell()
     }
 #if HAVE_DBUS
     if (m_unique) {
-        QDBusConnection::sessionBus().unregisterService(QStringLiteral("org.kde.okular"));
+        QDBusConnection::sessionBus().unregisterService(QStringLiteral("org.charta.reader"));
     }
 #endif // HAVE_DBUS
 
@@ -1166,8 +1166,8 @@ void Shell::triggerUpdateRecentItems(const int maxItems)
 
 void Shell::readRecentFilesSettings()
 {
-    // Read no. of max. recent items from okularpartrc, populate File->Open Recent menu-item as well as recentsListView on welcome screen
-    QString configFilePath = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + QLatin1Char('/') + QLatin1String("okularpartrc");
+    // Read no. of max. recent items from chartapartrc, populate File->Open Recent menu-item as well as recentsListView on welcome screen
+    QString configFilePath = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + QLatin1Char('/') + QLatin1String("chartapartrc");
     const KConfigGroup confgrp = KSharedConfig::openConfig(configFilePath).data()->group(QStringLiteral("General"));
     const int defaultMaxRecentItems = 10;
     int maxRecentItems = confgrp.readEntry<int>("MaxRecentItems", defaultMaxRecentItems);

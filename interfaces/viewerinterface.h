@@ -7,11 +7,11 @@
 #ifndef _OKULAR_VIEWERINTERFACE_H_
 #define _OKULAR_VIEWERINTERFACE_H_
 
-#include "../core/okularcore_export.h"
+#include "../core/chartacore_export.h"
 #ifdef Q_OS_WIN
 #define VIEWERINTERFACE_EXPORT __declspec(dllexport)
 #else
-#define VIEWERINTERFACE_EXPORT OKULARCORE_EXPORT
+#define VIEWERINTERFACE_EXPORT CHARTACORE_EXPORT
 #endif
 
 #include <QObject>
@@ -106,6 +106,6 @@ public:
 
 }
 
-Q_DECLARE_INTERFACE(Okular::ViewerInterface, "org.kde.okular.ViewerInterface/0.1")
+Q_DECLARE_INTERFACE(Okular::ViewerInterface, "org.charta.reader.ViewerInterface/0.1")
 
 #endif

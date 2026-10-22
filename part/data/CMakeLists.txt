@@ -3,7 +3,7 @@ install(FILES
    tools.xml
    toolsQuick.xml
    drawingtools.xml
-   DESTINATION ${KDE_INSTALL_DATADIR}/okular)
+   DESTINATION ${KDE_INSTALL_DATADIR}/charta)
 
 # install annotation tool images
 install(FILES
@@ -21,7 +21,7 @@ install(FILES
    tool-note-inline-okular-colorizable@2x.png
    tool-typewriter-okular-colorizable.png
    tool-typewriter-okular-colorizable@2x.png
-   DESTINATION ${KDE_INSTALL_DATADIR}/okular/pics)
+   DESTINATION ${KDE_INSTALL_DATADIR}/charta/pics)
 # install annotation page images
 install(FILES
    checkmark.png
@@ -41,5 +41,5 @@ install(FILES
    star.png
    uparrow.png
    upleftarrow.png
-   DESTINATION ${KDE_INSTALL_DATADIR}/okular/pics)
+   DESTINATION ${KDE_INSTALL_DATADIR}/charta/pics)
 # install misc images

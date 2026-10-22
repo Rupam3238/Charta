@@ -45,7 +45,7 @@ class KPluginFactory;
 class Shell : public KParts::MainWindow
 {
     Q_OBJECT
-    Q_CLASSINFO("D-Bus Interface", "org.kde.okular")
+    Q_CLASSINFO("D-Bus Interface", "org.charta.reader")
 
     friend class MainShellTest;
     friend class AnnotationToolBarTest;

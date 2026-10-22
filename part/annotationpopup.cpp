@@ -47,7 +47,7 @@ public:
         setUniqueName(QStringLiteral("charta-clipboard-image-") + QUuid::createUuid().toString(QUuid::WithoutBraces));
 
         // Create cache directory for clipboard stamp images
-        const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QLatin1String("/okular/clipboard-stamps/");
+        const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QLatin1String("/charta/clipboard-stamps/");
         QDir dir(cacheDir);
         if (!dir.exists()) {
             dir.mkpath(cacheDir);

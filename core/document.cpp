@@ -2678,7 +2678,7 @@ QString DocumentPrivate::docDataFileName(const QUrl &url, qint64 document_size)
 {
     QString fn = url.fileName();
     fn = QString::number(document_size) + QLatin1Char('.') + fn + QStringLiteral(".xml");
-    QString docdataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/okular/docdata");
+    QString docdataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/charta/docdata");
     // make sure that the okular/docdata/ directory exists (probably this used to be handled by KStandardDirs)
     if (!QFileInfo::exists(docdataDir)) {
         qCDebug(OkularCoreDebug) << "creating docdata folder" << docdataDir;

@@ -118,7 +118,7 @@ enum EmbedMode {
 class OKULARPART_EXPORT Part : public KParts::ReadWritePart, public Okular::DocumentObserver, public KDocumentViewer, public Okular::ViewerInterface
 {
     Q_OBJECT
-    Q_CLASSINFO("D-Bus Interface", "org.kde.okular")
+    Q_CLASSINFO("D-Bus Interface", "org.charta.reader")
     Q_INTERFACES(KDocumentViewer)
     Q_INTERFACES(Okular::ViewerInterface)
 

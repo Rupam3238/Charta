@@ -313,6 +313,45 @@ Poppler, QPDF, Qt and KDE Frameworks communities.
 | --- | --- |
 | Version | `26.11.70` (`CMakeLists.txt`) |
 | Application ID / executable | `org.charta.reader` / `charta` |
-| Core library | `Okular6Core` |
+| Core library | `Charta6Core` |
 | Poppler dependency | Patched fork (see [Patched Poppler](#patched-poppler)) |
 | Stack | C++20, CMake 3.22+ with ECM, Qt 6.6+, KDE Frameworks 6 |
+
+---
+
+## Identity migration applied
+
+Charta's identity migration has been applied. Charta no longer uses the Okular
+identity anywhere it is observable:
+
+* The session-bus service name is now `org.charta.reader` (was `org.kde.okular`),
+  the object path is `/chartashell` (was `/okularshell`), and the per-process
+  instance name is `org.charta.reader.Instance_<pid>`. The Flatpak manifest owns
+  `org.charta.reader` and `org.charta.reader.*`.
+* The 14 generator AppStream component ids are now `org.charta.reader-<name>`,
+  and the shipped metainfo files carry those names.
+* The core library is now `libCharta6Core.so.4`; its export header is
+  `chartacore_export.h`, its public headers are installed under
+  `include/charta/core/` and `include/charta/interfaces/`, and the CMake
+  package is `Charta6` with the `Charta::` namespace.
+* The translation domain is now `charta`; the catalogues are installed as
+  `share/locale/<lang>/LC_MESSAGES/charta.mo` and `charta_<generator>.mo`. The
+  translated content and the translator credits are unchanged.
+* The logging-category file is now `charta.categories`, and the data, cache and
+  configuration paths use `charta` instead of `okular`.
+
+What a user must do after upgrading: close every running Charta instance, then
+move `~/.config/okularpartrc` to `~/.config/chartapartrc`,
+`~/.config/okularrc` to `~/.config/chartarc`, and
+`~/.local/share/okular/bookmarks.xml` to `~/.local/share/charta/bookmarks.xml`,
+or start with a fresh configuration. Scripts that talk to the old D-Bus names
+must be updated to `org.charta.reader`, `/chartashell` and
+`org.charta.reader.<Interface>/<version>`.
+
+Not changed on purpose: the `application/vnd.kde.okular-archive` MIME type (a
+system-wide type that is not defined in this tree and is already used by files
+on disk), the Qt logging-category identifiers, the C++ `Okular` namespace, the
+mobile application id, and the upstream translation metadata inside the
+catalogues. The full plan, the risk analysis and the rollback instructions are
+in `docs/licensing/identity-migration.md`; the patch itself is in
+`docs/licensing/identity-migration.patch`.

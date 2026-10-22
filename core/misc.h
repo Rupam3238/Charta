@@ -8,14 +8,14 @@
 #define _OKULAR_MISC_H_
 
 #include "area.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 namespace Okular
 {
 /**
   @short Wrapper around the information needed to generate the selection area
 */
-class OKULARCORE_EXPORT TextSelection
+class CHARTACORE_EXPORT TextSelection
 {
 public:
     /**
@@ -46,7 +46,7 @@ private:
     std::unique_ptr<Private> d;
 };
 
-OKULARCORE_EXPORT QString removeLineBreaks(const QString &text);
+CHARTACORE_EXPORT QString removeLineBreaks(const QString &text);
 }
 
 #endif

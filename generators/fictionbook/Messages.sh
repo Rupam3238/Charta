@@ -1,2 +1,2 @@
 #!/bin/sh
-$XGETTEXT $(find . -name "*.cpp" -o -name "*.h") -o $podir/okular_fictionbook.pot
+$XGETTEXT $(find . -name "*.cpp" -o -name "*.h") -o $podir/charta_fictionbook.pot

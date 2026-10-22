@@ -12,7 +12,7 @@
 
 #include "area.h"
 #include "global.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 class QTransform;
 
@@ -49,7 +49,7 @@ class RegularAreaRect;
  *
  * @see TextPage, Generator
  */
-class OKULARCORE_EXPORT TextEntity
+class CHARTACORE_EXPORT TextEntity
 {
 public:
     typedef QList<TextEntity> List;
@@ -98,7 +98,7 @@ private:
  *
  * @see TextEntity
  */
-class OKULARCORE_EXPORT TextPage
+class CHARTACORE_EXPORT TextPage
 {
     /// @cond PRIVATE
     friend class Page;

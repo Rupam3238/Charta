@@ -816,18 +816,18 @@ Part::Part(QObject *parent, const QVariantList &args)
     , m_generatorGuiClient(nullptr)
     , m_keeper(nullptr)
 {
-    // make sure that the component name is okular otherwise the XMLGUI .rc files are not found
-    // when this part is used in an application other than okular (e.g. unit tests)
-    setComponentName(QStringLiteral("okular"), QString());
+    // make sure that the component name is charta otherwise the XMLGUI .rc files are not found
+    // when this part is used in an application other than charta (e.g. unit tests)
+    setComponentName(QStringLiteral("charta"), QString());
 
     setupConfigSkeleton(args);
 
 #if HAVE_DBUS
     numberOfParts++;
     if (numberOfParts == 1) {
-        m_registerDbusName = QStringLiteral("/okular");
+        m_registerDbusName = QStringLiteral("/charta");
     } else {
-        m_registerDbusName = QStringLiteral("/okular%1").arg(numberOfParts);
+        m_registerDbusName = QStringLiteral("/charta%1").arg(numberOfParts);
     }
     QDBusConnection::sessionBus().registerObject(m_registerDbusName, this, QDBusConnection::ExportScriptableSlots);
 #endif // HAVE_DBUS
@@ -843,7 +843,7 @@ Part::Part(QObject *parent, const QVariantList &args)
     // create browser extension (for printing when embedded into browser)
     m_bExtension = new BrowserExtension(this);
 
-    const QStringList iconDirs = QStandardPaths::locateAll(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics"), QStandardPaths::LocateDirectory);
+    const QStringList iconDirs = QStandardPaths::locateAll(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics"), QStandardPaths::LocateDirectory);
     QIcon::setFallbackSearchPaths(QIcon::fallbackSearchPaths() << iconDirs);
 
     m_sidebar = new Sidebar(widget());
@@ -1149,7 +1149,7 @@ Part::Part(QObject *parent, const QVariantList &args)
 
 void Part::setupConfigSkeleton(const QVariantList &args)
 {
-    const QLatin1String configFileName("okularpartrc");
+    const QLatin1String configFileName("chartapartrc");
 
     // first, we check if a config file name has been specified
     QString configFilePath = detectConfigFileName(args);

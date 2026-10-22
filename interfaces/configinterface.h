@@ -7,7 +7,7 @@
 #ifndef _OKULAR_CONFIGINTERFACE_H_
 #define _OKULAR_CONFIGINTERFACE_H_
 
-#include "../core/okularcore_export.h"
+#include "../core/chartacore_export.h"
 
 #include <QObject>
 
@@ -32,7 +32,7 @@ namespace Okular
  * @endcode
  * and - of course - implementing its methods.
  */
-class OKULARCORE_EXPORT ConfigInterface
+class CHARTACORE_EXPORT ConfigInterface
 {
 public:
     ConfigInterface()
@@ -70,6 +70,6 @@ public:
 
 }
 
-Q_DECLARE_INTERFACE(Okular::ConfigInterface, "org.kde.okular.ConfigInterface/0.1")
+Q_DECLARE_INTERFACE(Okular::ConfigInterface, "org.charta.reader.ConfigInterface/0.1")
 
 #endif

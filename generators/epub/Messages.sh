@@ -1,2 +1,2 @@
 #!/bin/sh
-$XGETTEXT $(find . -name "*.cpp") -o $podir/okular_epub.pot
+$XGETTEXT $(find . -name "*.cpp") -o $podir/charta_epub.pot

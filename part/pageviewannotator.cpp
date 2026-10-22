@@ -2755,7 +2755,7 @@ QPixmap PageViewAnnotator::makeToolPixmap(const QDomElement &toolElement)
     }
 
     // Load base pixmap. We'll draw on top of it
-    pixmap.load(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/tool-base-okular") + imageVariant + QStringLiteral(".png")));
+    pixmap.load(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/tool-base-okular") + imageVariant + QStringLiteral(".png")));
 
     /* Parse color, innerColor and icon (if present) */
     QColor engineColor, innerColor, textColor, annotColor;
@@ -2796,7 +2796,7 @@ QPixmap PageViewAnnotator::makeToolPixmap(const QDomElement &toolElement)
         p.setPen(QPen(engineColor, 2));
         p.drawEllipse(2, 7, 21, 14);
     } else if (annotType == QLatin1String("highlight")) {
-        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/tool-highlighter-okular-colorizable") + imageVariant + QStringLiteral(".png")));
+        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/tool-highlighter-okular-colorizable") + imageVariant + QStringLiteral(".png")));
         QImage colorizedOverlay = overlay;
         GuiUtils::colorizeImage(colorizedOverlay, engineColor);
 
@@ -2804,7 +2804,7 @@ QPixmap PageViewAnnotator::makeToolPixmap(const QDomElement &toolElement)
         p.drawImage(QPoint(0, -32), overlay);          // Text + Shadow (uncolorized)
         p.drawImage(QPoint(0, -64), colorizedOverlay); // Pen
     } else if (annotType == QLatin1String("ink")) {
-        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/tool-ink-okular-colorizable") + imageVariant + QStringLiteral(".png")));
+        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/tool-ink-okular-colorizable") + imageVariant + QStringLiteral(".png")));
         QImage colorizedOverlay = overlay;
         GuiUtils::colorizeImage(colorizedOverlay, engineColor);
 
@@ -2812,11 +2812,11 @@ QPixmap PageViewAnnotator::makeToolPixmap(const QDomElement &toolElement)
         p.drawImage(QPoint(0, -32), overlay);          // Shadow (uncolorized)
         p.drawImage(QPoint(0, -64), colorizedOverlay); // Pen
     } else if (annotType == QLatin1String("note-inline")) {
-        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/tool-note-inline-okular-colorizable") + imageVariant + QStringLiteral(".png")));
+        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/tool-note-inline-okular-colorizable") + imageVariant + QStringLiteral(".png")));
         GuiUtils::colorizeImage(overlay, engineColor);
         p.drawImage(QPoint(0, 0), overlay);
     } else if (annotType == QLatin1String("note-linked")) {
-        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/tool-note-okular-colorizable") + imageVariant + QStringLiteral(".png")));
+        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/tool-note-okular-colorizable") + imageVariant + QStringLiteral(".png")));
         GuiUtils::colorizeImage(overlay, engineColor);
         p.drawImage(QPoint(0, 0), overlay);
     } else if (annotType == QLatin1String("polygon")) {
@@ -2869,7 +2869,7 @@ QPixmap PageViewAnnotator::makeToolPixmap(const QDomElement &toolElement)
         p.drawLine(1, 13, 16, 13);
         p.drawLine(0, 20, 19, 20);
     } else if (annotType == QLatin1String("typewriter")) {
-        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/tool-typewriter-okular-colorizable") + imageVariant + QStringLiteral(".png")));
+        QImage overlay(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/tool-typewriter-okular-colorizable") + imageVariant + QStringLiteral(".png")));
         GuiUtils::colorizeImage(overlay, textColor);
         p.drawImage(QPoint(-2, 2), overlay);
     } else {

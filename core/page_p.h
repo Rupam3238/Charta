@@ -137,7 +137,7 @@ public:
     /*
      * Tries to find an equivalent form field to oldField by looking into the rect, type and name
      */
-    OKULARCORE_EXPORT static FormField *findEquivalentForm(const Page *p, FormField *oldField);
+    CHARTACORE_EXPORT static FormField *findEquivalentForm(const Page *p, FormField *oldField);
 
     void setPixmap(DocumentObserver *observer, QPixmap *pixmap, const NormalizedRect &rect, bool isPartialPixmap);
 

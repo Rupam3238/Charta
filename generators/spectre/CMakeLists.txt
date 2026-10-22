@@ -1,5 +1,5 @@
-remove_definitions(-DTRANSLATION_DOMAIN="okular")
-add_definitions(-DTRANSLATION_DOMAIN="okular_ghostview")
+remove_definitions(-DTRANSLATION_DOMAIN="charta")
+add_definitions(-DTRANSLATION_DOMAIN="charta_ghostview")
 
 add_subdirectory( conf )
 
@@ -21,7 +21,7 @@ kconfig_add_kcfg_files(okularGenerator_ghostview_SRCS conf/gssettings.kcfgc )
 okular_add_generator(okularGenerator_ghostview ${okularGenerator_ghostview_SRCS})
 
 target_include_directories(okularGenerator_ghostview PRIVATE ${LIBSPECTRE_INCLUDE_DIR})
-target_link_libraries(okularGenerator_ghostview okularcore ${LIBSPECTRE_LIBRARY} KF6::I18n Qt6::Xml)
+target_link_libraries(okularGenerator_ghostview chartacore ${LIBSPECTRE_LIBRARY} KF6::I18n Qt6::Xml)
 
 ########### install files ###############
 
@@ -31,5 +31,5 @@ endif()
 if (BUILD_MOBILE)
   install( PROGRAMS org.kde.mobile.okular_ghostview.desktop DESTINATION ${KDE_INSTALL_APPDIR} )
 endif()
-ecm_install_icons(ICONS 16-apps-okular-gv.png  32-apps-okular-gv.png DESTINATION ${KDE_INSTALL_DATADIR}/okular/icons)
-install( FILES org.kde.okular-spectre.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )
+ecm_install_icons(ICONS 16-apps-okular-gv.png  32-apps-okular-gv.png DESTINATION ${KDE_INSTALL_DATADIR}/charta/icons)
+install( FILES org.charta.reader-spectre.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )

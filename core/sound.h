@@ -7,7 +7,7 @@
 #ifndef _OKULAR_SOUND_H_
 #define _OKULAR_SOUND_H_
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 #include <QByteArray>
 #include <QString>
@@ -20,7 +20,7 @@ namespace Okular
  * This class encapsulates the information about a sound object
  * which is used for links on enter/leave page event.
  */
-class OKULARCORE_EXPORT Sound
+class CHARTACORE_EXPORT Sound
 {
 public:
     /**

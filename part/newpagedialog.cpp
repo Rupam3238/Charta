@@ -40,7 +40,7 @@ bool nearlyEqual(double a, double b)
 // The background color is remembered between dialogs (and sessions): a new page starts with the color used last
 KConfigGroup newPageConfigGroup()
 {
-    return KConfigGroup(KSharedConfig::openConfig(QStringLiteral("okularrc")), QStringLiteral("New Page Dialog"));
+    return KConfigGroup(KSharedConfig::openConfig(QStringLiteral("chartarc")), QStringLiteral("New Page Dialog"));
 }
 }
 

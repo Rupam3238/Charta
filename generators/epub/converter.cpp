@@ -307,7 +307,7 @@ QTextDocument *Converter::convert(const QString &fileName)
         while (!movieAnnots.isEmpty() && !(csr = mTextDocument->find(QStringLiteral("<video></video>"), csr)).isNull()) {
             const int posStart = csr.position();
             const QPoint startPoint = calculateXYPosition(mTextDocument, posStart);
-            QImage img(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/okular-epub-movie.png")));
+            QImage img(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/okular-epub-movie.png")));
             img = img.scaled(videoSize);
             csr.insertImage(img);
             const int posEnd = csr.position();
@@ -322,7 +322,7 @@ QTextDocument *Converter::convert(const QString &fileName)
         const QString keyToSearch(QStringLiteral("<audio></audio>"));
         while (!soundActions.isEmpty() && !(csr = mTextDocument->find(keyToSearch, csr)).isNull()) {
             const int posStart = csr.position() - keyToSearch.size();
-            const QImage img(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("okular/pics/okular-epub-sound-icon.png")));
+            const QImage img(QStandardPaths::locate(QStandardPaths::GenericDataLocation, QStringLiteral("charta/pics/okular-epub-sound-icon.png")));
             csr.insertImage(img);
             const int posEnd = csr.position();
             qDebug() << posStart << posEnd;

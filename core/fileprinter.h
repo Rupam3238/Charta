@@ -16,13 +16,13 @@
 #include <QString>
 
 #include "document.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 class QSize;
 
 namespace Okular
 {
-class OKULARCORE_EXPORT FilePrinter
+class CHARTACORE_EXPORT FilePrinter
 {
 public:
     /** Whether file(s) get deleted by the application or by the print system.

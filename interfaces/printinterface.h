@@ -7,7 +7,7 @@
 #ifndef _OKULAR_PRINTINTERFACE_H_
 #define _OKULAR_PRINTINTERFACE_H_
 
-#include "../core/okularcore_export.h"
+#include "../core/chartacore_export.h"
 
 #include <QObject>
 
@@ -33,7 +33,7 @@ namespace Okular
  * @endcode
  * and - of course - implementing its methods.
  */
-class OKULARCORE_EXPORT PrintInterface
+class CHARTACORE_EXPORT PrintInterface
 {
 public:
     PrintInterface()
@@ -65,6 +65,6 @@ public:
 
 }
 
-Q_DECLARE_INTERFACE(Okular::PrintInterface, "org.kde.okular.PrintInterface/0.1")
+Q_DECLARE_INTERFACE(Okular::PrintInterface, "org.charta.reader.PrintInterface/0.1")
 
 #endif

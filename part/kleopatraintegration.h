@@ -7,7 +7,7 @@
 #ifndef KLEOPATRAINTEGRATION_H
 #define KLEOPATRAINTEGRATION_H
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 #include <QString>
 class QWindow;
 

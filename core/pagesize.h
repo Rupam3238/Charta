@@ -11,7 +11,7 @@
 #include <QSharedDataPointer>
 #include <QString>
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 namespace Okular
 {
@@ -20,7 +20,7 @@ class PageSizePrivate;
 /**
  * @short A small class that represents the size of a page.
  */
-class OKULARCORE_EXPORT PageSize
+class CHARTACORE_EXPORT PageSize
 {
 public:
     typedef QList<PageSize> List;

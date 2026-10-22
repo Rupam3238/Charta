@@ -22,89 +22,89 @@ add_conf_unittest(editdrawingtooldialogtest.cpp)
 
 ecm_add_test(shelltest.cpp ../shell/shellutils.cpp
     TEST_NAME "shelltest"
-    LINK_LIBRARIES Qt6::Test okularcore
+    LINK_LIBRARIES Qt6::Test chartacore
 )
 
 if(Poppler_Qt6_FOUND)
     if (BUILD_DESKTOP)
         ecm_add_test(parttest.cpp closedialoghelper.cpp
             TEST_NAME "parttest"
-            LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore okularpart
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore okularpart
         )
 
         ecm_add_test(blankpageswritertest.cpp
             TEST_NAME "blankpageswritertest"
-            LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore okularpart
         )
         target_link_libraries(blankpageswritertest Poppler::Qt6)
 
         ecm_add_test(untitleddocumenttest.cpp
             TEST_NAME "untitleddocumenttest"
-            LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore okularpart
         )
         target_link_libraries(untitleddocumenttest Poppler::Qt6)
 
         ecm_add_test(documentbuildermodeltest.cpp
             TEST_NAME "documentbuildermodeltest"
-            LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore okularpart
         )
 
         ecm_add_test(documentbuilderparttest.cpp
             TEST_NAME "documentbuilderparttest"
-            LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore okularpart
+            LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore okularpart
         )
     endif()
 
     ecm_add_test(visibilitytest.cpp
         TEST_NAME "visibilitytest"
-        LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore
     )
 
     ecm_add_test(jsfunctionstest.cpp
         TEST_NAME "jsfunctionstest"
-        LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore
     )
 
     ecm_add_test(formattest.cpp
         TEST_NAME "formattest"
-        LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore
     )
 
     ecm_add_test(keystroketest.cpp
         TEST_NAME "keystroketest"
-        LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore
     )
 
     ecm_add_test(signunsignedfieldtest.cpp
         TEST_NAME "signunsignedfieldtest"
-        LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore
     )
 endif()
 
 ecm_add_test(suggestedfilenametest.cpp
     TEST_NAME "suggestedfilenametest"
-    LINK_LIBRARIES Qt6::Test okularcore KF6::I18n
+    LINK_LIBRARIES Qt6::Test chartacore KF6::I18n
 )
 
 ecm_add_test(documenttest.cpp
     TEST_NAME "documenttest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore KF6::ThreadWeaver
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore KF6::ThreadWeaver
 )
 
 ecm_add_test(searchtest.cpp
     TEST_NAME "searchtest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore
 )
 
 ecm_add_test(annotationstest.cpp
     TEST_NAME "annotationstest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore
 )
 
 if(BUILD_DESKTOP)
     ecm_add_test(annotationclipboardtest.cpp
         TEST_NAME "annotationclipboardtest"
-        LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore okularpart
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore okularpart
     )
 endif()
 
@@ -115,12 +115,12 @@ ecm_add_test(urldetecttest.cpp
 
 ecm_add_test(editannotationcontentstest.cpp testingutils.cpp
     TEST_NAME "editannotationcontentstest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore
 )
 
 ecm_add_test(addremoveannotationtest.cpp testingutils.cpp ../part/annotationtools.cpp
     TEST_NAME "addremoveannotationtest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore okularpart
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore okularpart
 )
 if(Poppler_Qt6_FOUND)
     target_link_libraries(addremoveannotationtest Poppler::Qt6)
@@ -128,33 +128,33 @@ if(Poppler_Qt6_FOUND)
 
     ecm_add_test(annotationpersistencetest.cpp
         TEST_NAME "annotationpersistencetest"
-        LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Gui Qt6::Xml okularcore okularpart Poppler::Qt6
+        LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Gui Qt6::Xml chartacore okularpart Poppler::Qt6
     )
 endif()
 
 ecm_add_test(translateannotationtest.cpp testingutils.cpp
     TEST_NAME "translateannotationtest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore
 )
 
 ecm_add_test(annotationrotationtest.cpp
     TEST_NAME "annotationrotationtest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test Qt6::Xml chartacore
 )
 
 ecm_add_test(modifyannotationpropertiestest.cpp testingutils.cpp
     TEST_NAME "modifyannotationpropertiestest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore
 )
 
 ecm_add_test(editformstest.cpp
     TEST_NAME "editformstest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore
 )
 
 ecm_add_test(calculatetexttest.cpp
     TEST_NAME "calculatetexttest"
-    LINK_LIBRARIES Qt6::Widgets Qt6::Test okularcore
+    LINK_LIBRARIES Qt6::Widgets Qt6::Test chartacore
 )
 
 ecm_add_test(check_distinguished_name_parser.cpp
@@ -164,7 +164,7 @@ ecm_add_test(check_distinguished_name_parser.cpp
 if(BUILD_DESKTOP)
     ecm_add_test(mainshelltest.cpp ../shell/okular_main.cpp ../shell/shellutils.cpp ../shell/shell.cpp ../shell/welcomescreen.cpp ../gui/recentitemsmodel.cpp closedialoghelper.cpp
         TEST_NAME "mainshelltest"
-        LINK_LIBRARIES Qt6::Test okularpart okularcore
+        LINK_LIBRARIES Qt6::Test okularpart chartacore
     )
     target_compile_definitions(mainshelltest PRIVATE OKULAR_BINARY="$<TARGET_FILE:charta>")
 
@@ -196,13 +196,13 @@ endif()
 
 ecm_add_test(generatorstest.cpp
     TEST_NAME "generatorstest"
-    LINK_LIBRARIES Qt6::Test KF6::CoreAddons okularcore
+    LINK_LIBRARIES Qt6::Test KF6::CoreAddons chartacore
 )
 target_compile_definitions(generatorstest PRIVATE GENERATORS_BUILD_DIR="${CMAKE_BINARY_DIR}/generators")
 
 ecm_add_test(signatureformtest.cpp
     TEST_NAME "signatureformtest"
-    LINK_LIBRARIES Qt6::Test okularcore
+    LINK_LIBRARIES Qt6::Test chartacore
 )
 
 find_package(Discount)
@@ -210,7 +210,7 @@ find_package(Discount)
 if(Discount_FOUND)
     ecm_add_test(markdowntest.cpp ../generators/markdown/converter.cpp
         TEST_NAME "markdowntest"
-        LINK_LIBRARIES Qt6::Test okularcore KF6::I18n PkgConfig::Discount
+        LINK_LIBRARIES Qt6::Test chartacore KF6::I18n PkgConfig::Discount
     )
 endif()
 

@@ -20,7 +20,7 @@
 #include <QTransform>
 
 #include "area.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 #include "signatureutils.h"
 
 namespace Okular
@@ -60,7 +60,7 @@ class NewSignatureData;
  *
  * @since 25.08
  */
-struct OKULARCORE_EXPORT AnnotationFrame {
+struct CHARTACORE_EXPORT AnnotationFrame {
     NormalizedPoint center;
     QSizeF size;
     double rotation = 0.0;
@@ -69,7 +69,7 @@ struct OKULARCORE_EXPORT AnnotationFrame {
 /**
  * @short Helper class for (recursive) annotation retrieval/storage.
  */
-class OKULARCORE_EXPORT AnnotationUtils
+class CHARTACORE_EXPORT AnnotationUtils
 {
 public:
     /**
@@ -137,7 +137,7 @@ public:
      *
      * @since 21.12
      */
-    OKULARCORE_DEPRECATED static QPixmap loadStamp(const QString &nameOrPath, int size, bool keepAspectRatio = true);
+    CHARTACORE_DEPRECATED static QPixmap loadStamp(const QString &nameOrPath, int size, bool keepAspectRatio = true);
     static QPixmap loadStamp(const QString &nameOrPath, QSize size, Qt::AspectRatioMode aspectRatio = Qt::KeepAspectRatio);
 };
 
@@ -147,7 +147,7 @@ public:
  * An Annotation is an object (text note, highlight, sound, popup window, ..)
  * contained by a Page in the document.
  */
-class OKULARCORE_EXPORT Annotation
+class CHARTACORE_EXPORT Annotation
 {
     /// @cond PRIVATE
     friend class AnnotationObjectRect;
@@ -420,7 +420,7 @@ public:
      * The Style class contains all information about style of the
      * annotation.
      */
-    class OKULARCORE_EXPORT Style
+    class CHARTACORE_EXPORT Style
     {
     public:
         /**
@@ -555,7 +555,7 @@ public:
      * The Window class contains all information about the popup window
      * of the annotation that is used to edit the content and properties.
      */
-    class OKULARCORE_EXPORT Window
+    class CHARTACORE_EXPORT Window
     {
     public:
         /**
@@ -650,7 +650,7 @@ public:
      * The Revision class contains all information about the revision
      * of the annotation.
      */
-    class OKULARCORE_EXPORT Revision
+    class CHARTACORE_EXPORT Revision
     {
     public:
         /**
@@ -837,7 +837,7 @@ private:
  *
  * @since 0.15 (KDE 4.9)
  */
-class OKULARCORE_EXPORT AnnotationProxy
+class CHARTACORE_EXPORT AnnotationProxy
 {
 public:
     enum Capability {
@@ -889,7 +889,7 @@ public:
 /**
  * Optional native annotation ordering support supplied by a generator.
  */
-class OKULARCORE_EXPORT AnnotationOrderProxy
+class CHARTACORE_EXPORT AnnotationOrderProxy
 {
 public:
     virtual ~AnnotationOrderProxy();
@@ -898,7 +898,7 @@ public:
     virtual bool moveAnnotationToIndex(int page, Annotation *annotation, int index) = 0;
 };
 
-class OKULARCORE_EXPORT TextAnnotation : public Annotation
+class CHARTACORE_EXPORT TextAnnotation : public Annotation
 {
 public:
     /**
@@ -1037,7 +1037,7 @@ private:
     Q_DISABLE_COPY(TextAnnotation)
 };
 
-class OKULARCORE_EXPORT LineAnnotation : public Annotation
+class CHARTACORE_EXPORT LineAnnotation : public Annotation
 {
 public:
     /**
@@ -1201,7 +1201,7 @@ private:
     Q_DISABLE_COPY(LineAnnotation)
 };
 
-class OKULARCORE_EXPORT GeomAnnotation : public Annotation
+class CHARTACORE_EXPORT GeomAnnotation : public Annotation
 {
 public:
     // common enums
@@ -1262,7 +1262,7 @@ private:
     Q_DISABLE_COPY(GeomAnnotation)
 };
 
-class OKULARCORE_EXPORT HighlightAnnotation : public Annotation
+class CHARTACORE_EXPORT HighlightAnnotation : public Annotation
 {
 public:
     /**
@@ -1315,7 +1315,7 @@ public:
      *
      * @see NormalizedPoint
      */
-    class OKULARCORE_EXPORT Quad
+    class CHARTACORE_EXPORT Quad
     {
     public:
         /**
@@ -1423,7 +1423,7 @@ private:
     Q_DISABLE_COPY(HighlightAnnotation)
 };
 
-class OKULARCORE_EXPORT StampAnnotation : public Annotation
+class CHARTACORE_EXPORT StampAnnotation : public Annotation
 {
 public:
     /**
@@ -1471,7 +1471,7 @@ private:
 /**
  * \since 24.12
  */
-class OKULARCORE_EXPORT SignatureAnnotation : public Annotation
+class CHARTACORE_EXPORT SignatureAnnotation : public Annotation
 {
 public:
     /**
@@ -1537,7 +1537,7 @@ private:
 };
 #endif
 
-class OKULARCORE_EXPORT InkAnnotation : public Annotation
+class CHARTACORE_EXPORT InkAnnotation : public Annotation
 {
 public:
     /**
@@ -1603,7 +1603,7 @@ private:
     Q_DISABLE_COPY(InkAnnotation)
 };
 
-class OKULARCORE_EXPORT CaretAnnotation : public Annotation
+class CHARTACORE_EXPORT CaretAnnotation : public Annotation
 {
 public:
     /**
@@ -1655,7 +1655,7 @@ private:
     Q_DISABLE_COPY(CaretAnnotation)
 };
 
-class OKULARCORE_EXPORT FileAttachmentAnnotation : public Annotation
+class CHARTACORE_EXPORT FileAttachmentAnnotation : public Annotation
 {
 public:
     /**
@@ -1715,7 +1715,7 @@ private:
  *
  * @since 0.7 (KDE 4.1)
  */
-class OKULARCORE_EXPORT SoundAnnotation : public Annotation
+class CHARTACORE_EXPORT SoundAnnotation : public Annotation
 {
 public:
     /**
@@ -1775,7 +1775,7 @@ private:
  *
  * @since 0.8 (KDE 4.2)
  */
-class OKULARCORE_EXPORT MovieAnnotation : public Annotation
+class CHARTACORE_EXPORT MovieAnnotation : public Annotation
 {
 public:
     /**
@@ -1821,7 +1821,7 @@ private:
  *
  * @since 0.16 (KDE 4.10)
  */
-class OKULARCORE_EXPORT ScreenAnnotation : public Annotation
+class CHARTACORE_EXPORT ScreenAnnotation : public Annotation
 {
 public:
     /**
@@ -1890,7 +1890,7 @@ private:
  *
  * @since 0.16 (KDE 4.10)
  */
-class OKULARCORE_EXPORT WidgetAnnotation : public Annotation
+class CHARTACORE_EXPORT WidgetAnnotation : public Annotation
 {
 public:
     /**
@@ -1945,7 +1945,7 @@ private:
  *
  * @since 1.0
  */
-class OKULARCORE_EXPORT RichMediaAnnotation : public Annotation
+class CHARTACORE_EXPORT RichMediaAnnotation : public Annotation
 {
 public:
     /**

@@ -1,5 +1,5 @@
-remove_definitions(-DTRANSLATION_DOMAIN="okular")
-add_definitions(-DTRANSLATION_DOMAIN="okular_dvi")
+remove_definitions(-DTRANSLATION_DOMAIN="charta")
+add_definitions(-DTRANSLATION_DOMAIN="charta_dvi")
 
 #add_definitions(-DDEBUG_DVIRENDERER -DDEBUG_RENDER -DDEBUG_PRESCAN -DDEBUG_PSGS -DDEBUG_FONTPOOL)
 
@@ -44,7 +44,7 @@ set(okularGenerator_dvi_SRCS
 
 okular_add_generator(okularGenerator_dvi ${okularGenerator_dvi_SRCS})
 
-target_link_libraries(okularGenerator_dvi okularcore KF6::I18n)
+target_link_libraries(okularGenerator_dvi chartacore KF6::I18n)
 if (FREETYPE_FOUND)
    target_link_libraries(okularGenerator_dvi Freetype::Freetype)
 endif (FREETYPE_FOUND)
@@ -57,4 +57,4 @@ endif()
 if (BUILD_MOBILE)
   install( PROGRAMS org.kde.mobile.okular_dvi.desktop DESTINATION ${KDE_INSTALL_APPDIR} )
 endif()
-install( FILES org.kde.okular-dvi.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )
+install( FILES org.charta.reader-dvi.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )

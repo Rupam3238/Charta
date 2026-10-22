@@ -12,7 +12,7 @@
 #include <QSharedDataPointer>
 #include <QString>
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 namespace Okular
 {
@@ -21,7 +21,7 @@ class FontInfoPrivate;
 /**
  * @short A small class that represents the information of a font.
  */
-class OKULARCORE_EXPORT FontInfo
+class CHARTACORE_EXPORT FontInfo
 {
 public:
     typedef QList<FontInfo> List;

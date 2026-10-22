@@ -16,7 +16,7 @@
 #include "document.h"
 #include "fontinfo.h"
 #include "global.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 #include "pagesize.h"
 #include "signatureutils.h"
 
@@ -71,7 +71,7 @@ class NormalizedRect;
  * Every Generator can support 0 or more export formats which can be
  * queried with @ref Generator::exportFormats().
  */
-class OKULARCORE_EXPORT ExportFormat
+class CHARTACORE_EXPORT ExportFormat
 {
 public:
     typedef QList<ExportFormat> List;
@@ -180,7 +180,7 @@ private:
  *
  * @see PrintInterface, ConfigInterface, GuiInterface
  */
-class OKULARCORE_EXPORT Generator : public QObject
+class CHARTACORE_EXPORT Generator : public QObject
 {
     /// @cond PRIVATE
     friend class PixmapGenerationThread;
@@ -654,7 +654,7 @@ private:
 /**
  * @short Describes a pixmap type request.
  */
-class OKULARCORE_EXPORT PixmapRequest
+class CHARTACORE_EXPORT PixmapRequest
 {
     friend class Document;
     friend class DocumentPrivate;
@@ -791,7 +791,7 @@ private:
  *
  * @since 1.4
  */
-class OKULARCORE_EXPORT TextRequest
+class CHARTACORE_EXPORT TextRequest
 {
 public:
     /**
@@ -827,11 +827,11 @@ private:
 
 Q_DECLARE_METATYPE(Okular::PixmapRequest *)
 
-#define OkularGeneratorInterface_iid "org.kde.okular.Generator"
+#define OkularGeneratorInterface_iid "org.charta.reader.Generator"
 Q_DECLARE_INTERFACE(Okular::Generator, OkularGeneratorInterface_iid)
 
 #ifndef QT_NO_DEBUG_STREAM
-OKULARCORE_EXPORT QDebug operator<<(QDebug str, const Okular::PixmapRequest &req);
+CHARTACORE_EXPORT QDebug operator<<(QDebug str, const Okular::PixmapRequest &req);
 #endif
 
 #endif

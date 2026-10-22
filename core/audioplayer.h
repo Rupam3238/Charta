@@ -7,7 +7,7 @@
 #ifndef _OKULAR_AUDIOPLAYER_H_
 #define _OKULAR_AUDIOPLAYER_H_
 
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 #include <QObject>
 
@@ -24,7 +24,7 @@ class SoundAction;
  * Singleton utility class to play sounds in documents using the KDE sound
  * system.
  */
-class OKULARCORE_EXPORT AudioPlayer : public QObject
+class CHARTACORE_EXPORT AudioPlayer : public QObject
 {
     Q_OBJECT
 

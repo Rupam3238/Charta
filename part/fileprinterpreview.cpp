@@ -38,7 +38,7 @@ public:
         , mainWidget(new QWidget(host))
         , previewPart(nullptr)
         , failMessage(nullptr)
-        , config(KSharedConfig::openConfig(QStringLiteral("okularrc")))
+        , config(KSharedConfig::openConfig(QStringLiteral("chartarc")))
 
     {
         mainlayout = new QVBoxLayout(q);

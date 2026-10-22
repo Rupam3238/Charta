@@ -56,7 +56,7 @@ static bool attachUniqueInstance(const QStringList &paths, const QString &serial
         return false;
     }
 
-    QDBusInterface iface(QStringLiteral("org.kde.okular"), QStringLiteral("/okularshell"), QStringLiteral("org.kde.okular"));
+    QDBusInterface iface(QStringLiteral("org.charta.reader"), QStringLiteral("/chartashell"), QStringLiteral("org.charta.reader"));
     if (!iface.isValid()) {
         return false;
     }
@@ -115,7 +115,7 @@ static bool attachExistingInstance(const QStringList &paths, const QString &seri
     const QString ownDbus = ShellUtils::currentProcessDbusName();
     for (const QString &service : services) {
         if (service.startsWith(ShellUtils::kPerProcessDbusPrefix) && service != ownDbus) {
-            bestService.reset(new QDBusInterface(service, QStringLiteral("/okularshell"), QStringLiteral("org.kde.okular")));
+            bestService.reset(new QDBusInterface(service, QStringLiteral("/chartashell"), QStringLiteral("org.charta.reader")));
 
             // Find a window that can handle our documents
             const QDBusReply<bool> reply = bestService->call(QStringLiteral("canOpenDocs"), (int)paths.count(), desktop);

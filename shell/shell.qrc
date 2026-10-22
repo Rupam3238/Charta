@@ -1,6 +1,6 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
-    <qresource prefix="/kxmlgui5/okular">
+    <qresource prefix="/kxmlgui5/charta">
         <file>shell.rc</file>
     </qresource>
     <qresource prefix="/branding">

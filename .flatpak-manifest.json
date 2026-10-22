@@ -20,8 +20,8 @@
         "--device=dri",
         "--filesystem=host",
         "--allow=bluetooth",
-        "--own-name=org.kde.okular",
-        "--own-name=org.kde.okular.*",
+        "--own-name=org.charta.reader",
+        "--own-name=org.charta.reader.*",
         "--talk-name=org.freedesktop.ScreenSaver",
         "--talk-name=org.freedesktop.login1"
     ],

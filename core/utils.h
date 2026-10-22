@@ -8,7 +8,7 @@
 #define _OKULAR_UTILS_H_
 
 #include "area.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 
 class QRect;
 class QImage;
@@ -20,7 +20,7 @@ namespace Okular
  *
  * This class contains some static functions of general utility.
  */
-class OKULARCORE_EXPORT Utils
+class CHARTACORE_EXPORT Utils
 {
 public:
     /**

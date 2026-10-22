@@ -17,7 +17,7 @@ if [ "${CHARTA_SKIP_LICENSE_HOOK:-0}" = "1" ]; then
 fi
 
 # Paths whose licence comes from REUSE.toml, or which are not text.
-skip_re='^(po/|docs/|charta_logo_package/|icons/charta\.svg$|autotests/data/|part/data/sources/|.*/Messages\.sh$|generators/dvi/|mobile/|autotests/closedialoghelper\.(cpp|h)$|cmake/modules/FindDjVuLibre\.cmake$|Okular6Config\.cmake\.in$|OkularConfigureChecks\.cmake$|config-okular\.h\.cmake$|shell/MacOSXBundleInfo\.plist\.in$|LICENSE$|REUSE\.toml$|.*\.orig$|.*\.patch$|.*\.diff$|.*\.svg$|.*\.svgz$|.*\.png$|.*\.jpg$|.*\.pdf$|.*\.eps$|.*\.po$|.*\.ts$|.*\.json$|.*\.ui$|.*\.kcfgc?$|.*\.qrc$)'
+skip_re='^(po/|docs/|charta_logo_package/|icons/charta\.svg$|autotests/data/|part/data/sources/|.*/Messages\.sh$|generators/dvi/|mobile/|autotests/closedialoghelper\.(cpp|h)$|cmake/modules/FindDjVuLibre\.cmake$|Charta6Config\.cmake\.in$|OkularConfigureChecks\.cmake$|config-okular\.h\.cmake$|shell/MacOSXBundleInfo\.plist\.in$|LICENSE$|REUSE\.toml$|.*\.orig$|.*\.patch$|.*\.diff$|.*\.svg$|.*\.svgz$|.*\.png$|.*\.jpg$|.*\.pdf$|.*\.eps$|.*\.po$|.*\.ts$|.*\.json$|.*\.ui$|.*\.kcfgc?$|.*\.qrc$)'
 
 # File types that are expected to carry an SPDX header.
 text_re='\.(c|cc|cpp|cxx|h|hh|hpp|qml|js|py|sh|cmake|in|m|mm)$'

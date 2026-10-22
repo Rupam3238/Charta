@@ -41,7 +41,7 @@ Plan: `/home/workstation/.opencode/plan/Licensing.md` (phases, gates, decisions)
 | `install-manifest.txt` | 7 | the staged install, the notices that ship, and the collision with a distro Okular |
 | `FIRST-PASS-REPORT.md` | — | what this pass did, what it did not, and the task list |
 | `legal-open-questions.md` | — | the open legal questions (AI-generated code, the Drawy expression) and what a lawyer must be asked |
-| `identity-migration.md` + `.patch` | 7 | the prepared (deferred) rename of the remaining Okular identity, with the migration notes and the footer note |
+| `identity-migration.md` + `.patch` | 7 | the remaining-Okular-identity rename: prepared, then applied (2026-10-22), with the migration notes and the footer note |
 
 ## Machine-readable helpers
 

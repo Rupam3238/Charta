@@ -7,7 +7,7 @@
 #ifndef _OKULAR_GUIINTERFACE_H_
 #define _OKULAR_GUIINTERFACE_H_
 
-#include "../core/okularcore_export.h"
+#include "../core/chartacore_export.h"
 
 #include <QObject>
 
@@ -33,7 +33,7 @@ namespace Okular
  * @endcode
  * and - of course - implementing its methods.
  */
-class OKULARCORE_EXPORT GuiInterface : protected KXMLGUIClient
+class CHARTACORE_EXPORT GuiInterface : protected KXMLGUIClient
 {
 public:
     GuiInterface()
@@ -61,6 +61,6 @@ public:
 
 }
 
-Q_DECLARE_INTERFACE(Okular::GuiInterface, "org.kde.okular.GuiInterface/0.1")
+Q_DECLARE_INTERFACE(Okular::GuiInterface, "org.charta.reader.GuiInterface/0.1")
 
 #endif

@@ -96,9 +96,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 ecm_setup_version(${PROJECT_VERSION}
-                  VARIABLE_PREFIX OKULAR
+                  VARIABLE_PREFIX CHARTA
                   VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/core/version.h"
-                  PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake")
+                  PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/Charta6ConfigVersion.cmake")
 
 find_package(Qt6 ${QT_REQUIRED_VERSION} CONFIG REQUIRED COMPONENTS Core Test Widgets PrintSupport Svg Xml)
 
@@ -368,7 +368,7 @@ set_okular_optional_package_properties(Discount PROPERTIES
         URL "https://www.pell.portland.or.us/~orc/Code/discount/"
         PURPOSE "Support for Markdown documents in Charta.")
 
-add_definitions(-DTRANSLATION_DOMAIN="okular")
+add_definitions(-DTRANSLATION_DOMAIN="charta")
 add_definitions(-DQT_DEPRECATED_WARNINGS_SINCE=0x060600)
 add_definitions(-DKF_DEPRECATED_WARNINGS_SINCE=0x05F000)
 
@@ -421,9 +421,9 @@ else(NOT WIN32)
  set(MATH_LIB)
 endif(NOT WIN32)
 
-# okularcore
+# chartacore
 
-set(okularcore_SRCS
+set(chartacore_SRCS
    core/action.cpp
    core/annotations.cpp
    core/area.cpp
@@ -461,11 +461,11 @@ set(okularcore_SRCS
    core/synctex/synctex_parser.c
    core/synctex/synctex_parser_utils.c
 )
-qt_add_resources(okularcore_SRCS
+qt_add_resources(chartacore_SRCS
    core/script/builtin.qrc
 )
 
-ki18n_wrap_ui(okularcore_SRCS
+ki18n_wrap_ui(chartacore_SRCS
    core/textdocumentsettings.ui
 )
 
@@ -493,9 +493,9 @@ install( FILES
            core/printoptionswidget.h
            core/observer.h
            ${CMAKE_CURRENT_BINARY_DIR}/core/version.h
-           ${CMAKE_CURRENT_BINARY_DIR}/core/okularcore_export.h
+           ${CMAKE_CURRENT_BINARY_DIR}/core/chartacore_export.h
            ${CMAKE_CURRENT_BINARY_DIR}/settings_core.h
-         DESTINATION ${KDE_INSTALL_INCLUDEDIR}/okular/core COMPONENT Devel)
+         DESTINATION ${KDE_INSTALL_INCLUDEDIR}/charta/core COMPONENT Devel)
 
 install( FILES
            interfaces/configinterface.h
@@ -503,17 +503,17 @@ install( FILES
            interfaces/printinterface.h
            interfaces/saveinterface.h
            interfaces/viewerinterface.h
-         DESTINATION ${KDE_INSTALL_INCLUDEDIR}/okular/interfaces COMPONENT Devel)
+         DESTINATION ${KDE_INSTALL_INCLUDEDIR}/charta/interfaces COMPONENT Devel)
 
-ki18n_wrap_ui(okularcore_SRCS
+ki18n_wrap_ui(chartacore_SRCS
    core/chooseenginewidget.ui
 )
 
-kconfig_add_kcfg_files(okularcore_SRCS GENERATE_MOC conf/settings_core.kcfgc)
+kconfig_add_kcfg_files(chartacore_SRCS GENERATE_MOC conf/settings_core.kcfgc)
 
-add_library(okularcore SHARED ${okularcore_SRCS})
-generate_export_header(okularcore BASE_NAME okularcore EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/core/okularcore_export.h")
-target_include_directories(okularcore PUBLIC "$<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}>")
+add_library(chartacore SHARED ${chartacore_SRCS})
+generate_export_header(chartacore BASE_NAME chartacore EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/core/chartacore_export.h")
+target_include_directories(chartacore PUBLIC "$<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}>")
 
 if (ANDROID)
     set(fileName ${CMAKE_BINARY_DIR}/Okular5Core-android-dependencies.xml)
@@ -524,7 +524,7 @@ if (ANDROID)
 endif()
 
 
-# Special handling for linking okularcore on OSX/Apple
+# Special handling for linking chartacore on OSX/Apple
 IF(APPLE)
     SET(OKULAR_IOKIT "-framework IOKit" CACHE STRING "Apple IOKit framework")
 ENDIF(APPLE)
@@ -534,7 +534,7 @@ if(WIN32)
     set(SHLWAPI shlwapi)
 endif(WIN32)
 
-target_link_libraries(okularcore
+target_link_libraries(chartacore
 PRIVATE
     ${OKULAR_IOKIT}
     ${SHLWAPI}
@@ -555,15 +555,15 @@ PUBLIC  # these are included from the installed headers
     Qt6::Widgets
 )
 if (TARGET Qt6::MultimediaWidgets)
-    target_link_libraries(okularcore PRIVATE Qt6::MultimediaWidgets)
+    target_link_libraries(chartacore PRIVATE Qt6::MultimediaWidgets)
 endif()
 
 
 if (KF6Wallet_FOUND)
-    target_link_libraries(okularcore PRIVATE KF6::Wallet)
+    target_link_libraries(chartacore PRIVATE KF6::Wallet)
 endif()
 if (TARGET Qt6::Qml)
-    target_sources(okularcore PRIVATE
+    target_sources(chartacore PRIVATE
             core/script/executor_js.cpp
             core/script/js_app.cpp
             core/script/js_data.cpp
@@ -578,12 +578,12 @@ if (TARGET Qt6::Qml)
             core/script/js_ocg.cpp
             core/script/js_global.cpp
     )
-    target_link_libraries(okularcore PRIVATE Qt6::Qml)
+    target_link_libraries(chartacore PRIVATE Qt6::Qml)
 endif()
 
-set_target_properties(okularcore PROPERTIES VERSION 4.0.0 SOVERSION 4 OUTPUT_NAME Okular6Core EXPORT_NAME Core)
+set_target_properties(chartacore PROPERTIES VERSION 4.0.0 SOVERSION 4 OUTPUT_NAME Charta6Core EXPORT_NAME Core)
 
-install(TARGETS okularcore EXPORT Okular6Targets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+install(TARGETS chartacore EXPORT Charta6Targets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
 install(FILES conf/okular.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
 install(FILES conf/okular_core.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
@@ -686,7 +686,7 @@ kconfig_add_kcfg_files(okularpart_SRCS GENERATE_MOC conf/settings.kcfgc)
 add_library(okularpart SHARED ${okularpart_SRCS})
 generate_export_header(okularpart BASE_NAME okularpart)
 
-target_link_libraries(okularpart okularcore
+target_link_libraries(okularpart chartacore
     ${MATH_LIB}
     Qt6::Svg
     KF6::Archive
@@ -744,31 +744,31 @@ endif()# End of BUILD_DESKTOP if
 
 ########### install files ###############
 
-install(FILES okular.categories  DESTINATION  ${KDE_INSTALL_LOGGINGCATEGORIESDIR})
+install(FILES charta.categories  DESTINATION  ${KDE_INSTALL_LOGGINGCATEGORIESDIR})
 
 ki18n_install(po)
 
 ########### cmake files #################
 
-set(CMAKECONFIG_INSTALL_DIR "${KDE_INSTALL_CMAKEPACKAGEDIR}/Okular6")
+set(CMAKECONFIG_INSTALL_DIR "${KDE_INSTALL_CMAKEPACKAGEDIR}/Charta6")
 configure_package_config_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/Okular6Config.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/Okular6Config.cmake"
+  "${CMAKE_CURRENT_SOURCE_DIR}/Charta6Config.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/Charta6Config.cmake"
   INSTALL_DESTINATION  ${CMAKECONFIG_INSTALL_DIR}
 )
 
 install(FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/Okular6Config.cmake"
-  "${CMAKE_CURRENT_BINARY_DIR}/Okular6ConfigVersion.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/Charta6Config.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/Charta6ConfigVersion.cmake"
   DESTINATION "${CMAKECONFIG_INSTALL_DIR}"
   COMPONENT Devel
 )
 
-install(EXPORT Okular6Targets DESTINATION "${CMAKECONFIG_INSTALL_DIR}" FILE Okular6Targets.cmake NAMESPACE Okular::)
+install(EXPORT Charta6Targets DESTINATION "${CMAKECONFIG_INSTALL_DIR}" FILE Charta6Targets.cmake NAMESPACE Charta::)
 
 install(FILES
    core/stamps.svg
-   DESTINATION ${KDE_INSTALL_DATADIR}/okular/pics)
+   DESTINATION ${KDE_INSTALL_DATADIR}/charta/pics)
 
 ########### summary #################
 

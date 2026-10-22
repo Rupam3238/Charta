@@ -1,5 +1,5 @@
-remove_definitions(-DTRANSLATION_DOMAIN="okular")
-add_definitions(-DTRANSLATION_DOMAIN="okular_comicbook")
+remove_definitions(-DTRANSLATION_DOMAIN="charta")
+add_definitions(-DTRANSLATION_DOMAIN="charta_comicbook")
 
 ########### next target ###############
 
@@ -11,7 +11,7 @@ set( okularGenerator_comicbook_PART_SRCS
    )
 
 add_library(okular_comicbook STATIC ${okularGenerator_comicbook_PART_SRCS})
-target_link_libraries(okular_comicbook okularcore KF6::I18n KF6::Archive)
+target_link_libraries(okular_comicbook chartacore KF6::I18n KF6::Archive)
 set_target_properties(okular_comicbook PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 okular_add_generator(okularGenerator_comicbook generator_comicbook.cpp)
@@ -29,7 +29,7 @@ if(BUILD_TESTING)
     add_definitions( -DKDESRCDIR="${CMAKE_CURRENT_SOURCE_DIR}/" )
     ecm_add_test(autotests/comicbooktest.cpp
         TEST_NAME "comicbooktest"
-        LINK_LIBRARIES Qt6::Test KF6::CoreAddons okularcore okular_comicbook
+        LINK_LIBRARIES Qt6::Test KF6::CoreAddons chartacore okular_comicbook
     )
 endif()
 
@@ -40,4 +40,4 @@ endif()
 if (BUILD_MOBILE)
   install( PROGRAMS org.kde.mobile.okular_comicbook.desktop DESTINATION ${KDE_INSTALL_APPDIR} )
 endif()
-install( FILES org.kde.okular-comicbook.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )
+install( FILES org.charta.reader-comicbook.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )

@@ -12,7 +12,7 @@
 
 #include "area.h"
 #include "global.h"
-#include "okularcore_export.h"
+#include "chartacore_export.h"
 #include "textpage.h"
 
 #include <QColor>
@@ -46,7 +46,7 @@ class Tile;
  *
  * Note: The class takes ownership of all objects.
  */
-class OKULARCORE_EXPORT Page
+class CHARTACORE_EXPORT Page
 {
 public:
     /**
