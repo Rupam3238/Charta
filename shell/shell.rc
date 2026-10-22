@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!DOCTYPE gui SYSTEM "kpartgui.dtd">
-<gui version="11" name="okular_shell" >
+<gui version="13" name="okular_shell" >
  <MenuBar>
   <Menu name="file" >
    <DefineGroup append="open_merge" name="file_open" />
@@ -22,11 +22,10 @@
    <DefineGroup append="about_merge" name="about_merge" />
   </Menu>
  </MenuBar>
- <ToolBar noMerge="1" name="mainToolBar" >
-  <text>Main Toolbar</text>
-  <!--Action name="file_open_recent" /-->
-  <!--Action name="file_print" /-->
- </ToolBar>
+ <!-- Charta does not use a horizontal toolbar. Mark the toolbar of the
+      standard GUI file (ui_standards.rc, which is merged in automatically
+      by KXmlGuiWindow) as deleted so that it is not created at all. -->
+ <ToolBar name="mainToolBar" noMerge="1" deleted="true"/>
  <ActionProperties scheme="Default">
  </ActionProperties>
 </gui>

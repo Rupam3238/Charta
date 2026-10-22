@@ -33,6 +33,11 @@ endif()
 
 install(TARGETS charta ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
+# KXMLGUI prefers an on-disk copy of the .rc file over the one embedded in the
+# binary, so install it to keep both in sync (see the note in the top-level
+# CMakeLists.txt).
+install(FILES shell.rc DESTINATION ${KDE_INSTALL_KXMLGUIDIR}/okular)
+
 if(APPLE)
     set_target_properties(charta PROPERTIES
         MACOSX_BUNDLE_DISPLAY_NAME "Charta"

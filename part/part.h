@@ -79,9 +79,9 @@ class FileKeeper;
 class Reviews;
 class BookmarkList;
 class DrawingToolActions;
-class Layers;
 class SignaturePanel;
 class DocumentBuilderWidget;
+class QDialog;
 
 #if HAVE_PURPOSE
 namespace Purpose
@@ -276,7 +276,6 @@ protected Q_SLOTS:
     void slotShowTOCMenu(const Okular::DocumentViewport &vp, const QPoint point, const QString &title);
     void slotShowProperties();
     void slotShowEmbeddedFiles();
-    void slotShowLeftPanel();
     void slotShowBottomBar();
     void slotShowPresentation();
     void slotHidePresentation();
@@ -305,8 +304,8 @@ protected Q_SLOTS:
     void updateBookmarksActions();
     void enableTOC(bool enable);
     void slotRebuildBookmarkMenu();
-    void enableLayers(bool enable);
-    void enableSidebarSignaturesItem(bool enable);
+    void enableSignaturesAction(bool hasSignatures);
+    void showSignaturesDialog();
 
 public Q_SLOTS:
     bool saveFile() override;
@@ -461,14 +460,13 @@ private:
     bool m_tocEnabled;
     QPointer<MiniBarLogic> m_miniBarLogic;
     QPointer<MiniBar> m_miniBar;
-    QPointer<MiniBar> m_pageNumberTool;
     QPointer<QWidget> m_bottomBar;
     QPointer<PresentationWidget> m_presentationWidget;
     QPointer<PageSizeLabel> m_pageSizeLabel;
     QPointer<Reviews> m_reviewsWidget;
     QPointer<BookmarkList> m_bookmarkList;
-    QPointer<Layers> m_layers;
     QPointer<SignaturePanel> m_signaturePanel;
+    QPointer<QDialog> m_signatureDialog;
 
     // Right-hand side of the window: either the document view (index 0) or the Document Builder
     // page (index 1). Everything that belongs to the document view (the options bar, the find bar,
@@ -552,7 +550,6 @@ private:
     QAction *m_openContainingFolder;
     KHamburgerMenu *m_hamburgerMenuAction;
     KToggleAction *m_showMenuBarAction;
-    KToggleAction *m_showLeftPanel;
     KToggleAction *m_showBottomBar;
     QAction *m_showSignaturePanel;
     KToggleFullScreenAction *m_showFullScreenAction;

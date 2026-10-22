@@ -657,7 +657,6 @@ if(BUILD_DESKTOP)
     part/toc.cpp
     part/toggleactionmenu.cpp
     part/videowidget.cpp
-    part/layers.cpp
     part/signaturepartutils.cpp
     part/signaturepartutilskeydelegate.cpp
     part/signaturepartutilsrecentimagesmodel.cpp

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!DOCTYPE gui SYSTEM "kpartgui.dtd">
-<gui name="okular_part" version="56">
+<gui name="okular_part" version="57">
 <MenuBar>
   <Menu name="file"><text>&amp;File</text>
     <Action name="get_new_stuff" group="file_open"/>
@@ -80,17 +80,18 @@
     <Separator/>
     <Action name="mouse_toggle_annotate"/>
     <Separator/>
-    <Action name="add_digital_signature"/>
-    <Separator/>
     <Action name="speak_document"/>
     <Action name="speak_from_current_page"/>
     <Action name="speak_current_page"/>
     <Action name="speak_stop_all"/>
     <Action name="speak_pause_resume"/>
   </Menu>
+  <Menu name="signatures"><text>Sig&amp;natures</text>
+    <Action name="show_signatures"/>
+    <Action name="add_digital_signature"/>
+  </Menu>
   <Menu name="settings"><text>&amp;Settings</text>
     <Action name="colorscheme_menu" group="show_merge"/>
-    <Action name="show_leftpanel" group="show_merge"/>
     <Action name="show_bottombar" group="show_merge"/>
     <Action name="options_configure_generators" group="configure_merge"/>
     <Action name="options_configure" group="configure_merge"/>
@@ -99,19 +100,7 @@
     <Action name="help_about_backend" group="about_merge"/>
   </Menu>
 </MenuBar>
-<ToolBar name="mainToolBar"><text>Main Toolbar</text>
-  <Action name="show_leftpanel"/>
-  <Separator/>
-  <Action name="page_number"/>
-  <Separator/>
-  <Action name="view_zoom_out"/>
-  <Action name="zoom_to" />
-  <Action name="view_zoom_in"/>
-  <Action name="view_render_mode"/>
-  <Action name="hamburger_menu"/>
-</ToolBar>
 <ActionProperties scheme="Default">
-  <Action priority="0" name="show_leftpanel"/>
   <Action priority="0" name="view_zoom_out"/>
   <Action priority="0" name="view_zoom_in"/>
 </ActionProperties>

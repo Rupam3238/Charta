@@ -41,7 +41,6 @@
 #if HAVE_DBUS
 #include <QDBusConnection>
 #endif // HAVE_DBUS
-#include <QDockWidget>
 #include <QDragMoveEvent>
 #include <QFileDialog>
 #include <QJsonArray>
@@ -64,9 +63,6 @@ static const char *shouldShowMenuBarComingFromFullScreen = "shouldShowMenuBarCom
 static const char *const SESSION_URL_KEY = "Urls";
 static const char *const SESSION_TAB_KEY = "ActiveTab";
 
-static constexpr char SIDEBAR_LOCKED_KEY[] = "LockSidebar";
-static constexpr char SIDEBAR_VISIBLE_KEY[] = "ShowSidebar";
-
 static inline QString DesktopEntryGroupKey()
 {
     return QStringLiteral("Desktop Entry");
@@ -74,10 +70,6 @@ static inline QString DesktopEntryGroupKey()
 static inline QString RecentFilesGroupKey()
 {
     return QStringLiteral("Recent Files");
-}
-static inline QString GeneralGroupKey()
-{
-    return QStringLiteral("General");
 }
 
 class ResizableStackedWidget : public QStackedWidget
@@ -93,87 +85,6 @@ public:
     {
         return currentWidget()->minimumSizeHint();
     }
-};
-
-/**
- * Groups sidebar containers in a QDockWidget.
- *
- * This control groups all the sidebar containers provided by each tab (the Part object),
- * allowing the user to dock it to the left and right sides of the window,
- * or detach it from the window altogether.
- */
-class Sidebar : public QDockWidget
-{
-    Q_OBJECT
-
-public:
-    explicit Sidebar(QWidget *parent = nullptr)
-        : QDockWidget(parent)
-    {
-        setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-        setFeatures(defaultFeatures());
-
-        m_stackedWidget = new QStackedWidget;
-        setWidget(m_stackedWidget);
-        // It seems that without requesting a specific minimum size, Qt
-        // somehow calculates a (0,-1) minimum size, and then Qt gets angry
-        // that negative sizes is not possible.
-        setMinimumSize(10, 10);
-    }
-
-    bool isLocked() const
-    {
-        return features().testFlag(NoDockWidgetFeatures);
-    }
-
-    void setLocked(bool locked)
-    {
-        setFeatures(locked ? NoDockWidgetFeatures : defaultFeatures());
-
-        // show titlebar only if not locked
-        if (locked) {
-            if (!m_dumbTitleWidget) {
-                m_dumbTitleWidget = new QWidget;
-            }
-            setTitleBarWidget(m_dumbTitleWidget);
-        } else {
-            setTitleBarWidget(nullptr);
-        }
-    }
-
-    int indexOf(QWidget *widget) const
-    {
-        return m_stackedWidget->indexOf(widget);
-    }
-
-    void addWidget(QWidget *widget)
-    {
-        m_stackedWidget->addWidget(widget);
-    }
-
-    void removeWidget(QWidget *widget)
-    {
-        m_stackedWidget->removeWidget(widget);
-    }
-
-    void setCurrentWidget(QWidget *widget)
-    {
-        m_stackedWidget->setCurrentWidget(widget);
-    }
-
-private:
-    static DockWidgetFeatures defaultFeatures()
-    {
-        DockWidgetFeatures dockFeatures = DockWidgetClosable | DockWidgetMovable;
-        if (!KWindowSystem::isPlatformWayland()) { // TODO : Remove this check when QTBUG-87332 is fixed
-            dockFeatures |= DockWidgetFloatable;
-        }
-
-        return dockFeatures;
-    }
-
-    QStackedWidget *m_stackedWidget = nullptr;
-    QWidget *m_dumbTitleWidget = nullptr;
 };
 
 Shell::Shell(const QString &serializedOptions)
@@ -246,24 +157,6 @@ Shell::Shell(const QString &serializedOptions)
         connect(m_tabWidget, &QTabWidget::tabCloseRequested, this, &Shell::closeTab);
         connect(m_tabWidget->tabBar(), &QTabBar::tabMoved, this, &Shell::moveTabData);
 
-        m_sidebar = new Sidebar;
-        m_sidebar->setObjectName(QStringLiteral("okular_sidebar"));
-        m_sidebar->setContextMenuPolicy(Qt::ActionsContextMenu);
-        m_sidebar->setWindowTitle(i18n("Sidebar"));
-        connect(m_sidebar, &QDockWidget::visibilityChanged, this, [this](bool visible) {
-            // sync sidebar visibility with the m_showSidebarAction only if welcome screen is hidden
-            if (m_showSidebarAction && m_centralStackedWidget->currentWidget() != m_welcomeScreen) {
-                m_showSidebarAction->setChecked(visible);
-            }
-            if (m_centralStackedWidget->currentWidget() == m_welcomeScreen) {
-                // MainWindow tries hard to make its child dockwidgets shown, but during
-                // welcome screen we don't want to see the sidebar,
-                // so try a bit more to actually hide it.
-                m_sidebar->hide();
-            }
-        });
-        addDockWidget(Qt::LeftDockWidgetArea, m_sidebar);
-
         // then, setup our actions
         setupActions();
         connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &QObject::deleteLater);
@@ -277,9 +170,6 @@ Shell::Shell(const QString &serializedOptions)
             "QMenu::item { border-radius: 4px; padding: 5px 24px 5px 22px; }"
             "QMenu::item:selected { color: #ffffff; background: #16414c; }"
             "QMenu::separator { height: 1px; margin: 4px 8px; background: #3b4653; }"));
-
-        // NOTE : apply default sidebar width only after calling setupGUI(...)
-        resizeDocks({m_sidebar}, {200}, Qt::Horizontal);
 
         m_tabs.append(TabState(firstPart));
         m_tabWidget->addTab(firstPart->widget(), QString()); // triggers setActiveTab that calls createGUI( part )
@@ -544,24 +434,11 @@ void Shell::readSettings()
     if (fullScreen) {
         m_menuBarWasShown = group.readEntry(shouldShowMenuBarComingFromFullScreen, true);
     }
-
-    const KConfigGroup sidebarGroup = KSharedConfig::openConfig()->group(GeneralGroupKey());
-    m_sidebar->setVisible(sidebarGroup.readEntry(SIDEBAR_VISIBLE_KEY, true));
-    m_sidebar->setLocked(sidebarGroup.readEntry(SIDEBAR_LOCKED_KEY, true));
-
-    m_showSidebarAction->setChecked(m_sidebar->isVisibleTo(this));
-    m_lockSidebarAction->setChecked(m_sidebar->isLocked());
 }
 
 void Shell::writeSettings()
 {
     saveRecents();
-
-    KConfigGroup sidebarGroup = KSharedConfig::openConfig()->group(GeneralGroupKey());
-    sidebarGroup.writeEntry(SIDEBAR_LOCKED_KEY, m_sidebar->isLocked());
-    // NOTE : Consider whether the m_showSidebarAction is checked, because
-    // the sidebar can be forcibly hidden if the welcome screen is displayed
-    sidebarGroup.writeEntry(SIDEBAR_VISIBLE_KEY, m_sidebar->isVisibleTo(this) || m_showSidebarAction->isChecked());
 
     KConfigGroup group = KSharedConfig::openConfig()->group(DesktopEntryGroupKey());
     group.writeEntry("FullScreen", m_fullScreenAction->isChecked());
@@ -644,13 +521,6 @@ void Shell::setupActions()
     m_undoCloseTab->setIcon(QIcon::fromTheme(QStringLiteral("edit-undo")));
     m_undoCloseTab->setEnabled(false);
     connect(m_undoCloseTab, &QAction::triggered, this, &Shell::undoCloseTab);
-
-    m_lockSidebarAction = actionCollection()->addAction(QStringLiteral("okular_lock_sidebar"));
-    m_lockSidebarAction->setCheckable(true);
-    m_lockSidebarAction->setIcon(QIcon::fromTheme(QStringLiteral("lock")));
-    m_lockSidebarAction->setText(i18n("Lock Sidebar"));
-    connect(m_lockSidebarAction, &QAction::triggered, m_sidebar, &Sidebar::setLocked);
-    m_sidebar->addAction(m_lockSidebarAction);
 }
 
 void Shell::saveProperties(KConfigGroup &group)
@@ -909,67 +779,12 @@ bool Shell::queryClose()
 
 void Shell::setActiveTab(int tab)
 {
-    if (m_showSidebarAction) {
-        m_showSidebarAction->disconnect(m_sidebar);
-    }
-
-    // Leaving a tab that was showing the Document Builder gives the sidebar back, so that
-    // isSidebarVisible below describes the tab we are entering and not the builder state.
-    if (m_activeTab >= 0 && m_activeTab < m_tabs.size() && m_activeTab != tab && m_tabs[m_activeTab].builderVisible) {
-        m_sidebar->setVisible(m_sidebarWasVisibleBeforeBuilder);
-    }
-
     m_tabWidget->setCurrentIndex(tab);
 
-    // NOTE : createGUI(...) breaks the visibility of the sidebar, so we need
-    // to save and restore it
-    const bool isSidebarVisible = m_sidebar->isVisible();
     createGUI(m_tabs[tab].part);
-    m_sidebar->setVisible(isSidebarVisible);
-
-    // dock KPart's sidebar if new and make it current
-    Okular::ViewerInterface *iPart = qobject_cast<Okular::ViewerInterface *>(m_tabs[tab].part);
-    Q_ASSERT(iPart);
-    QWidget *sideContainer = iPart->getSideContainer();
-    if (m_sidebar->indexOf(sideContainer) == -1) {
-        m_sidebar->addWidget(sideContainer);
-        if (m_sidebar->maximumWidth() > sideContainer->maximumWidth()) {
-            m_sidebar->setMaximumWidth(sideContainer->maximumWidth());
-        }
-    }
-    m_sidebar->setCurrentWidget(sideContainer);
-
-    m_showSidebarAction = m_tabs[tab].part->actionCollection()->action(QStringLiteral("show_leftpanel"));
-    Q_ASSERT(m_showSidebarAction);
-    m_showSidebarAction->disconnect(m_sidebar);
-    m_showSidebarAction->setChecked(m_sidebar->isVisibleTo(this));
-    connect(m_showSidebarAction, &QAction::triggered, m_sidebar, &Sidebar::setVisible);
-
-    m_activeTab = tab;
-
-    // A tab left in the Document Builder keeps the sidebar out of the way.
-    updateSidebarForActiveTab();
 
     m_printAction->setEnabled(m_tabs[tab].printEnabled);
     m_closeAction->setEnabled(m_tabs[tab].closeEnabled);
-}
-
-void Shell::updateSidebarForActiveTab()
-{
-    if (!m_showSidebarAction || !m_sidebar) {
-        return;
-    }
-
-    const bool builderIsUp = m_activeTab >= 0 && m_activeTab < m_tabs.size() && m_tabs[m_activeTab].builderVisible;
-    if (!builderIsUp) {
-        m_showSidebarAction->setEnabled(true);
-        m_showSidebarAction->setChecked(m_sidebar->isVisibleTo(this));
-        return;
-    }
-
-    m_showSidebarAction->setEnabled(false);
-    m_sidebar->setVisible(false);
-    m_showSidebarAction->setChecked(false);
 }
 
 void Shell::closeTab(int tab)
@@ -982,12 +797,6 @@ void Shell::closeTab(int tab)
             part->factory()->removeClient(part);
         }
         part->disconnect(this);
-
-        Okular::ViewerInterface *iPart = qobject_cast<Okular::ViewerInterface *>(m_tabs[tab].part);
-        Q_ASSERT(iPart);
-        QWidget *sideContainer = iPart->getSideContainer();
-        m_sidebar->removeWidget(sideContainer);
-        connect(part, &QObject::destroyed, sideContainer, &QObject::deleteLater);
 
         part->deleteLater();
         m_tabs.removeAt(tab);
@@ -1184,28 +993,9 @@ void Shell::openDocumentBuilder()
 
 void Shell::setDocumentBuilderVisible(bool visible)
 {
-    if (!m_showSidebarAction || !m_sidebar) {
-        return;
-    }
-
     const int tab = findTabIndex(sender());
     if (tab >= 0) {
         m_tabs[tab].builderVisible = visible;
-    }
-
-    // Only the active tab drives the real chrome; the others just remember the state.
-    if (tab >= 0 && tab != m_activeTab) {
-        return;
-    }
-
-    if (visible) {
-        m_sidebarWasVisibleBeforeBuilder = m_sidebar->isVisible();
-        updateSidebarForActiveTab();
-        m_showSidebarAction->setChecked(false);
-    } else {
-        m_showSidebarAction->setEnabled(true);
-        m_sidebar->setVisible(m_sidebarWasVisibleBeforeBuilder);
-        m_showSidebarAction->setChecked(m_sidebarWasVisibleBeforeBuilder);
     }
 }
 
@@ -1341,15 +1131,11 @@ void Shell::slotFitWindowToPage(const QSize pageViewSize, const QSize pageSize)
 void Shell::hideWelcomeScreen()
 {
     m_centralStackedWidget->setCurrentWidget(m_tabWidget);
-    m_sidebar->setVisible(m_showSidebarAction->isChecked());
-    m_showSidebarAction->setEnabled(true);
 }
 
 void Shell::showWelcomeScreen()
 {
-    m_showSidebarAction->setEnabled(false);
     m_centralStackedWidget->setCurrentWidget(m_welcomeScreen);
-    m_sidebar->setVisible(false);
 
     refreshRecentsOnWelcomeScreen();
 }

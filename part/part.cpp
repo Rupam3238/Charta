@@ -129,7 +129,6 @@
 #include "fileprinterpreview.h"
 #include "findbar.h"
 #include "gui/signatureguiutils.h"
-#include "layers.h"
 #include "minibar.h"
 #include "okmenutitle.h"
 #include "pagesizelabel.h"
@@ -885,10 +884,6 @@ Part::Part(QObject *parent, const QVariantList &args)
     connect(m_toc.data(), &TOC::hasTOC, this, &Part::enableTOC);
     connect(m_toc.data(), &TOC::rightClick, this, &Part::slotShowTOCMenu);
 
-    // [left toolbox optional item: Layers] | []
-    m_layers = new Layers(nullptr, m_document);
-    connect(m_layers.data(), &Layers::hasLayers, this, &Part::enableLayers);
-
     // [left toolbox: Thumbnails and Bookmarks] | []
     QWidget *thumbsBox = new ThumbnailsBox(nullptr);
     thumbsBox->layout()->setSpacing(6);
@@ -917,9 +912,18 @@ Part::Part(QObject *parent, const QVariantList &args)
     m_bookmarkList = new BookmarkList(m_document, nullptr);
     m_sidebar->addItem(m_bookmarkList, QIcon::fromTheme(QStringLiteral("bookmarks")), i18n("Bookmarks"));
 
-    // [left toolbox optional item: Signature Panel] | []
-    m_signaturePanel = new SignaturePanel(m_document, nullptr);
-    connect(m_signaturePanel.data(), &SignaturePanel::documentHasSignatures, this, &Part::enableSidebarSignaturesItem);
+    // [signature panel] | []
+    // The signature list used to live in the (now removed) left sidebar. It is now shown in
+    // its own dialog, reachable from the Signatures menu of the menu bar.
+    m_signatureDialog = new QDialog(widget());
+    m_signatureDialog->setObjectName(QStringLiteral("signatureDialog"));
+    m_signatureDialog->setWindowTitle(i18n("Signatures"));
+    m_signatureDialog->resize(600, 400);
+    auto *signatureLayout = new QVBoxLayout(m_signatureDialog);
+    signatureLayout->setContentsMargins(0, 0, 0, 0);
+    m_signaturePanel = new SignaturePanel(m_document, m_signatureDialog);
+    signatureLayout->addWidget(m_signaturePanel);
+    connect(m_signaturePanel.data(), &SignaturePanel::documentHasSignatures, this, &Part::enableSignaturesAction);
 
     // widgets: [] | [right 'pageView']
     QWidget *rightContainer = new QWidget(nullptr);
@@ -1020,7 +1024,6 @@ Part::Part(QObject *parent, const QVariantList &args)
     m_mainStack->addWidget(m_documentBuilder);
     rightLayout->addWidget(m_mainStack, 1);
 
-    m_layers->setPageView(m_pageView);
     m_signaturePanel->setPageView(m_pageView);
     m_findBar = new FindBar(m_document, rightContainer);
     m_findBar->setObjectName(QStringLiteral("findBar"));
@@ -1038,13 +1041,10 @@ Part::Part(QObject *parent, const QVariantList &args)
     bottomBarLayout->addWidget(m_pageSizeLabel);
     rightLayout->addWidget(m_bottomBar);
 
-    m_pageNumberTool = new MiniBar(nullptr, m_miniBarLogic);
-
     connect(m_findBar, &FindBar::forwardKeyPressEvent, m_pageView, &PageView::externalKeyPressEvent);
     connect(m_findBar, &FindBar::onCloseButtonPressed, m_pageView, qOverload<>(&PageView::setFocus));
     connect(m_miniBar, &MiniBar::forwardKeyPressEvent, m_pageView, &PageView::externalKeyPressEvent);
     connect(m_pageView.data(), &PageView::escPressed, m_findBar, &FindBar::resetSearch);
-    connect(m_pageNumberTool, &MiniBar::forwardKeyPressEvent, m_pageView, &PageView::externalKeyPressEvent);
     connect(m_pageView.data(), &PageView::requestOpenNewlySignedFile, this, &Part::requestOpenNewlySignedFile);
 
     connect(m_reviewsWidget.data(), &Reviews::openAnnotationWindow, m_pageView.data(), &PageView::openAnnotationWindow);
@@ -1182,7 +1182,6 @@ void Part::setupViewerActions()
     ac->setDefaultShortcuts(m_gotoPage, KStandardShortcut::gotoLine());
     // dirty way to activate gotopage when pressing miniBar's button
     connect(m_miniBar.data(), &MiniBar::gotoPage, m_gotoPage, &QAction::trigger);
-    connect(m_pageNumberTool.data(), &MiniBar::gotoPage, m_gotoPage, &QAction::trigger);
 
     m_prevPage = KStandardAction::prior(this, SLOT(slotPreviousPage()), ac);
     m_prevPage->setIconText(i18nc("Previous page", "Previous"));
@@ -1191,7 +1190,6 @@ void Part::setupViewerActions()
     ac->setDefaultShortcut(m_prevPage, QKeySequence());
     // dirty way to activate prev page when pressing miniBar's button
     connect(m_miniBar.data(), &MiniBar::prevPage, m_prevPage, &QAction::trigger);
-    connect(m_pageNumberTool.data(), &MiniBar::prevPage, m_prevPage, &QAction::trigger);
 
     m_nextPage = KStandardAction::next(this, SLOT(slotNextPage()), ac);
     m_nextPage->setIconText(i18nc("Next page", "Next"));
@@ -1200,7 +1198,6 @@ void Part::setupViewerActions()
     ac->setDefaultShortcut(m_nextPage, QKeySequence());
     // dirty way to activate next page when pressing miniBar's button
     connect(m_miniBar.data(), &MiniBar::nextPage, m_nextPage, &QAction::trigger);
-    connect(m_pageNumberTool.data(), &MiniBar::nextPage, m_nextPage, &QAction::trigger);
 
     m_beginningOfDocument = KStandardAction::firstPage(this, SLOT(slotGotoFirst()), ac);
     ac->addAction(QStringLiteral("first_page"), m_beginningOfDocument);
@@ -1275,7 +1272,6 @@ void Part::setupViewerActions()
     m_printPreview = KStandardAction::printPreview(this, SLOT(slotPrintPreview()), ac);
     m_printPreview->setEnabled(false);
 
-    m_showLeftPanel = nullptr;
     m_showBottomBar = nullptr;
     m_showSignaturePanel = nullptr;
 
@@ -1320,11 +1316,6 @@ void Part::setupViewerActions()
     m_closeFindBar->setText(i18n("Close &Find Bar"));
     ac->setDefaultShortcut(m_closeFindBar, QKeySequence(Qt::Key_Escape));
     m_closeFindBar->setEnabled(false);
-
-    QWidgetAction *pageno = new QWidgetAction(ac);
-    pageno->setText(i18n("Page Number"));
-    pageno->setDefaultWidget(m_pageNumberTool);
-    ac->addAction(QStringLiteral("page_number"), pageno);
 
     QAction *configureColorModes = new QAction(i18nc("@action", "Configure Color Modes…"), ac);
     ac->addAction(QStringLiteral("options_configure_color_modes"), configureColorModes);
@@ -1412,15 +1403,6 @@ void Part::setupActions()
     m_saveAs->setEnabled(false);
     m_migrationMessage->addAction(m_saveAs);
 
-    m_showLeftPanel = ac->add<KToggleAction>(QStringLiteral("show_leftpanel"));
-    m_showLeftPanel->setText(i18n("Show S&idebar"));
-    const QString preferredSidebarIcon = m_sidebar->layoutDirection() == Qt::LeftToRight ? QStringLiteral("sidebar-expand-left") : QStringLiteral("sidebar-expand-right");
-    m_showLeftPanel->setIcon(QIcon::fromTheme(preferredSidebarIcon, QIcon::fromTheme(QStringLiteral("view-sidetree"))));
-    connect(m_showLeftPanel, &QAction::toggled, this, &Part::slotShowLeftPanel);
-    ac->setDefaultShortcut(m_showLeftPanel, QKeySequence(Qt::Key_F7));
-    m_showLeftPanel->setChecked(Okular::Settings::showLeftPanel());
-    slotShowLeftPanel();
-
     m_showBottomBar = ac->add<KToggleAction>(QStringLiteral("show_bottombar"));
     m_showBottomBar->setText(i18n("Show &Page Bar"));
     connect(m_showBottomBar, &QAction::toggled, this, &Part::slotShowBottomBar);
@@ -1428,15 +1410,11 @@ void Part::setupActions()
     slotShowBottomBar();
 
     m_showSignaturePanel = ac->add<QAction>(QStringLiteral("show_signatures"));
-    m_showSignaturePanel->setText(i18n("Show &Signatures Panel"));
-    connect(m_showSignaturePanel, &QAction::triggered, this, [this] {
-        if (m_sidebar->currentItem() != m_signaturePanel) {
-            m_sidebar->setCurrentItem(m_signaturePanel);
-        }
-        if (!m_showLeftPanel->isChecked()) {
-            m_showLeftPanel->trigger();
-        }
-    });
+    m_showSignaturePanel->setText(i18n("Show Signatures…"));
+    m_showSignaturePanel->setIcon(QIcon::fromTheme(QStringLiteral("application-pkcs7-signature")));
+    // Enabled as soon as a document with signatures is loaded (see enableSignaturesAction()).
+    m_showSignaturePanel->setEnabled(false);
+    connect(m_showSignaturePanel, &QAction::triggered, this, &Part::showSignaturesDialog);
 
     m_showEmbeddedFiles = ac->addAction(QStringLiteral("embedded_files"));
     m_showEmbeddedFiles->setText(i18n("&Embedded Files"));
@@ -1530,11 +1508,9 @@ Part::~Part()
     cleanupUntitledTempFile();
 
     delete m_toc;
-    delete m_layers;
     delete m_pageView;
     delete m_thumbnailList;
     delete m_miniBar;
-    delete m_pageNumberTool;
     delete m_miniBarLogic;
     delete m_bottomBar;
     delete m_pageSizeLabel;
@@ -2609,15 +2585,6 @@ void Part::cannotQuit()
     KMessageBox::information(widget(), i18n("This link points to a quit application action that does not work when using the embedded viewer."), QString(), QStringLiteral("warnNoQuitIfNotInOkular"));
 }
 
-void Part::slotShowLeftPanel()
-{
-    bool showLeft = m_showLeftPanel->isChecked();
-    Okular::Settings::setShowLeftPanel(showLeft);
-    Okular::Settings::self()->save();
-    // show/hide left panel
-    m_sidebar->setSidebarVisibility(showLeft);
-}
-
 void Part::slotShowBottomBar()
 {
     const bool showBottom = m_showBottomBar->isChecked();
@@ -2903,22 +2870,25 @@ void Part::slotRebuildBookmarkMenu()
     rebuildBookmarkMenu();
 }
 
-void Part::enableLayers(bool enable)
+void Part::enableSignaturesAction(bool hasSignatures)
 {
-    if (!enable) {
+    if (!m_showSignaturePanel) {
         return;
     }
 
-    m_sidebar->addItem(m_layers, QIcon::fromTheme(QStringLiteral("format-list-unordered")), i18n("Layers"));
+    // The action is only useful for documents that actually carry signatures.
+    m_showSignaturePanel->setEnabled(hasSignatures);
 }
 
-void Part::enableSidebarSignaturesItem(bool enable)
+void Part::showSignaturesDialog()
 {
-    if (!enable) {
+    if (!m_signatureDialog) {
         return;
     }
 
-    m_sidebar->addItem(m_signaturePanel, QIcon::fromTheme(QStringLiteral("application-pkcs7-signature")), i18n("Signatures"));
+    m_signatureDialog->show();
+    m_signatureDialog->raise();
+    m_signatureDialog->activateWindow();
 }
 
 void Part::slotShowFindBar()
@@ -3860,7 +3830,7 @@ void Part::slotNewConfig()
     }
 
     // update ThumbnailList contents
-    if (Okular::Settings::showLeftPanel() && !m_thumbnailList->isHidden()) {
+    if (!m_thumbnailList->isHidden()) {
         m_thumbnailList->updateWidgets();
     }
 
@@ -4103,9 +4073,13 @@ void Part::slotUpdateHamburgerMenu()
 
     QToolBar *visibleMainToolbar = nullptr;
     if (auto *mainWindow = findMainWindow()) {
-        visibleMainToolbar = mainWindow->toolBar();
-        if (!visibleMainToolbar->isVisible()) {
-            visibleMainToolbar = nullptr;
+        // Note: KMainWindow::toolBar() creates the toolbar when it does not exist yet,
+        // so look the toolbar up in the list of existing ones instead.
+        for (auto *toolbar : mainWindow->toolBars()) {
+            if (toolbar->objectName() == QLatin1String("mainToolBar")) {
+                visibleMainToolbar = toolbar->isVisible() ? toolbar : nullptr;
+                break;
+            }
         }
         const auto toolbars = mainWindow->toolBars();
         for (const auto &toolbar : toolbars) {
@@ -4120,9 +4094,6 @@ void Part::slotUpdateHamburgerMenu()
         }
         if (!menuAvailable) {
             menu->addAction(m_showMenuBarAction);
-            if (!visibleMainToolbar) {
-                menu->addAction(findActionInKPartHierarchy(QStringLiteral("mainToolBar")));
-            }
             menu->addSeparator();
         }
     }
@@ -4143,7 +4114,6 @@ void Part::slotUpdateHamburgerMenu()
     menu->addAction(m_copy);
     menu->addAction(m_copyWithoutLineBreaks);
     menu->addAction(m_find);
-    menu->addAction(m_showLeftPanel);
     if (!visibleMainToolbar || visibleMainToolbar->actions().contains(ac->action(QStringLiteral("annotation_favorites")))) {
         menu->addAction(ac->action(QStringLiteral("mouse_toggle_annotate")));
     }
@@ -4508,7 +4478,8 @@ void Part::unsetDummyMode()
         return;
     }
 
-    m_sidebar->setSidebarVisibility(Okular::Settings::showLeftPanel());
+    // The legacy left sidebar is gone: its container stays hidden for good.
+    m_sidebar->setSidebarVisibility(false);
 
     // add back and next in history
     m_historyBack = KStandardAction::documentBack(this, SLOT(slotHistoryBack()), actionCollection());

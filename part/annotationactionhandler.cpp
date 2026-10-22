@@ -2511,33 +2511,6 @@ void AnnotationActionHandler::setupAnnotationToolBarVisibilityAction()
 
     KToolBar *annotationToolBar = mw->toolBar(QStringLiteral("annotationToolBar"));
     KToolBar *quickAnnotationToolBar = mw->toolBar(QStringLiteral("quickAnnotationToolBar"));
-    if (KToolBar *mainToolBar = mw->toolBar(QStringLiteral("mainToolBar"))) {
-        mainToolBar->removeAction(d->aQuickTools);
-        mainToolBar->removeAction(d->aBrowseTool);
-        mainToolBar->removeAction(d->aMouseSelectTools);
-
-        QAction *previousAction = nullptr;
-        for (QAction *action : mainToolBar->actions()) {
-            if (action->isSeparator() && (!previousAction || previousAction->isSeparator())) {
-                mainToolBar->removeAction(action);
-                continue;
-            }
-            previousAction = action;
-        }
-        const QList<QAction *> toolbarActions = mainToolBar->actions();
-        if (!toolbarActions.isEmpty() && toolbarActions.constLast()->isSeparator()) {
-            mainToolBar->removeAction(toolbarActions.constLast());
-        }
-        mainToolBar->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
-        mainToolBar->adjustSize();
-        mainToolBar->setStyleSheet(QStringLiteral(
-            "QToolBar { background: #202630; border: 0; border-bottom: 1px solid #3b4653; spacing: 1px; padding: 1px 5px; }"
-            "QToolButton { color: #b9c3ce; background: transparent; border: 1px solid transparent; border-radius: 6px; min-width: 32px; min-height: 28px; padding: 2px 4px; }"
-            "QToolButton:hover { background: #303a46; }"
-            "QToolButton:checked { background: #16414c; border-color: #27bfd6; }"
-            "QToolButton:focus { border-color: #27bfd6; }"
-            "QToolBar::separator { width: 1px; margin: 4px 5px; background: #45515e; }"));
-    }
     annotationToolBar->hide();
     quickAnnotationToolBar->hide();
     QObject::disconnect(d->aShowToolBar, &QAction::triggered, annotationToolBar, &KToolBar::show);

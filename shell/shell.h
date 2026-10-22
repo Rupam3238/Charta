@@ -29,7 +29,6 @@
 
 #include "welcomescreen.h"
 
-class Sidebar;
 class KRecentFilesAction;
 class KToggleAction;
 class QTabWidget;
@@ -114,7 +113,7 @@ private Q_SLOTS:
 
     /** Shows the Document Builder page in the active tab (File -> Document Builder). */
     void openDocumentBuilder();
-    /** Syncs the sidebar with the part's Document Builder page. */
+    /** Records the Document Builder visibility state of the tab that emitted the signal. */
     void setDocumentBuilderVisible(bool visible);
     /** Back on an empty builder: closes that tab (and shows the welcome screen if it was the last). */
     void closeEmptyDocumentBuilder();
@@ -174,8 +173,6 @@ private:
     int findTabIndex(QObject *sender) const;
     int findTabIndex(const QUrl &url) const;
     void readRecentFilesSettings();
-    /// Points the sidebar dock at the active tab's builder state (hidden while the builder is up).
-    void updateSidebarForActiveTab();
 
 private:
     void reloadAllXML();
@@ -198,7 +195,6 @@ private:
     KToggleAction *m_openInTab;
     WelcomeScreen *m_welcomeScreen;
     QStackedWidget *m_centralStackedWidget;
-    Sidebar *m_sidebar = nullptr;
 
     struct TabState {
         explicit TabState(KParts::ReadWritePart *p)
@@ -218,12 +214,6 @@ private:
     QAction *m_nextTabAction;
     QAction *m_prevTabAction;
     QAction *m_undoCloseTab;
-    QAction *m_showSidebarAction = nullptr;
-    QAction *m_lockSidebarAction = nullptr;
-
-    // Sidebar state to restore when leaving the Document Builder page
-    bool m_sidebarWasVisibleBeforeBuilder = false;
-    int m_activeTab = 0;
 
     bool m_isValid;
 };
