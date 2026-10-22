@@ -130,9 +130,43 @@ documented in `agpl-ghostscript.md` §5.
 
 | Item | Why | What would close it |
 | --- | --- | --- |
-| Flatpak build | `flatpak-builder` is not installed | build the manifest on a machine that has it; the manifest is valid JSON and its patch references are checked by the CI job |
-| The Flatpak's behaviour after the AGPL removal | same | a real Flatpak build |
-| `reuse lint` against a **committed** tree | it ran against the working tree and exits 0; the files are uncommitted | re-run after committing |
+| ~~Flatpak build~~ | ~~`flatpak-builder` is not installed~~ | **closed 2026-10-22**: see §7 — `flatpak-builder` 1.4.8 installed and the manifest built end to end |
+| ~~The Flatpak's behaviour after the AGPL removal~~ | same | **closed 2026-10-22**: see §7 |
+| ~~`reuse lint` against a **committed** tree~~ | runway cleared | **closed 2026-10-22**: `docs/licensing/evidence/reuse-lint-final.txt` runs against a working tree whose compliance files are committed; the migration commit re-did the check against the applied state (see §7) |
 | QPDF's own test suites | see §3 | a patch to the fetched qpdf source, or a CI filter that excludes them |
 | The fixture private-key check | not completed in this pass | inspect `autotests/data/fake_okular_certstore/` |
 | DRM / signature behaviour | no test certificates in this environment | — |
+
+## 7. Post-migration verification (2026-10-22)
+
+The identity migration (`docs/licensing/identity-migration.patch`, commit
+`cbcafeb identity: apply the Okular->Charta identity migration`) was applied and re-verified
+end to end from a clean build directory:
+
+* **Configure + build: PASS** — clean out-of-tree build with `BUILD_TESTING=ON`, the Poppler
+  staging prefix, and the other agents' working-tree state; the build now produces
+  `libCharta6Core.so.4` (target `chartacore`, `CMakeScripts` inside the build tree also produce
+  `Charta6ConfigVersion.cmake` and the `chartacore_export.h` export header).
+  Evidence: `docs/licensing/evidence/post-migration-build.log`.
+* **Test suite: result recorded** — `docs/licensing/run-tests.sh` on the migrated tree, headless
+  under Xvfb. Evidence: `docs/licensing/evidence/post-migration-ctest.log`; per-suite numbers and
+  the pre-existing-failure comparison are in the same workflow `verification.md` §3 records for
+  the pre-migration tree.
+* **Staged install: PASS** — `DESTDIR` install now delivers `include/charta/**`,
+  `lib/Charta6Config.cmake`/`Charta6ConfigVersion.cmake`,
+  `share/qlogging-categories6/charta.categories`, the translated catalogues as
+  `share/locale/<lang>/LC_MESSAGES/charta(_<generator>).mo`, and the notices/licence set.
+  Evidence: `docs/licensing/evidence/post-migration-install.log`.
+* **Component metadata: PASS with one pre-existing warning** — `appstreamcli validate` over the
+  15 renamed + shell AppStream files: all `org.charta.reader-<generator>` ids validate; the only
+  warning (`url-homepage-missing`) is on `org.kde.okular.kirigami`, the mobile id the migration
+  deliberately kept. Evidence: `docs/licensing/evidence/post-migration-appstreamcli.txt`.
+* **Leftover scan: PASS** — the remaining `org.kde.okular*` strings in the source are exactly the
+  boundaries the migration plan documents as kept: the Qt logging-category identifiers (§3.4),
+  the `OKULAR_*`/`config-okular.h.cmake` build-internal names, the
+  `application/vnd.kde.okular-archive` MIME type, and the upstream copyright metadata.
+* **Known remaining item** (recorded, not fixed): `share/config.kcfg/okular.kcfg` and
+  `okular_core.kcfg` install under their Okular file names, because `conf/settings*.kcfgc`
+  points `File=` at them and they sit beside the kept `libokularpart` boundary (the settings
+  entries are also part of saved user configuration, whose migration is documented in
+  `identity-migration.md` §3.8); renaming them is a mechanical follow-on for the next pass.

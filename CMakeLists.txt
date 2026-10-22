@@ -739,6 +739,14 @@ endif()
 #instead install the part to this path so it can be found
 install(TARGETS okularpart DESTINATION ${KDE_INSTALL_PLUGINDIR}/kf6/parts/ )
 
+# The XMLGUI .rc files are embedded in the part and the shell binaries through
+# their .qrc resources, but KXMLGUI looks for them on disk first (in the
+# component's data directory, e.g. ${KDE_INSTALL_DATADIR}/kxmlgui5/okular) and
+# only falls back to the embedded copy. Install them as well so that a stale
+# copy from an older installation can never shadow the current one.
+install(FILES part/part.rc part/part-viewermode.rc
+        DESTINATION ${KDE_INSTALL_KXMLGUIDIR}/okular)
+
 endif()# End of BUILD_DESKTOP if
 
 

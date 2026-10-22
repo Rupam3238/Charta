@@ -1,0 +1,46 @@
+org.charta.reader-comicbook.metainfo.xml
+  I: org.charta.reader-comicbook:~: developer-info-missing
+
+org.charta.reader-djvu.metainfo.xml
+  I: org.charta.reader-djvu:~: developer-info-missing
+
+org.charta.reader-dvi.metainfo.xml
+  I: org.charta.reader-dvi:~: developer-info-missing
+
+org.charta.reader-epub.metainfo.xml
+  I: org.charta.reader-epub:~: developer-info-missing
+
+org.charta.reader-fax.metainfo.xml
+  I: org.charta.reader-fax:~: developer-info-missing
+
+org.charta.reader-fb.metainfo.xml
+  I: org.charta.reader-fb:~: developer-info-missing
+
+org.charta.reader-kimgio.metainfo.xml
+  I: org.charta.reader-kimgio:~: developer-info-missing
+
+org.charta.reader-md.metainfo.xml
+  I: org.charta.reader-md:~: developer-info-missing
+
+org.charta.reader-mobipocket.metainfo.xml
+  I: org.charta.reader-mobipocket:~: developer-info-missing
+
+org.charta.reader-poppler.metainfo.xml
+  I: org.charta.reader-poppler:~: developer-info-missing
+
+org.charta.reader-spectre.metainfo.xml
+  I: org.charta.reader-spectre:~: developer-info-missing
+
+org.charta.reader-tiff.metainfo.xml
+  I: org.charta.reader-tiff:~: developer-info-missing
+
+org.charta.reader-txt.metainfo.xml
+  I: org.charta.reader-txt:~: developer-info-missing
+
+org.charta.reader-xps.metainfo.xml
+  I: org.charta.reader-xps:~: developer-info-missing
+
+org.kde.okular.kirigami.appdata.xml
+  W: org.kde.okular.kirigami:~: url-homepage-missing
+
+✘ Validation failed: warnings: 1, infos: 14, pedantic: 14

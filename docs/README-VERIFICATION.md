@@ -5,8 +5,9 @@
 A static comparison of the `main` branch of
 [Rupam3238/Charta](https://github.com/Rupam3238/Charta) at commit `0f13a44` (`Rotation Done`,
 2026-10-21). It covers the README, the notes in `docs/`, the CMake files, the Flatpak manifest,
-selected sources and the registered tests. It is a source inspection, not a build or runtime
-validation. Re-run these checks after source, dependency or packaging changes.
+selected sources and the registered tests. It is primarily a source inspection, not a build or
+runtime validation; the one runtime observation used for the README screenshots is recorded
+below. Re-run these checks after source, dependency or packaging changes.
 
 Results for the Poppler fork `Rupam3238/poppler-patch-for-charta-26.08.0` (commit `0fe4c9d`) were
 carried forward from an earlier revision and **not rechecked** at this baseline.
@@ -22,7 +23,7 @@ carried forward from an earlier revision and **not rechecked** at this baseline.
 | Fork has a committed `build/` directory | 1523 tracked files under `build/` in the fork | Carried forward, not rechecked (fork, not Charta) |
 | `patches/poppler-annotation-rotation.patch` and `ChartaRotate/LocalW/LocalH` | Patch present in `patches/` and contains the three keys | Confirmed. Presence does not prove that an installed Poppler contains the changes |
 | Rotation scope: text, stamps, shapes, line, ink | `README.md`; `annots.cpp:118,1617`; `autotests/annotationrotationtest.cpp`; `autotests/annotationpersistencetest.cpp` | Documented and implemented. The persistence test saves and reopens through Poppler; neither test was run |
-| `Ctrl+Shift+B` opens Document Builder | `shell/shell.cpp:588` | Confirmed; also bound to add-to-quick-tools in `part/annotationactionhandler.cpp:2204` |
+| `Ctrl+Shift+B` opens Document Builder | `shell/shell.cpp:588`; runtime check with an annotation tool active | Ambiguous: the shortcut displayed an ambiguity warning and triggered neither action. `File → Document Builder…` worked. Also bound to add-to-quick-tools in `part/annotationactionhandler.cpp:2204` |
 | `File → Document Builder…` | `shell/shell.cpp:584` | Confirmed |
 | Default shortcut table | `annotationactionhandler.cpp:2185-2205`, `part/pageview.cpp:922,942,949` | Confirmed |
 | 180 ms hold threshold; seven-point smoothing | `annotationactionhandler.cpp:78`; `part/annotationtools.cpp:457` | Confirmed |
@@ -35,9 +36,16 @@ carried forward from an earlier revision and **not rechecked** at this baseline.
 | Flatpak uses the full fork | `.flatpak-manifest.json`: upstream Poppler 26.08.0 plus `patches/poppler-ink-appearance.patch` only | **No.** The rotation patch is not applied, and the manifest is not expected to build while the generator calls the patched APIs unguarded (not tested) |
 | Charta-specific tests are registered | `autotests/CMakeLists.txt` | Confirmed. Also `annotationrotationtest`, `annotationpersistencetest` (needs Poppler Qt6) and `annotationclipboardtest` (desktop UI). Registration is not evidence that tests pass |
 
+## Runtime observation (2026-10-21)
+
+The existing development build was launched under Xvfb to capture the README screenshots. With
+an annotation tool active, `Ctrl+Shift+B` produced an ambiguity warning and opened nothing;
+`File → Document Builder…` opened the builder. The screenshots use an original sample PDF and
+are illustrative; they were not produced from a clean build.
+
 ## Checks not performed
 
-- Clean configure, compile, install or launch of Charta.
+- Clean configure, compile, install or launch of Charta from a clean tree.
 - Flatpak build or runtime verification.
 - Build or runtime verification of the Poppler fork.
 - Execution of the CTest suite.
