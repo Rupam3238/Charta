@@ -16,7 +16,7 @@ inih,optional build dep,r62,https://github.com/benhoyt/inih,BSD-3-Clause,dynamic
 libzip,optional build dep,1.11.4,https://libzip.org,BSD-3-Clause,dynamic,yes:BSD-3-Clause.txt,keep copyright notice,E3,
 boost,optional build dep,1.92.0,https://archives.boost.io,BSL-1.0,headers only,NO,ship BSL-1.0 text if headers are redistributed,E3,BSL-1.0 text is NOT in LICENSES/
 poppler-data,optional build dep,0.4.12,https://poppler.freedesktop.org,MIT-style + Adobe CMaps under separate terms,data,NO,keep upstream notices; the CMaps have their own terms,E3,licence of the bundled CMap data must be checked
-gnustep-make / libs-base,optional build dep,make-2_9_3 / base-1.29,https://github.com/gnustep,GPL-2.0-or-later (make) / LGPL-2.1 (libs-base),dynamic,partial,ship the matching texts if the modules ship,E3,one local patch applied to libs-base
+gnustep-make / libs-base,optional build dep,make-2_9_3 / base-1.31.1,https://github.com/gnustep,GPL-2.0-or-later (make) / LGPL-2.1 (libs-base),dynamic,partial,ship the matching texts if the modules ship,E3,one upstream GNUstep patch (gdomap signal handler) applied to libs-base
 unarchiver (XADMaster),optional build dep,universal-detector,https://github.com/MacPaw/universal-detector,LGPL-2.1,dynamic,NO,ship LGPL-2.1 text if shipped,E3,
 Freetype,build dep,system,https://www.freetype.org,FTL or GPL-2.0-or-later,dynamic,NO,notices; the FTL text is missing from LICENSES/,E3,
 libtiff,build dep,system,http://www.libtiff.org,libtiff licence (BSD-like),dynamic,NO,notices,E3,

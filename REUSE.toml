@@ -154,6 +154,15 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Charta contributors"
 SPDX-License-Identifier = "GPL-2.0-or-later"
 
+# --- Upstream patches vendored for the Flatpak build --------------------------------------------------
+# The patch below is a verbatim upstream GNUstep commit (Tools/gdomap.c) that the Flatpak manifest
+# applies to the pinned libs-base archive; gdomap.c is GPL-2.0-or-later.
+[[annotations]]
+path = ".flatpak-patches/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "1996-2002 Free Software Foundation, Inc. (GNUstep)"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
 # --- AppStream metadata files ----------------------------------------------------------------------
 # metadata_license is CC0-1.0: that is the licence of the METADATA in these files, not of the
 # software they describe. The software licence is declared in the <project_license> element.

@@ -91,7 +91,7 @@ this project does about it. The evidence behind each entry is in `docs/licensing
 | libzip | 1.11.4 | BSD-3-Clause | optional module |
 | boost | 1.92.0 | BSL-1.0 | headers only; **text not yet in `LICENSES/`** |
 | poppler-data | 0.4.12 | MIT-style + separate Adobe CMap terms | data files; **text not yet in `LICENSES/`** |
-| gnustep-make / libs-base | 2_9_3 / 1.29 | GPL-2.0-or-later / LGPL-2.1 | optional module; one local patch |
+| gnustep-make / libs-base | 2_9_3 / 1.31.1 | GPL-2.0-or-later / LGPL-2.1 | optional module; one upstream GNUstep patch (gdomap signal handler) |
 | unarchiver (XADMaster) | universal-detector | LGPL-2.1 | optional module |
 | Freetype, libtiff, zlib | system | FTL / libtiff / zlib | system libraries; **texts not yet in `LICENSES/`** |
 
