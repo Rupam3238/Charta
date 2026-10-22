@@ -3,9 +3,11 @@
 #
 # Install with:   git config core.hooksPath .githooks
 #
-# It refuses to commit a staged source file that has no SPDX header, except for the paths that
-# are covered by REUSE.toml (grouped annotations) or that carry no text at all. It never rewrites
-# anything; it only stops the commit and prints what is missing.
+# It refuses to commit a staged source file that has no SPDX header, except for paths covered by
+# REUSE.toml (grouped annotations) or paths that carry no text at all. The REUSE.toml coverage
+# check reads REUSE.toml itself, so the hook and the lint cannot drift apart; if python3 is
+# missing the hook falls back to header-checking every text file. It never rewrites anything;
+# it only stops the commit and prints what is missing.
 #
 # Escape hatch for a one-off commit:  CHARTA_SKIP_LICENSE_HOOK=1 git commit ...
 
@@ -16,21 +18,67 @@ if [ "${CHARTA_SKIP_LICENSE_HOOK:-0}" = "1" ]; then
     exit 0
 fi
 
-# Paths whose licence comes from REUSE.toml, or which are not text.
-skip_re='^(po/|docs/|charta_logo_package/|icons/charta\.svg$|autotests/data/|part/data/sources/|.*/Messages\.sh$|generators/dvi/|mobile/|autotests/closedialoghelper\.(cpp|h)$|cmake/modules/FindDjVuLibre\.cmake$|Charta6Config\.cmake\.in$|OkularConfigureChecks\.cmake$|config-okular\.h\.cmake$|shell/MacOSXBundleInfo\.plist\.in$|LICENSE$|REUSE\.toml$|.*\.orig$|.*\.patch$|.*\.diff$|.*\.svg$|.*\.svgz$|.*\.png$|.*\.jpg$|.*\.pdf$|.*\.eps$|.*\.po$|.*\.ts$|.*\.json$|.*\.ui$|.*\.kcfgc?$|.*\.qrc$)'
-
 # File types that are expected to carry an SPDX header.
 text_re='\.(c|cc|cpp|cxx|h|hh|hpp|qml|js|py|sh|cmake|in|m|mm)$'
+
+# Does REUSE.toml cover `path` with one of its annotation globs?
+# Glob semantics mirrored from REUSE: '*' stops at '/', '**' does not, and a pattern ending in
+# '/**' also matches the directory itself. Non-glob characters are literal.
+covered_by_reuse_toml() {
+    python3 - "$1" <<'PY'
+import re, sys
+path = sys.argv[1]
+toml = open('REUSE.toml', encoding='utf8').read()
+groups = re.findall(r'\[\[annotations\]\](.*?)(?=\[\[annotations\]\]|\Z)', toml, re.S)
+for body in groups:
+    paths = []
+    # multi-line list:  path = [ "a", "b", ... ]  (the closing bracket may be lines below)
+    m = re.search(r'^\s*path\s*=\s*\[(.*?)\]', body, re.S | re.M)
+    if m:
+        paths += re.findall(r'"([^"]*)"', m.group(1))
+    # single line:  path = "x"   or   path = x
+    for m in re.finditer(r'^\s*path\s*=\s*(\S[^\n]*)$', body, re.M):
+        raw = m.group(1).strip()
+        if not raw.startswith('['):
+            paths += [raw.strip('"\'') if raw[0] in '"' or raw[0] in "'" else raw]
+            continue
+        if raw.endswith(']'):
+            paths += re.findall(r'"([^"]*)"', raw)
+    for g in paths:
+            pattern = g.rstrip('/')
+            if pattern.endswith('/**') and (
+                    path == pattern[:-3]
+                    or re.fullmatch(re.escape(pattern[:-3]) + '/.*', path)):
+                sys.exit(0)
+            rx = ''
+            # '**/' (anywhere, incl. the start) matches any number of complete directory
+            # segments, i.e. also an empty run: '**/Messages.sh' matches 'Messages.sh'.
+            for token in re.split(r'(\*\*/|\*\*|\*)', pattern):
+                if token == '**/':
+                    rx += '(?:[^/]+/)*'
+                elif token == '**':
+                    rx += '.*'
+                elif token == '*':
+                    rx += '[^/]*'
+                else:
+                    rx += re.escape(token)
+            if re.fullmatch(rx, path):
+                sys.exit(0)
+sys.exit(1)
+PY
+}
 
 staged=$(git diff --cached --name-only --diff-filter=ACM)
 
 fail=0
 for f in $staged; do
-    if printf '%s' "$f" | grep -Eq "$skip_re"; then
-        continue
-    fi
     if ! printf '%s' "$f" | grep -Eq "$text_re"; then
         continue
+    fi
+    if [ -f REUSE.toml ] && command -v python3 >/dev/null 2>&1; then
+        if covered_by_reuse_toml "$f"; then
+            continue
+        fi
     fi
     if ! git show ":$f" 2>/dev/null | head -40 | grep -q 'SPDX-License-Identifier'; then
         echo "pre-commit: $f has no SPDX-License-Identifier header." >&2
