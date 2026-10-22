@@ -13,6 +13,10 @@ KDE or Okular release and is not affiliated with or endorsed by the KDE communit
 Okular's document core and format backends and adds a drawing-first annotation workflow,
 in-place PDF page editing, a visual Document Builder, and a "Create a PDF" flow.
 
+<img src="docs/images/annotations.png" alt="Charta showing a PDF with highlighted text and a hand-drawn underline" width="700">
+
+*Reading and annotating a PDF in Charta.*
+
 ## Highlights
 
 - **Drawing-first annotation:** pressure-sensitive pen, freeform highlighter, dedicated eraser,
@@ -84,15 +88,24 @@ on build options and the document.
 | `Ctrl+Shift+Delete` | Clear annotations on the current page |
 | `Ctrl+Shift+B` | Open Document Builder (shell); also bound to "add to quick tools" in the part |
 
-All shortcuts are configurable. The `Ctrl+Shift+B` double binding is a known inconsistency; see
-[Known limitations](#known-limitations).
+All shortcuts are configurable. The `Ctrl+Shift+B` double binding is a confirmed inconsistency:
+when an annotation tool is active, the shortcut can show an ambiguity warning and trigger neither
+action; use `File → Document Builder…` in that case. See [Known limitations](#known-limitations).
 
 **Page editing (PDF, Poppler backend).** Insert blank pages, delete pages (the last page cannot
 be removed), reorder by dragging thumbnails, undo/redo, and save in place. Saving a changed
 structure uses QPDF when built with it, otherwise `pdfseparate`/`pdfunite` from poppler-utils.
 
+<img src="docs/images/page-editing.png" alt="Pages panel with thumbnails for a multi-page PDF" width="700">
+
+*The Pages panel, used for thumbnail navigation and page editing.*
 **Document Builder.** A full-window page, opened from the options rail, the welcome screen, or
 `File → Document Builder…`.
+
+<img src="docs/images/document-builder.png" alt="Document Builder showing four page cards assembled from a PDF" width="700">
+
+*Assembling pages in the Document Builder.*
+
 1. **Add Files** accepts local PDFs and images; password-protected PDFs prompt for a password.
 2. Pages appear as thumbnail cards; reorder by drag, `Alt+Up`/`Alt+Down`, or context menu.
 3. Remove pages, adjust the grid, and set page size, margin and fit for image pages.
@@ -108,6 +121,10 @@ and cannot be cancelled. Internals: [docs/architecture.md](docs/architecture.md)
 
 **Create a PDF.** `File → New` or the welcome screen creates an untitled document backed by a
 temporary blank-page PDF; `Save As` makes it a normal document. Autosave never runs on it.
+
+<img src="docs/images/create-pdf.png" alt="Create a PDF dialog with page size and page count options" width="700">
+
+*Creating a new PDF from blank pages.*
 
 ## Requirements
 
@@ -193,6 +210,10 @@ flatpak run org.charta.reader
 
 ## Running Charta
 
+<img src="docs/images/welcome.png" alt="Welcome screen with Open Document, Create a PDF, and Document Builder actions" width="700">
+
+*The welcome screen shown on startup.*
+
 ```text
 charta [options] [urls...]
 ```
@@ -239,6 +260,8 @@ The Document Builder accepts PDFs and images readable by Qt's `QImageReader`.
   annotations are deliberately kept unrotated, as are signatures and other action annotations.
   Layer flattening is not implemented.
 - `Ctrl+Shift+B` is bound both to Document Builder (shell) and "add to quick tools" (part).
+  With an annotation tool active, the ambiguity warning can block both actions; use
+  `File → Document Builder…` instead.
 - Page editing is Poppler-only. After a page edit, the original is removed and replaced, which is
   not guaranteed atomic. Links and named destinations may point to deleted pages.
 - Autosave never runs for untitled, password-opened, non-local, print-preview, read-only, or
