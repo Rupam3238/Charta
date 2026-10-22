@@ -6,34 +6,51 @@
 
 > **Status: early-usable prototype.** Linux desktop is the only target platform. Some features
 > are experimental or incomplete, behaviour may change between commits, and there is no CI or
-> tagged release.
+> tagged release. This project is being refactored by its creator ahead of a public release.
 
 Charta is substantially based on [KDE Okular](https://okular.kde.org/). It is **not** an official
 KDE or Okular release and is not affiliated with or endorsed by the KDE community. It keeps
 Okular's document core and format backends and adds a drawing-first annotation workflow,
 in-place PDF page editing, a visual Document Builder, and a "Create a PDF" flow.
 
+## Contents
+
+[About](#about) · [Feature status](#feature-status) · [Features](#features) ·
+[Requirements](#requirements) · [Building from source](#building-from-source) ·
+[Running charta](#running-charta) · [Tests](#tests) · [Supported formats](#supported-formats) ·
+[Known limitations](#known-limitations) · [Documentation](#documentation) ·
+[Attribution and provenance](#attribution-and-provenance) · [License](#license) ·
+[Contributing and reporting issues](#contributing-and-reporting-issues) ·
+[Acknowledgements](#acknowledgements) · [Project facts](#project-facts)
+
+## About
+
+Charta is a PDF reader and annotation tool for the Linux desktop. It is built on KDE Okular's
+document engine and adds:
+
+- **Drawing-first annotation** — pressure-sensitive pen, freeform highlighter, dedicated eraser,
+  shapes, stamps, and a recent-colour history.
+- **Temporary tools** — hold **Space** to pan or **E** to erase; release to return to your tool.
+- **In-place PDF page editing** — insert, delete, and reorder pages with undo/redo.
+- **Document Builder** — assemble a new PDF from pages of other PDFs and from images.
+- **Create a PDF** — start from configured blank pages and `Save As`.
+
+### How this was built
+
+The code in this repository was generated with AI tools under the direction of its project
+creator and maintainer, who integrated and tested the work. AI systems are disclosed as tools,
+not authors or copyright holders. The creator is currently studying computer science and plans
+to refactor parts of the codebase personally before a public release, so that the shipped code
+can be claimed as their own work.
+
+This statement describes the development process. It is not a substitute for copyright
+attribution, and no legal clearance has been obtained for AI-generated output. See
+[Attribution and provenance](#attribution-and-provenance) and
+[docs/licensing/](docs/licensing/) for the full position.
+
 <img src="docs/images/annotations.png" alt="Charta showing a PDF with highlighted text and a hand-drawn underline" width="700">
 
 *Reading and annotating a PDF in Charta.*
-
-## Highlights
-
-- **Drawing-first annotation:** pressure-sensitive pen, freeform highlighter, dedicated eraser,
-  shapes, stamps, and a recent-colour history.
-- **Temporary tools:** hold **Space** to pan or **E** to erase, release to return.
-- **In-place PDF page editing:** insert, delete, and reorder pages with undo/redo.
-- **Document Builder:** assemble a new PDF from pages of other PDFs and from images.
-- **Create a PDF:** start from configured blank pages and `Save As`.
-
-## Contents
-
-[Feature status](#feature-status) · [Features](#features) · [Requirements](#requirements) ·
-[Building](#building-from-source) · [Running](#running-charta) · [Tests](#tests) ·
-[Formats](#supported-formats) · [Limitations](#known-limitations) ·
-[Documentation](#documentation) · [Provenance](#attribution-and-provenance) ·
-[License](#license) · [Contributing](#contributing-and-reporting-issues) ·
-[Acknowledgements](#acknowledgements)
 
 ## Feature status
 
@@ -41,7 +58,7 @@ in-place PDF page editing, a visual Document Builder, and a "Create a PDF" flow.
 [Tests](#tests) and [docs/README-VERIFICATION.md](docs/README-VERIFICATION.md).
 
 | Area | Status | Notes |
-| --- | --- | --- |
+|---|---|---|
 | PDF viewing and navigation | Implemented (inherited) | Poppler backend; the main use case |
 | Text markup (highlight, underline, squiggly, strike out) | Implemented | |
 | Freehand ink, freeform highlighter, eraser | Implemented | Pressure is session-only |
@@ -65,6 +82,7 @@ recent files. Presentation mode, forms, signatures and text-to-speech are inheri
 on build options and the document.
 
 **Annotation.**
+
 - Tools: text markup, typewriter, inline and popup notes, pen, freeform highlighter, eraser,
   line, arrow, rectangle, ellipse, polygon, and stamps (including clipboard-image stamps).
 - Per-point tablet pressure is captured and mapped to stroke width; a seven-point moving average
@@ -73,7 +91,7 @@ on build options and the document.
   tool persistently. A history of recent colours is cycled with **C**.
 
 | Default shortcut | Action |
-| --- | --- |
+|---|---|
 | `Alt+1` … `Alt+4` | Highlighter, underline, squiggly, strike out |
 | `Alt+6` / `Alt+7` | Inline note / popup note |
 | `Alt+Shift+T` | Typewriter |
@@ -90,7 +108,8 @@ on build options and the document.
 
 All shortcuts are configurable. The `Ctrl+Shift+B` double binding is a confirmed inconsistency:
 when an annotation tool is active, the shortcut can show an ambiguity warning and trigger neither
-action; use `File → Document Builder…` in that case. See [Known limitations](#known-limitations).
+action; use `File → Document Builder…` in that case. See
+[Known limitations](#known-limitations).
 
 **Page editing (PDF, Poppler backend).** Insert blank pages, delete pages (the last page cannot
 be removed), reorder by dragging thumbnails, undo/redo, and save in place. Saving a changed
@@ -99,6 +118,7 @@ structure uses QPDF when built with it, otherwise `pdfseparate`/`pdfunite` from 
 <img src="docs/images/page-editing.png" alt="Pages panel with thumbnails for a multi-page PDF" width="700">
 
 *The Pages panel, used for thumbnail navigation and page editing.*
+
 **Document Builder.** A full-window page, opened from the options rail, the welcome screen, or
 `File → Document Builder…`.
 
@@ -148,6 +168,7 @@ Linux (X11/Wayland) only; the build uses Qt private GUI headers.
 ## Building from source
 
 ### Patched Poppler
+
 Charta needs three things stock Poppler does not offer: a way to attach a custom appearance
 stream (`/AP`) to an annotation (used for pressure-shaped ink), annotation-order access
 (`moveAnnotation`), and persistence for oriented annotation frames. The fork lives in
@@ -186,7 +207,7 @@ Generators and `okularpart.so` are loaded as plugins: if code changes have no ef
 the build-tree plugins are used rather than a stale installed copy.
 
 | CMake option | Default | Meaning |
-| --- | --- | --- |
+|---|---|---|
 | `OKULAR_UI` | `desktop` (Linux) | `desktop`, `mobile`, or `both` |
 | `BUILD_TESTING` | CTest default | Build tests |
 | `USE_DBUS` | ON on Linux/BSD | DBus components |
@@ -194,6 +215,7 @@ the build-tree plugins are used rather than a stale installed copy.
 | `BUILD_COVERAGE` | OFF | gcov instrumentation |
 
 ### Flatpak
+
 `.flatpak-manifest.json` (app ID `org.charta.reader`, runtime `org.kde.Platform` 6.11) builds
 upstream Poppler 26.08.0 with only `patches/poppler-ink-appearance.patch`. It does **not** apply
 `patches/poppler-annotation-rotation.patch` and does not use the full fork. Because the generator
@@ -208,7 +230,7 @@ flatpak run org.charta.reader
 > **Verification:** these commands follow the CMake files and manifest at commit `0f13a44`. A clean build,
 > install, and Flatpak build were **not** run for this documentation.
 
-## Running Charta
+## Running charta
 
 <img src="docs/images/welcome.png" alt="Welcome screen with Open Document, Create a PDF, and Document Builder actions" width="700">
 
@@ -333,7 +355,7 @@ the KDE Drawy contributors, for the annotation interaction ideas referenced abov
 Poppler, QPDF, Qt and KDE Frameworks communities.
 
 | Project fact | Value |
-| --- | --- |
+|---|---|
 | Version | `26.11.70` (`CMakeLists.txt`) |
 | Application ID / executable | `org.charta.reader` / `charta` |
 | Core library | `Charta6Core` |
