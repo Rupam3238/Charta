@@ -11,6 +11,7 @@
 #define _OKULAR_DOCUMENT_COMMANDS_P_H_
 
 #include <QDomNode>
+#include <QHash>
 #include <QUndoCommand>
 
 #include "annotations.h"
@@ -68,6 +69,27 @@ private:
     Okular::Annotation *m_annotation;
     int m_pageNumber;
     int m_oldIndex;
+    bool m_done;
+};
+
+class RemoveAnnotationsFromPagesCommand : public OkularUndoCommand
+{
+public:
+    RemoveAnnotationsFromPagesCommand(Okular::DocumentPrivate *doc, const QHash<int, QList<Okular::Annotation *>> &annotationsByPage);
+    ~RemoveAnnotationsFromPagesCommand() override;
+    void undo() override;
+    void redo() override;
+
+    bool refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector) override;
+
+private:
+    struct PageAnnotationRemoval {
+        int pageNumber;
+        Okular::Annotation *annotation;
+        int oldIndex;
+    };
+    Okular::DocumentPrivate *m_docPriv;
+    QList<PageAnnotationRemoval> m_removals;
     bool m_done;
 };
 

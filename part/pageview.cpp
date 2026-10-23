@@ -45,6 +45,7 @@
 #include <QScroller>
 #include <QScrollerProperties>
 #include <QSet>
+#include <QHash>
 #include <QTimer>
 #include <QToolButton>
 #include <QToolTip>
@@ -1046,6 +1047,32 @@ void PageView::setupActions(KActionCollection *ac)
         }
         if (!annotations.isEmpty()) {
             d->document->removePageAnnotations(pageNumber, annotations);
+        }
+    });
+
+    auto *clearAllPagesAnnotations = new QAction(i18n("Clear All Pages"), this);
+    ac->addAction(QStringLiteral("clear_all_pages_annotations"), clearAllPagesAnnotations);
+    ac->setDefaultShortcut(clearAllPagesAnnotations, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Backspace));
+    connect(clearAllPagesAnnotations, &QAction::triggered, this, [this] {
+        QHash<int, QList<Okular::Annotation *>> annotationsByPage;
+        const int pageCount = d->document->pages();
+        for (int pageNumber = 0; pageNumber < pageCount; ++pageNumber) {
+            const Okular::Page *page = d->document->page(pageNumber);
+            if (!page) {
+                continue;
+            }
+            QList<Okular::Annotation *> annotations;
+            for (Okular::Annotation *annotation : page->annotations()) {
+                if (d->document->canRemovePageAnnotation(annotation)) {
+                    annotations.append(annotation);
+                }
+            }
+            if (!annotations.isEmpty()) {
+                annotationsByPage[pageNumber] = annotations;
+            }
+        }
+        if (!annotationsByPage.isEmpty()) {
+            d->document->removeAnnotationsFromPages(annotationsByPage);
         }
     });
 

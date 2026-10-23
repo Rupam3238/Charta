@@ -165,6 +165,82 @@ bool RemoveAnnotationCommand::refreshInternalPageReferences(const QList<Okular::
     return true;
 }
 
+RemoveAnnotationsFromPagesCommand::RemoveAnnotationsFromPagesCommand(Okular::DocumentPrivate *doc, const QHash<int, QList<Okular::Annotation *>> &annotationsByPage)
+    : m_docPriv(doc)
+    , m_done(false)
+{
+    setText(i18nc("remove annotations from all pages", "remove all annotations"));
+
+    for (auto it = annotationsByPage.cbegin(); it != annotationsByPage.cend(); ++it) {
+        const int pageNumber = it.key();
+        Page *kp = m_docPriv->m_pagesVector.value(pageNumber, nullptr);
+        if (!kp) {
+            continue;
+        }
+
+        for (Okular::Annotation *annotation : it.value()) {
+            PageAnnotationRemoval removal;
+            removal.pageNumber = pageNumber;
+            removal.annotation = annotation;
+            removal.oldIndex = kp->annotationIndex(annotation);
+            m_removals.append(removal);
+        }
+    }
+}
+
+RemoveAnnotationsFromPagesCommand::~RemoveAnnotationsFromPagesCommand()
+{
+    if (m_done) {
+        for (const PageAnnotationRemoval &removal : m_removals) {
+            delete removal.annotation;
+        }
+    }
+}
+
+void RemoveAnnotationsFromPagesCommand::undo()
+{
+    m_docPriv->beginAnnotationChangeBatch();
+    m_docPriv->beginAnnotationPixmapRefreshBatch();
+
+    for (const PageAnnotationRemoval &removal : m_removals) {
+        m_docPriv->performAddPageAnnotation(removal.pageNumber, removal.annotation, removal.oldIndex);
+    }
+
+    m_docPriv->endAnnotationChangeBatch();
+    m_docPriv->endAnnotationPixmapRefreshBatch();
+    m_done = false;
+}
+
+void RemoveAnnotationsFromPagesCommand::redo()
+{
+    m_docPriv->beginAnnotationChangeBatch();
+    m_docPriv->beginAnnotationPixmapRefreshBatch();
+
+    for (const PageAnnotationRemoval &removal : m_removals) {
+        m_docPriv->performRemovePageAnnotation(removal.pageNumber, removal.annotation);
+    }
+
+    m_docPriv->endAnnotationChangeBatch();
+    m_docPriv->endAnnotationPixmapRefreshBatch();
+    m_done = true;
+}
+
+bool RemoveAnnotationsFromPagesCommand::refreshInternalPageReferences(const QList<Okular::Page *> &newPagesVector)
+{
+    if (!m_done) {
+        for (PageAnnotationRemoval &removal : m_removals) {
+            if (removal.pageNumber < newPagesVector.size()) {
+                auto a = newPagesVector[removal.pageNumber]->annotation(removal.annotation->uniqueName());
+                if (a) {
+                    removal.annotation = a;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
     ReorderAnnotationCommand::ReorderAnnotationCommand(Okular::DocumentPrivate *docPriv, Okular::Annotation *annotation, int pageNumber, int oldIndex, int newIndex, int oldNativeIndex, int newNativeIndex)
     : m_docPriv(docPriv)
     , m_annotation(annotation)

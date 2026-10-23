@@ -4350,6 +4350,18 @@ void Document::removePageAnnotations(int page, const QList<Annotation *> &annota
     d->endAnnotationPixmapRefreshBatch();
 }
 
+void Document::removeAnnotationsFromPages(const QHash<int, QList<Annotation *>> &annotationsByPage)
+{
+    if (annotationsByPage.isEmpty()) {
+        return;
+    }
+    d->beginAnnotationPixmapRefreshBatch();
+    d->beginAnnotationChangeBatch();
+    d->m_undoStack->push(new RemoveAnnotationsFromPagesCommand(this->d, annotationsByPage));
+    d->endAnnotationChangeBatch();
+    d->endAnnotationPixmapRefreshBatch();
+}
+
 bool DocumentPrivate::canAddAnnotationsNatively() const
 {
     Okular::SaveInterface *iface = qobject_cast<Okular::SaveInterface *>(m_generator);

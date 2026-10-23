@@ -19,6 +19,7 @@
 #include "signatureutils.h"
 
 #include <QDomDocument>
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QPrinter>
@@ -746,6 +747,13 @@ public:
      * Removes the given @p annotations from the given @p page.
      */
     void removePageAnnotations(int page, const QList<Annotation *> &annotations);
+
+   /**
+    * Removes the given annotations from all the given pages in a single undoable batch.
+    * @p annotationsByPage maps page numbers to the annotations to remove from that page.
+    * The operation is grouped into one undo command so that undo restores all annotations at once.
+    */
+   void removeAnnotationsFromPages(const QHash<int, QList<Annotation *>> &annotationsByPage);
 
     /**
      * Clears the text selection highlights for the given @p page,
