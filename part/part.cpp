@@ -895,6 +895,7 @@ Part::Part(QObject *parent, const QVariantList &args)
     connect(m_thumbnailList.data(), &ThumbnailList::rightClick, this, &Part::slotShowMenu);
     connect(m_thumbnailList.data(), &ThumbnailList::menuRequested, this, &Part::slotThumbnailMenu);
     connect(m_thumbnailList.data(), &ThumbnailList::pagesDeleted, this, &Part::slotDeletePages);
+    connect(m_thumbnailList.data(), &ThumbnailList::pagesDuplicated, this, &Part::slotDuplicatePages);
     connect(m_thumbnailList.data(), &ThumbnailList::pageAddedBefore, this, &Part::slotInsertPageBefore);
     connect(m_thumbnailList.data(), &ThumbnailList::pageAddedAfter, this, &Part::slotInsertPageAfter);
     connect(m_thumbnailList.data(), &ThumbnailList::pageAdded, this, &Part::slotAddPage);
@@ -4771,6 +4772,15 @@ void Part::slotDeletePages(const QList<int> &pageNumbers)
     }
 
     m_document->removePages(pageNumbers);
+}
+
+void Part::slotDuplicatePages(const QList<int> &pageNumbers)
+{
+    if (!m_document || !m_document->canModifyPages() || pageNumbers.isEmpty()) {
+        return;
+    }
+
+    m_document->duplicatePages(pageNumbers);
 }
 
 void Part::insertBlankPages(int index, const NewPageDialog::NewPageData &data)

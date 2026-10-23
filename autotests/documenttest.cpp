@@ -31,6 +31,8 @@ private Q_SLOTS:
     void testDocdataMigration();
     void testEvaluateKeystrokeEventChange_data();
     void testEvaluateKeystrokeEventChange();
+    void testDuplicatePage();
+    void testDuplicatePages();
 };
 
 // Test that we don't crash if the document is closed while a RotationJob
@@ -177,6 +179,105 @@ void DocumentTest::testEvaluateKeystrokeEventChange()
     QFETCH(QString, expectedDiff);
 
     QCOMPARE(Okular::DocumentPrivate::evaluateKeystrokeEventChange(oldVal, newVal, selStart, selEnd), expectedDiff);
+}
+
+// Duplicate a single page: the document grows by one, the copy sits right after
+// the original, its content matches the original, and the original is untouched.
+void DocumentTest::testDuplicatePage()
+{
+    Okular::SettingsCore::instance(QStringLiteral("documenttest"));
+
+    const QString testFile = QStringLiteral(KDESRCDIR "data/simple-multipage.pdf");
+    QMimeDatabase db;
+    const QMimeType mime = db.mimeTypeForFile(testFile);
+
+    Okular::Document *document = new Okular::Document(nullptr);
+    QCOMPARE(document->openDocument(testFile, QUrl(), mime), Okular::Document::OpenSuccess);
+    QVERIFY(document->canModifyPages());
+
+    const uint originalCount = document->pages();
+    QVERIFY(originalCount > 1);
+
+    const int index = 5;
+    QVERIFY(index < (int)originalCount);
+
+    // Snapshot the original before duplicating it.
+    const double originalWidth = document->page(index)->width();
+    const double originalHeight = document->page(index)->height();
+    const Okular::Rotation originalOrientation = document->page(index)->orientation();
+    const int originalAnnotations = document->page(index)->annotations().size();
+    const int originalFormFields = document->page(index)->formFields().size();
+    const QString originalText = document->page(index)->text();
+
+    QVERIFY(document->duplicatePage(index));
+    QCOMPARE(document->pages(), originalCount + 1);
+
+    // The copy sits right after the original.
+    QCOMPARE(document->page(index + 1)->width(), originalWidth);
+    QCOMPARE(document->page(index + 1)->height(), originalHeight);
+    QCOMPARE(document->page(index + 1)->orientation(), originalOrientation);
+    QCOMPARE(document->page(index + 1)->annotations().size(), originalAnnotations);
+    QCOMPARE(document->page(index + 1)->formFields().size(), originalFormFields);
+    QCOMPARE(document->page(index + 1)->text(), originalText);
+
+    // The original page stays at its index and is untouched.
+    QCOMPARE(document->page(index)->width(), originalWidth);
+    QCOMPARE(document->page(index)->height(), originalHeight);
+    QCOMPARE(document->page(index)->orientation(), originalOrientation);
+    QCOMPARE(document->page(index)->annotations().size(), originalAnnotations);
+    QCOMPARE(document->page(index)->formFields().size(), originalFormFields);
+    QCOMPARE(document->page(index)->text(), originalText);
+
+    // Invalid indices are rejected and leave the document unchanged.
+    QVERIFY(!document->duplicatePage(-1));
+    QVERIFY(!document->duplicatePage((int)originalCount + 10));
+    QCOMPARE(document->pages(), originalCount + 1);
+
+    delete document;
+}
+
+// Duplicate several pages at once: the document grows by N, each copy sits right
+// after its original, and out-of-range indices fail the whole operation.
+void DocumentTest::testDuplicatePages()
+{
+    Okular::SettingsCore::instance(QStringLiteral("documenttest"));
+
+    const QString testFile = QStringLiteral(KDESRCDIR "data/simple-multipage.pdf");
+    QMimeDatabase db;
+    const QMimeType mime = db.mimeTypeForFile(testFile);
+
+    Okular::Document *document = new Okular::Document(nullptr);
+    QCOMPARE(document->openDocument(testFile, QUrl(), mime), Okular::Document::OpenSuccess);
+    QVERIFY(document->canModifyPages());
+
+    const uint originalCount = document->pages();
+    QVERIFY(originalCount > 2);
+
+    // Duplicate the first and the last page. Indices are handled in descending
+    // order, so the last page is duplicated first, then the first one.
+    QVERIFY(document->duplicatePages(QList<int>() << 0 << (int)(originalCount - 1)));
+    QCOMPARE(document->pages(), originalCount + 2);
+
+    // Copy of page 0 now sits at index 1.
+    QCOMPARE(document->page(1)->width(), document->page(0)->width());
+    QCOMPARE(document->page(1)->height(), document->page(0)->height());
+    QCOMPARE(document->page(1)->orientation(), document->page(0)->orientation());
+    QCOMPARE(document->page(1)->text(), document->page(0)->text());
+
+    // Original last page is now at index originalCount, its copy right after it.
+    QCOMPARE(document->page(originalCount)->width(), document->page(originalCount - 1)->width());
+    QCOMPARE(document->page(originalCount + 1)->width(), document->page(originalCount)->width());
+    QCOMPARE(document->page(originalCount + 1)->orientation(), document->page(originalCount)->orientation());
+
+    // An out-of-range index fails the whole call and changes nothing.
+    QVERIFY(!document->duplicatePages(QList<int>() << 0 << 999999));
+    QCOMPARE(document->pages(), originalCount + 2);
+
+    // An empty list fails and changes nothing.
+    QVERIFY(!document->duplicatePages(QList<int>()));
+    QCOMPARE(document->pages(), originalCount + 2);
+
+    delete document;
 }
 
 QTEST_MAIN(DocumentTest)

@@ -76,6 +76,7 @@ Q_SIGNALS:
     // emitted while the page menu is built, so that the owner can append its own actions
     void menuRequested(QMenu *menu, const Okular::Page *page, const QPoint &globalPos);
     void pagesDeleted(const QList<int> &pageNumbers);
+    void pagesDuplicated(const QList<int> &pageNumbers);
     void pageAddedBefore(int pageNumber);
     void pageAddedAfter(int pageNumber);
     void pageAdded(const Okular::NewPageDialog::NewPageData &data);

@@ -114,6 +114,63 @@ qint64 imagePixelCount(const QString &path)
 }
 }
 
+// SelectionBar: bottom bar shown during checkbox selection mode.
+SelectionBar::SelectionBar(QWidget *parent)
+    : QWidget(parent)
+{
+    setAutoFillBackground(true);
+    setBackgroundRole(QPalette::Window);
+
+    auto *layout = new QHBoxLayout(this);
+    layout->setContentsMargins(12, 6, 12, 6);
+    layout->setSpacing(12);
+
+    m_countLabel = new QLabel(this);
+    m_countLabel->setStyleSheet(QStringLiteral("color: #c4ced8; font-weight: bold;"));
+    layout->addWidget(m_countLabel);
+
+    layout->addStretch(1);
+
+    m_doneButton = new QToolButton(this);
+    m_doneButton->setText(i18n("Done"));
+    m_doneButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    connect(m_doneButton, &QToolButton::clicked, this, &SelectionBar::doneClicked);
+    layout->addWidget(m_doneButton);
+
+    m_selectAllButton = new QToolButton(this);
+    m_selectAllButton->setText(i18n("Select all"));
+    m_selectAllButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    connect(m_selectAllButton, &QToolButton::clicked, this, &SelectionBar::selectAllClicked);
+    layout->addWidget(m_selectAllButton);
+
+    m_deleteButton = new QToolButton(this);
+    m_deleteButton->setText(i18n("Delete"));
+    m_deleteButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-delete")));
+    m_deleteButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    connect(m_deleteButton, &QToolButton::clicked, this, &SelectionBar::deleteClicked);
+    layout->addWidget(m_deleteButton);
+
+    m_duplicateButton = new QToolButton(this);
+    m_duplicateButton->setText(i18n("Duplicate"));
+    m_duplicateButton->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
+    m_duplicateButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    connect(m_duplicateButton, &QToolButton::clicked, this, &SelectionBar::duplicateClicked);
+    layout->addWidget(m_duplicateButton);
+
+    hide();
+    setSelectionCount(0);
+}
+
+void SelectionBar::setSelectionCount(int count)
+{
+    m_selectionCount = count;
+    m_countLabel->setText(i18np("%1 page selected", "%1 pages selected", count));
+    m_doneButton->setEnabled(count > 0);
+    m_deleteButton->setEnabled(count > 0);
+    m_duplicateButton->setEnabled(count > 0);
+    m_selectAllButton->setEnabled(count >= 0);
+}
+
 DocumentBuilderDelegate::DocumentBuilderDelegate(QObject *parent)
     : QStyledItemDelegate(parent)
 {
@@ -142,6 +199,21 @@ void DocumentBuilderDelegate::setCellSize(const QSize &size)
 QRect DocumentBuilderDelegate::deleteBadgeRect(const QRect &itemRect)
 {
     return QRect(itemRect.right() - kTilePadding - kBadgeSize - 2, itemRect.top() + kTilePadding + 2, kBadgeSize, kBadgeSize);
+}
+
+QRect DocumentBuilderDelegate::checkboxRect(const QRect &itemRect)
+{
+    return QRect(itemRect.right() - kTilePadding - kBadgeSize - 2, itemRect.bottom() - kTilePadding - kBadgeSize - 2, kBadgeSize, kBadgeSize);
+}
+
+void DocumentBuilderDelegate::setSelectMode(bool on)
+{
+    m_selectMode = on;
+}
+
+void DocumentBuilderDelegate::setSelectedEntryIds(const QSet<QUuid> &ids)
+{
+    m_selectedEntryIds = ids;
 }
 
 void DocumentBuilderDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
@@ -207,14 +279,28 @@ void DocumentBuilderDelegate::paint(QPainter *painter, const QStyleOptionViewIte
     painter->setFont(badgeFont);
     painter->drawText(badge, Qt::AlignCenter, QString::number(index.row() + 1));
 
-    // Delete badge.
-    const QRect deleteRect = deleteBadgeRect(rect);
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(QColor(0, 0, 0, 120));
-    painter->drawEllipse(deleteRect);
-    painter->setPen(QPen(QColor(0xdc, 0xe3, 0xea), 1.5));
-    painter->drawLine(deleteRect.adjusted(5, 5, -5, -5).topLeft(), deleteRect.adjusted(5, 5, -5, -5).bottomRight());
-    painter->drawLine(deleteRect.adjusted(5, 5, -5, -5).topRight(), deleteRect.adjusted(5, 5, -5, -5).bottomLeft());
+    // Delete badge (shown when not in select mode) or selection checkbox (shown in select mode).
+    if (m_selectMode) {
+        const QRect checkRect = checkboxRect(rect);
+        const bool checked = m_selectedEntryIds.contains(index.data(DocumentBuilderModel::EntryIdRole).value<QUuid>());
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(0, 0, 0, 120));
+        painter->drawRoundedRect(checkRect, 4, 4);
+        painter->setPen(QPen(QColor(0xdc, 0xe3, 0xea), 1.5));
+        painter->drawRect(checkRect.adjusted(1, 1, -1, -1));
+        if (checked) {
+            painter->setBrush(QColor(0x27, 0xbf, 0xd6));
+            painter->drawRoundedRect(checkRect.adjusted(5, 5, -5, -5), 2, 2);
+        }
+    } else {
+        const QRect deleteRect = deleteBadgeRect(rect);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(0, 0, 0, 120));
+        painter->drawEllipse(deleteRect);
+        painter->setPen(QPen(QColor(0xdc, 0xe3, 0xea), 1.5));
+        painter->drawLine(deleteRect.adjusted(5, 5, -5, -5).topLeft(), deleteRect.adjusted(5, 5, -5, -5).bottomRight());
+        painter->drawLine(deleteRect.adjusted(5, 5, -5, -5).topRight(), deleteRect.adjusted(5, 5, -5, -5).bottomLeft());
+    }
 
     // Caption. The Configure popup can hide it and give the room back to the thumbnail.
     if (m_showFileNames) {
@@ -327,13 +413,14 @@ void DocumentBuilderView::updateGridSize()
         return;
     }
 
-    // Auto: the largest count in 2..6 that still leaves a readable card. A configured count is used
-    // as-is (the card may then be narrow, but that is what the user asked for).
+    // Auto: the largest count in 2..6 that still leaves a readable card.
+    // The effective minimum width per column grows with m_tileScale, so zooming in
+    // yields fewer (bigger) columns and zooming out yields more (smaller) ones.
     int columns = m_columns;
     if (columns <= DocumentBuilderConfig::kAutoColumns) {
         columns = DocumentBuilderConfig::kMinColumns;
         for (int candidate = DocumentBuilderConfig::kMaxColumns; candidate >= DocumentBuilderConfig::kMinColumns; --candidate) {
-            if (available / candidate >= kMinCellWidth + spacing) {
+            if (available / candidate >= kMinCellWidth * m_tileScale + spacing) {
                 columns = candidate;
                 break;
             }
@@ -764,10 +851,19 @@ void DocumentBuilderView::mousePressEvent(QMouseEvent *event)
         const QPoint pos = event->position().toPoint();
         const QModelIndex index = indexAt(pos);
         const auto *listModel = qobject_cast<const DocumentBuilderModel *>(model());
-        if (index.isValid() && listModel && !listModel->isAddTile(index.row())
-            && !DocumentBuilderDelegate::deleteBadgeRect(visualRect(index)).contains(pos)) {
-            m_pressedRow = index.row();
-            m_pressPos = pos;
+        const auto *delegate = qobject_cast<const DocumentBuilderDelegate *>(itemDelegate());
+        if (index.isValid() && listModel && !listModel->isAddTile(index.row()) && delegate) {
+            // Checkbox click while in select mode: toggle selection, no drag.
+            if (delegate->isSelectMode() && delegate->checkboxRect(visualRect(index)).contains(pos)) {
+                Q_EMIT checkboxToggled(index.data(DocumentBuilderModel::EntryIdRole).value<QUuid>());
+                QListView::mousePressEvent(event);
+                return;
+            }
+            if (!delegate->checkboxRect(visualRect(index)).contains(pos)
+                && !DocumentBuilderDelegate::deleteBadgeRect(visualRect(index)).contains(pos)) {
+                m_pressedRow = index.row();
+                m_pressPos = pos;
+            }
         }
     }
     QListView::mousePressEvent(event);
@@ -837,13 +933,11 @@ void DocumentBuilderView::keyPressEvent(QKeyEvent *event)
         }
     }
 
-    // Alt+Up / Alt+Down move the selection itself, so reordering works without a mouse (§10.1).
-    if ((event->key() == Qt::Key_Up || event->key() == Qt::Key_Down) && (event->modifiers() & Qt::AltModifier)) {
-        const QList<int> rows = selectedEntryRows();
-        if (!rows.isEmpty()) {
-            Q_EMIT moveSelectionRequested(event->key() == Qt::Key_Up ? -1 : 1);
-            return;
-        }
+    // Ctrl+Plus / Ctrl+Minus zoom the tile grid (§Phase 6).
+    if ((event->modifiers() & Qt::ControlModifier) &&
+        (event->key() == Qt::Key_Plus || event->key() == Qt::Key_Minus)) {
+        setTileScale(m_tileScale + (event->key() == Qt::Key_Plus ? 0.1 : -0.1));
+        return;
     }
 
     // Enter/Space on the add tile opens the file dialog, matching the mouse behaviour (§10.2).
@@ -857,6 +951,17 @@ void DocumentBuilderView::keyPressEvent(QKeyEvent *event)
     }
 
     QListView::keyPressEvent(event);
+}
+
+void DocumentBuilderView::wheelEvent(QWheelEvent *event)
+{
+    // Ctrl+scroll zooms the tile grid (§Phase 6).
+    if ((event->modifiers() & Qt::ControlModifier) && event->angleDelta().y() != 0) {
+        setTileScale(m_tileScale + (event->angleDelta().y() > 0 ? 0.1 : -0.1));
+        event->accept();
+        return;
+    }
+    QListView::wheelEvent(event);
 }
 
 DocumentBuilderWidget::DocumentBuilderWidget(QWidget *parent)
@@ -1006,9 +1111,22 @@ void DocumentBuilderWidget::buildUi()
     m_view->setModel(m_model);
     layout->addWidget(m_view, 1);
 
+    // Selection bar: shown at the bottom when checkbox select mode is on.
+    m_selectionBar = new SelectionBar(this);
+    layout->addWidget(m_selectionBar);
+    connect(m_selectionBar, &SelectionBar::doneClicked, this, [this] { setSelectMode(false); });
+    connect(m_selectionBar, &SelectionBar::selectAllClicked, this, &DocumentBuilderWidget::selectAllEntries);
+    connect(m_selectionBar, &SelectionBar::deleteClicked, this, [this] {
+        deleteRows(m_view->selectedEntryRows());
+        setSelectMode(false);
+    });
+    connect(m_selectionBar, &SelectionBar::duplicateClicked, this, [this] {
+        duplicateRows();
+        setSelectMode(false);
+    });
+
     connect(m_view, &DocumentBuilderView::addTileActivated, this, &DocumentBuilderWidget::handleAddTile);
     connect(m_view, &DocumentBuilderView::deleteRequested, this, &DocumentBuilderWidget::deleteRows);
-    connect(m_view, &DocumentBuilderView::moveSelectionRequested, this, &DocumentBuilderWidget::moveSelectionBy);
     connect(m_view, &DocumentBuilderView::contextMenuRequested, this, &DocumentBuilderWidget::showContextMenu);
     connect(m_view, &DocumentBuilderView::filesDropped, this, &DocumentBuilderWidget::addFiles);
     connect(m_view, &DocumentBuilderView::remoteFilesDropped, this, [this](const QStringList &urls) {
@@ -1019,6 +1137,7 @@ void DocumentBuilderWidget::buildUi()
     connect(m_model, &DocumentBuilderModel::countsChanged, this, &DocumentBuilderWidget::updateCountLabel);
     connect(m_model, &DocumentBuilderModel::countsChanged, m_view, &DocumentBuilderView::scheduleThumbnailFill);
     connect(m_view->selectionModel(), &QItemSelectionModel::selectionChanged, this, &DocumentBuilderWidget::updateSelectionActions);
+    connect(m_view, &DocumentBuilderView::checkboxToggled, this, &DocumentBuilderWidget::toggleEntry);
 
     applySettings();
     updateCountLabel();
@@ -1252,61 +1371,22 @@ void DocumentBuilderWidget::clearWithConfirmation()
     }
 }
 
-// True when the selection is exactly the first `rows.size()` pages (nothing to gain from "Move to
-// Start"), or exactly the last ones. A scattered selection that happens to include row 0 is not a
-// prefix: the rest still has to be gathered.
-static bool isSelectionPrefix(const QList<int> &rows)
-{
-    for (int i = 0; i < rows.size(); ++i) {
-        if (rows.at(i) != i) {
-            return false;
-        }
-    }
-    return !rows.isEmpty();
-}
-
-static bool isSelectionSuffix(const QList<int> &rows, int pageCount)
-{
-    const int offset = pageCount - rows.size();
-    for (int i = 0; i < rows.size(); ++i) {
-        if (rows.at(i) != offset + i) {
-            return false;
-        }
-    }
-    return !rows.isEmpty();
-}
-
 void DocumentBuilderWidget::showContextMenu(const QPoint &globalPos)
 {
     const QList<int> rows = m_view->selectedEntryRows();
     const QList<QUuid> ids = m_view->selectedEntryIds();
     const bool hasImages = m_model->selectionHasImages(ids);
-    const int pageCount = m_model->pageCount();
-    const bool isPrefix = isSelectionPrefix(rows);
-    const bool isSuffix = isSelectionSuffix(rows, pageCount);
 
     QMenu menu(this);
     QAction *addAction = menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add Files…"));
     QAction *deleteAction = nullptr;
-    QAction *upAction = nullptr;
-    QAction *downAction = nullptr;
-    QAction *toStartAction = nullptr;
-    QAction *toEndAction = nullptr;
+    QAction *duplicateAction = nullptr;
     QAction *setupAction = nullptr;
     if (!rows.isEmpty()) {
         menu.addSeparator();
         deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")), i18np("Remove page", "Remove %1 pages", rows.size()));
+        duplicateAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), i18np("Duplicate page", "Duplicate %1 pages", rows.size()));
         menu.addSeparator();
-        upAction = menu.addAction(QIcon::fromTheme(QStringLiteral("go-up")), i18n("Move Up"));
-        upAction->setShortcut(QKeySequence(QStringLiteral("Alt+Up")));
-        upAction->setEnabled(rows.first() > 0);
-        downAction = menu.addAction(QIcon::fromTheme(QStringLiteral("go-down")), i18n("Move Down"));
-        downAction->setShortcut(QKeySequence(QStringLiteral("Alt+Down")));
-        downAction->setEnabled(rows.last() < pageCount - 1);
-        toStartAction = menu.addAction(QIcon::fromTheme(QStringLiteral("go-first")), i18n("Move to Start"));
-        toStartAction->setEnabled(!isPrefix);
-        toEndAction = menu.addAction(QIcon::fromTheme(QStringLiteral("go-last")), i18n("Move to End"));
-        toEndAction->setEnabled(!isSuffix);
         if (hasImages) {
             menu.addSeparator();
             setupAction = menu.addAction(QIcon::fromTheme(QStringLiteral("image-x-generic")), i18n("Page Setup…"));
@@ -1314,74 +1394,93 @@ void DocumentBuilderWidget::showContextMenu(const QPoint &globalPos)
     }
     menu.addSeparator();
     QAction *selectAllAction = menu.addAction(i18n("Select All"));
+    QAction *selectModeAction = nullptr;
+    if (m_selectMode) {
+        selectModeAction = menu.addAction(i18n("Exit Selection Mode"));
+    } else if (!rows.isEmpty()) {
+        selectModeAction = menu.addAction(i18n("Enter Selection Mode"));
+    }
 
     QAction *chosen = menu.exec(globalPos);
     if (chosen == addAction) {
         addFilesViaDialog();
     } else if (chosen && chosen == deleteAction) {
         deleteRows(rows);
-    } else if (chosen == upAction) {
-        moveSelectionBy(-1);
-    } else if (chosen == downAction) {
-        moveSelectionBy(1);
-    } else if (chosen == toStartAction) {
-        moveSelectionToStart();
-    } else if (chosen == toEndAction) {
-        moveSelectionToEnd();
+    } else if (chosen == duplicateAction) {
+        duplicateRows();
     } else if (chosen == setupAction) {
         editImagePageSettings();
     } else if (chosen == selectAllAction) {
         m_view->selectAll();
+    } else if (chosen == selectModeAction) {
+        setSelectMode(!m_selectMode);
     }
     updateSelectionActions();
 }
 
-void DocumentBuilderWidget::moveSelectionBy(int delta)
+void DocumentBuilderWidget::duplicateRows()
 {
-    const QList<int> rows = m_view->selectedEntryRows();
-    const int pageCount = m_model->pageCount();
-    if (rows.isEmpty() || pageCount == 0 || delta == 0) {
+    const QList<QUuid> ids = m_view->selectedEntryIds();
+    if (ids.isEmpty() || m_model->pageCount() == 0) {
         return;
     }
-    if ((delta < 0 && rows.first() == 0) || (delta > 0 && rows.last() >= pageCount - 1)) {
-        return; // already at the edge
-    }
 
-    const QList<QUuid> ids = m_view->selectedEntryIds();
-    if (m_model->moveEntriesByStep(ids, delta < 0 ? -1 : 1)) {
-        m_view->selectEntryIds(ids);
+    const QList<QUuid> newIds = m_model->duplicateEntries(ids);
+    if (!newIds.isEmpty()) {
+        m_view->selectEntryIds(newIds);
         m_view->setFocus();
     }
+    updateSelectionActions();
 }
 
-void DocumentBuilderWidget::moveSelectionToStart()
+void DocumentBuilderWidget::setSelectMode(bool on)
 {
-    const QList<int> rows = m_view->selectedEntryRows();
-    if (rows.isEmpty() || m_model->pageCount() == 0 || isSelectionPrefix(rows)) {
+    if (m_selectMode == on) {
         return;
     }
-    // moveEntriesBefore() handles a scattered selection correctly; moveRows() would sweep the
-    // unselected pages in between along with the selection.
-    const QList<QUuid> ids = m_view->selectedEntryIds();
-    if (m_model->moveEntriesBefore(ids, 0)) {
-        m_view->selectEntryIds(ids);
-        m_view->setFocus();
+    m_selectMode = on;
+    auto *delegate = qobject_cast<DocumentBuilderDelegate *>(m_view->itemDelegate());
+    if (delegate) {
+        delegate->setSelectMode(on);
+        delegate->setSelectedEntryIds(m_selectedEntryIds);
     }
+    m_selectionBar->setVisible(on);
+    m_selectionBar->setSelectionCount(m_selectedEntryIds.size());
+    // When leaving select mode, clear the selection set.
+    if (!on) {
+        m_selectedEntryIds.clear();
+    }
+    m_view->viewport()->update();
+    updateSelectionActions();
 }
 
-void DocumentBuilderWidget::moveSelectionToEnd()
+void DocumentBuilderWidget::toggleEntry(const QUuid &id)
 {
-    const QList<int> rows = m_view->selectedEntryRows();
-    const int pageCount = m_model->pageCount();
-    if (rows.isEmpty() || pageCount == 0 || isSelectionSuffix(rows, pageCount)) {
-        return;
+    if (m_selectedEntryIds.contains(id)) {
+        m_selectedEntryIds.remove(id);
+    } else {
+        m_selectedEntryIds.insert(id);
     }
-    const QList<QUuid> ids = m_view->selectedEntryIds();
-    // pageCount() is one past the last page, so the selection lands right before the add tile.
-    if (m_model->moveEntriesBefore(ids, pageCount)) {
-        m_view->selectEntryIds(ids);
-        m_view->setFocus();
+    auto *delegate = qobject_cast<DocumentBuilderDelegate *>(m_view->itemDelegate());
+    if (delegate) {
+        delegate->setSelectedEntryIds(m_selectedEntryIds);
     }
+    m_selectionBar->setSelectionCount(m_selectedEntryIds.size());
+    m_view->viewport()->update();
+}
+
+void DocumentBuilderWidget::selectAllEntries()
+{
+    m_selectedEntryIds.clear();
+    for (const QUuid &id : m_model->entryIds()) {
+        m_selectedEntryIds.insert(id);
+    }
+    auto *delegate = qobject_cast<DocumentBuilderDelegate *>(m_view->itemDelegate());
+    if (delegate) {
+        delegate->setSelectedEntryIds(m_selectedEntryIds);
+    }
+    m_selectionBar->setSelectionCount(m_selectedEntryIds.size());
+    m_view->viewport()->update();
 }
 
 // --- Phase 5b: export -------------------------------------------------------------------------

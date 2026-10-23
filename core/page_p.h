@@ -129,6 +129,23 @@ public:
     void adoptGeneratedContents(PagePrivate *oldPage);
 
     /**
+     * Deep-copies every owned member of this PagePrivate into a new PagePrivate
+     * owned by the given @p newPage.
+     *
+     * Copies scalars, the text page (TextPage::clone), the transition (copy ctor),
+     * text selections, form fields (FormField::clone), the opening/closing actions
+     * (Action::clone), the annotations (Annotation::clone) and the two QDomDocument
+     * blobs by value.
+     *
+     * Does NOT copy m_pixmaps / m_tilesManagers (observer-specific render state,
+     * regenerated on demand), nor m_page (set by the ctor to newPage) nor m_doc
+     * (set by the new Page's document when inserted).
+     *
+     * @since 25.12
+     */
+    PagePrivate *clone(Page *newPage) const;
+
+    /**
      * Adds a new @p annotation to the page. If @p isLastAnnotationChild is true, add a AnnotationObjectRect.
      * If @p index is given, the annotation is inserted at the specified absolute position in the page order.
      */

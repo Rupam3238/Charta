@@ -21,6 +21,7 @@
 #include <QListView>
 #include <QPixmap>
 #include <QPointer>
+#include <QSet>
 #include <QSize>
 #include <QStyledItemDelegate>
 #include <QUuid>
@@ -49,6 +50,9 @@ public:
     /// Where the little delete badge sits inside a tile, so the view can hit-test it.
     static QRect deleteBadgeRect(const QRect &itemRect);
 
+    /// Where the selection checkbox sits inside a tile when select mode is on.
+    static QRect checkboxRect(const QRect &itemRect);
+
     /// Hides the file-name strip under a card and gives the room back to the thumbnail (Configure).
     void setShowFileNames(bool show);
     bool showFileNames() const
@@ -63,9 +67,40 @@ public:
         return m_cellSize;
     }
 
+    /// Select mode: when on, the delegate paints a checkbox on each card instead of the delete badge.
+    void setSelectMode(bool on);
+    bool isSelectMode() const { return m_selectMode; }
+    void setSelectedEntryIds(const QSet<QUuid> &ids);
+
 private:
     bool m_showFileNames = true;
     QSize m_cellSize;
+    bool m_selectMode = false;
+    QSet<QUuid> m_selectedEntryIds;
+};
+
+class OKULARPART_EXPORT SelectionBar : public QWidget
+{
+    Q_OBJECT
+public:
+    explicit SelectionBar(QWidget *parent = nullptr);
+
+    void setSelectionCount(int count);
+    int selectionCount() const { return m_selectionCount; }
+
+Q_SIGNALS:
+    void doneClicked();
+    void selectAllClicked();
+    void deleteClicked();
+    void duplicateClicked();
+
+private:
+    int m_selectionCount = 0;
+    QLabel *m_countLabel = nullptr;
+    QToolButton *m_doneButton = nullptr;
+    QToolButton *m_selectAllButton = nullptr;
+    QToolButton *m_deleteButton = nullptr;
+    QToolButton *m_duplicateButton = nullptr;
 };
 
 class OKULARPART_EXPORT DocumentBuilderView : public QListView
@@ -113,18 +148,19 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void showEvent(QShowEvent *event) override;
 
 Q_SIGNALS:
     void addTileActivated();
     void deleteRequested(const QList<int> &rows);
-    /// Alt+Up / Alt+Down: move the selected entries one slot up or down.
-    void moveSelectionRequested(int delta);
     void contextMenuRequested(const QPoint &globalPos);
     void filesDropped(const QStringList &paths);
     /// URLs that are not local files were dropped; the widget explains why they are ignored.
     void remoteFilesDropped(const QStringList &urls);
+    /// Checkbox tapped on a card while select mode is on.
+    void checkboxToggled(const QUuid &id);
 
 private:
     void updateGridSize();
@@ -228,9 +264,12 @@ private:
     void addFilesViaDialog();
     void clearWithConfirmation();
     void updateSelectionActions();
-    void moveSelectionBy(int delta);
-    void moveSelectionToStart();
-    void moveSelectionToEnd();
+    void duplicateRows();
+
+    // --- Phase 5: checkbox selection mode ---
+    void setSelectMode(bool on);
+    void toggleEntry(const QUuid &id);
+    void selectAllEntries();
 
     /// Image file patterns the installed Qt image plugins can read (lower-case, sorted).
     static QStringList supportedImagePatterns();
@@ -277,6 +316,11 @@ private:
     /// The local document this builder was seeded from; the Save button writes it in place.
     QString m_saveTarget;
     bool m_largeImageWarningShown = false;
+
+    // --- Phase 5: checkbox selection mode ---
+    bool m_selectMode = false;
+    QSet<QUuid> m_selectedEntryIds;
+    SelectionBar *m_selectionBar = nullptr;
 };
 
 #endif // DOCUMENTBUILDER_H

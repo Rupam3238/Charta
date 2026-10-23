@@ -826,6 +826,39 @@ Annotation::~Annotation()
     delete d_ptr;
 }
 
+Annotation *Annotation::clone() const
+{
+    // Base implementation: subclasses must override to provide a real deep copy.
+    return nullptr;
+}
+
+void Annotation::copyBaseMembersTo(Annotation *clone) const
+{
+    Q_D(const Annotation);
+    AnnotationPrivate *cloneD = clone->d_ptr;
+
+    cloneD->m_author = d->m_author;
+    cloneD->m_contents = d->m_contents;
+    cloneD->m_uniqueName = d->m_uniqueName;
+    cloneD->m_modifyDate = d->m_modifyDate;
+    cloneD->m_creationDate = d->m_creationDate;
+    cloneD->m_flags = d->m_flags;
+    cloneD->m_boundary = d->m_boundary;
+    cloneD->m_transformedBoundary = d->m_transformedBoundary;
+    cloneD->m_frameCenter = d->m_frameCenter;
+    cloneD->m_frameSize = d->m_frameSize;
+    cloneD->m_rotation = d->m_rotation;
+    cloneD->m_frameInitialized = d->m_frameInitialized;
+    cloneD->m_style = d->m_style;
+    cloneD->m_window = d->m_window;
+    cloneD->m_previousRevision = d->m_previousRevision;
+    cloneD->m_revisions = d->m_revisions;
+    cloneD->m_disposeFunc = d->m_disposeFunc;
+    cloneD->m_nativeId = d->m_nativeId;
+    cloneD->m_nativeData = d->m_nativeData;
+    // m_page is intentionally not copied: it is set by the page that owns the clone.
+}
+
 void Annotation::setAuthor(const QString &author)
 {
     Q_D(Annotation);
@@ -1671,6 +1704,27 @@ TextAnnotation::~TextAnnotation()
 {
 }
 
+Annotation *TextAnnotation::clone() const
+{
+    TextAnnotation *clone = new TextAnnotation();
+    copyBaseMembersTo(clone);
+    TextAnnotationPrivate *cloneD = static_cast<TextAnnotationPrivate *>(clone->d_ptr);
+    const TextAnnotationPrivate *d = static_cast<const TextAnnotationPrivate *>(d_ptr);
+    cloneD->m_textType = d->m_textType;
+    cloneD->m_textIcon = d->m_textIcon;
+    cloneD->m_textFont = d->m_textFont;
+    cloneD->m_textColor = d->m_textColor;
+    cloneD->m_inplaceAlign = d->m_inplaceAlign;
+    cloneD->m_inplaceCallout[0] = d->m_inplaceCallout[0];
+    cloneD->m_inplaceCallout[1] = d->m_inplaceCallout[1];
+    cloneD->m_inplaceCallout[2] = d->m_inplaceCallout[2];
+    cloneD->m_transformedInplaceCallout[0] = d->m_transformedInplaceCallout[0];
+    cloneD->m_transformedInplaceCallout[1] = d->m_transformedInplaceCallout[1];
+    cloneD->m_transformedInplaceCallout[2] = d->m_transformedInplaceCallout[2];
+    cloneD->m_inplaceIntent = d->m_inplaceIntent;
+    return clone;
+}
+
 void TextAnnotation::setTextType(TextType textType)
 {
     Q_D(TextAnnotation);
@@ -2012,6 +2066,25 @@ LineAnnotation::LineAnnotation(const QDomNode &description)
 
 LineAnnotation::~LineAnnotation()
 {
+}
+
+Annotation *LineAnnotation::clone() const
+{
+    LineAnnotation *clone = new LineAnnotation();
+    copyBaseMembersTo(clone);
+    LineAnnotationPrivate *cloneD = static_cast<LineAnnotationPrivate *>(clone->d_ptr);
+    const LineAnnotationPrivate *d = static_cast<const LineAnnotationPrivate *>(d_ptr);
+    cloneD->m_linePoints = d->m_linePoints;
+    cloneD->m_transformedLinePoints = d->m_transformedLinePoints;
+    cloneD->m_lineStartStyle = d->m_lineStartStyle;
+    cloneD->m_lineEndStyle = d->m_lineEndStyle;
+    cloneD->m_lineClosed = d->m_lineClosed;
+    cloneD->m_lineShowCaption = d->m_lineShowCaption;
+    cloneD->m_lineInnerColor = d->m_lineInnerColor;
+    cloneD->m_lineLeadingFwdPt = d->m_lineLeadingFwdPt;
+    cloneD->m_lineLeadingBackPt = d->m_lineLeadingBackPt;
+    cloneD->m_lineIntent = d->m_lineIntent;
+    return clone;
 }
 
 void LineAnnotation::setLinePoints(const QList<NormalizedPoint> &points)
@@ -2375,6 +2448,17 @@ GeomAnnotation::~GeomAnnotation()
 {
 }
 
+Annotation *GeomAnnotation::clone() const
+{
+    GeomAnnotation *clone = new GeomAnnotation();
+    copyBaseMembersTo(clone);
+    GeomAnnotationPrivate *cloneD = static_cast<GeomAnnotationPrivate *>(clone->d_ptr);
+    const GeomAnnotationPrivate *d = static_cast<const GeomAnnotationPrivate *>(d_ptr);
+    cloneD->m_geomType = d->m_geomType;
+    cloneD->m_geomInnerColor = d->m_geomInnerColor;
+    return clone;
+}
+
 void GeomAnnotation::setGeometricalType(GeomType type)
 {
     Q_D(GeomAnnotation);
@@ -2673,6 +2757,17 @@ HighlightAnnotation::~HighlightAnnotation()
 {
 }
 
+Annotation *HighlightAnnotation::clone() const
+{
+    HighlightAnnotation *clone = new HighlightAnnotation();
+    copyBaseMembersTo(clone);
+    HighlightAnnotationPrivate *cloneD = static_cast<HighlightAnnotationPrivate *>(clone->d_ptr);
+    const HighlightAnnotationPrivate *d = static_cast<const HighlightAnnotationPrivate *>(d_ptr);
+    cloneD->m_highlightType = d->m_highlightType;
+    cloneD->m_highlightQuads = d->m_highlightQuads;
+    return clone;
+}
+
 void HighlightAnnotation::setHighlightType(HighlightType type)
 {
     Q_D(HighlightAnnotation);
@@ -2876,6 +2971,16 @@ StampAnnotation::~StampAnnotation()
 {
 }
 
+Annotation *StampAnnotation::clone() const
+{
+    StampAnnotation *clone = new StampAnnotation();
+    copyBaseMembersTo(clone);
+    StampAnnotationPrivate *cloneD = static_cast<StampAnnotationPrivate *>(clone->d_ptr);
+    const StampAnnotationPrivate *d = static_cast<const StampAnnotationPrivate *>(d_ptr);
+    cloneD->m_stampIconName = d->m_stampIconName;
+    return clone;
+}
+
 void StampAnnotation::setStampIconName(const QString &name)
 {
     Q_D(StampAnnotation);
@@ -2975,6 +3080,23 @@ SignatureAnnotation::SignatureAnnotation()
 
 SignatureAnnotation::~SignatureAnnotation()
 {
+}
+
+Annotation *SignatureAnnotation::clone() const
+{
+    SignatureAnnotation *clone = new SignatureAnnotation();
+    copyBaseMembersTo(clone);
+    SignatureAnnotationPrivate *cloneD = static_cast<SignatureAnnotationPrivate *>(clone->d_ptr);
+    const SignatureAnnotationPrivate *d = static_cast<const SignatureAnnotationPrivate *>(d_ptr);
+    cloneD->m_text = d->m_text;
+    cloneD->m_leftText = d->m_leftText;
+    cloneD->m_imagePath = d->m_imagePath;
+    cloneD->m_fieldPartialName = d->m_fieldPartialName;
+    cloneD->m_fontSize = d->m_fontSize;
+    cloneD->m_leftFontSize = d->m_leftFontSize;
+    cloneD->m_pageNumber = d->m_pageNumber;
+    // m_signFunction is a session-only callback: not copied.
+    return clone;
 }
 
 Annotation::SubType SignatureAnnotation::subType() const
@@ -3142,6 +3264,20 @@ InkAnnotation::InkAnnotation(const QDomNode &description)
 
 InkAnnotation::~InkAnnotation()
 {
+}
+
+Annotation *InkAnnotation::clone() const
+{
+    InkAnnotation *clone = new InkAnnotation();
+    copyBaseMembersTo(clone);
+    InkAnnotationPrivate *cloneD = static_cast<InkAnnotationPrivate *>(clone->d_ptr);
+    const InkAnnotationPrivate *d = static_cast<const InkAnnotationPrivate *>(d_ptr);
+    cloneD->m_inkPaths = d->m_inkPaths;
+    cloneD->m_transformedInkPaths = d->m_transformedInkPaths;
+    // m_sessionPressures and m_sessionPressureStrokeWidth are session-only: not copied.
+    cloneD->m_appearanceStream = d->m_appearanceStream;
+    cloneD->m_appearanceBoundingBox = d->m_appearanceBoundingBox;
+    return clone;
 }
 
 void InkAnnotation::setInkPaths(const QList<QList<NormalizedPoint>> &paths)
@@ -3466,6 +3602,16 @@ CaretAnnotation::~CaretAnnotation()
 {
 }
 
+Annotation *CaretAnnotation::clone() const
+{
+    CaretAnnotation *clone = new CaretAnnotation();
+    copyBaseMembersTo(clone);
+    CaretAnnotationPrivate *cloneD = static_cast<CaretAnnotationPrivate *>(clone->d_ptr);
+    const CaretAnnotationPrivate *d = static_cast<const CaretAnnotationPrivate *>(d_ptr);
+    cloneD->m_symbol = d->m_symbol;
+    return clone;
+}
+
 void CaretAnnotation::setCaretSymbol(CaretAnnotation::CaretSymbol symbol)
 {
     Q_D(CaretAnnotation);
@@ -3558,6 +3704,17 @@ FileAttachmentAnnotation::FileAttachmentAnnotation(const QDomNode &description)
 
 FileAttachmentAnnotation::~FileAttachmentAnnotation()
 {
+}
+
+Annotation *FileAttachmentAnnotation::clone() const
+{
+    FileAttachmentAnnotation *clone = new FileAttachmentAnnotation();
+    copyBaseMembersTo(clone);
+    FileAttachmentAnnotationPrivate *cloneD = static_cast<FileAttachmentAnnotationPrivate *>(clone->d_ptr);
+    const FileAttachmentAnnotationPrivate *d = static_cast<const FileAttachmentAnnotationPrivate *>(d_ptr);
+    cloneD->icon = d->icon;
+    // embfile has no public copy API: not copied.
+    return clone;
 }
 
 void FileAttachmentAnnotation::store(QDomNode &node, QDomDocument &document) const
@@ -3660,6 +3817,30 @@ SoundAnnotation::~SoundAnnotation()
 {
 }
 
+Annotation *SoundAnnotation::clone() const
+{
+    SoundAnnotation *clone = new SoundAnnotation();
+    copyBaseMembersTo(clone);
+    SoundAnnotationPrivate *cloneD = static_cast<SoundAnnotationPrivate *>(clone->d_ptr);
+    const SoundAnnotationPrivate *d = static_cast<const SoundAnnotationPrivate *>(d_ptr);
+    cloneD->icon = d->icon;
+    if (d->sound) {
+        // Re-create the sound so the clone does not share the original's Sound object.
+        Okular::Sound *sound;
+        if (d->sound->soundType() == Okular::Sound::Embedded) {
+            sound = new Okular::Sound(d->sound->data());
+        } else {
+            sound = new Okular::Sound(d->sound->url());
+        }
+        sound->setSamplingRate(d->sound->samplingRate());
+        sound->setChannels(d->sound->channels());
+        sound->setBitsPerSample(d->sound->bitsPerSample());
+        sound->setSoundEncoding(d->sound->soundEncoding());
+        cloneD->sound = sound;
+    }
+    return clone;
+}
+
 void SoundAnnotation::store(QDomNode &node, QDomDocument &document) const
 {
     // recurse to parent objects storing properties
@@ -3758,6 +3939,19 @@ MovieAnnotation::~MovieAnnotation()
 {
 }
 
+Annotation *MovieAnnotation::clone() const
+{
+    MovieAnnotation *clone = new MovieAnnotation();
+    copyBaseMembersTo(clone);
+    MovieAnnotationPrivate *cloneD = static_cast<MovieAnnotationPrivate *>(clone->d_ptr);
+    const MovieAnnotationPrivate *d = static_cast<const MovieAnnotationPrivate *>(d_ptr);
+    // Movie has no public copy API: re-create from the URL when available.
+    if (d->movie && !d->movie->url().isEmpty()) {
+        cloneD->movie = new Okular::Movie(d->movie->url());
+    }
+    return clone;
+}
+
 void MovieAnnotation::store(QDomNode &node, QDomDocument &document) const
 {
     // recurse to parent objects storing properties
@@ -3846,6 +4040,20 @@ ScreenAnnotation::ScreenAnnotation(const QDomNode &description)
 
 ScreenAnnotation::~ScreenAnnotation()
 {
+}
+
+Annotation *ScreenAnnotation::clone() const
+{
+    ScreenAnnotation *clone = new ScreenAnnotation();
+    copyBaseMembersTo(clone);
+    ScreenAnnotationPrivate *cloneD = static_cast<ScreenAnnotationPrivate *>(clone->d_ptr);
+    const ScreenAnnotationPrivate *d = static_cast<const ScreenAnnotationPrivate *>(d_ptr);
+    cloneD->m_action = d->m_action ? d->m_action->clone() : nullptr;
+    QMap<Okular::Annotation::AdditionalActionType, Okular::Action *>::const_iterator it;
+    for (it = d->m_additionalActions.constBegin(); it != d->m_additionalActions.constEnd(); ++it) {
+        cloneD->m_additionalActions.insert(it.key(), it.value() ? it.value()->clone() : nullptr);
+    }
+    return clone;
 }
 
 void ScreenAnnotation::store(QDomNode &node, QDomDocument &document) const
@@ -3951,6 +4159,19 @@ WidgetAnnotation::~WidgetAnnotation()
 {
 }
 
+Annotation *WidgetAnnotation::clone() const
+{
+    WidgetAnnotation *clone = new WidgetAnnotation();
+    copyBaseMembersTo(clone);
+    WidgetAnnotationPrivate *cloneD = static_cast<WidgetAnnotationPrivate *>(clone->d_ptr);
+    const WidgetAnnotationPrivate *d = static_cast<const WidgetAnnotationPrivate *>(d_ptr);
+    QMap<Okular::Annotation::AdditionalActionType, Okular::Action *>::const_iterator it;
+    for (it = d->m_additionalActions.constBegin(); it != d->m_additionalActions.constEnd(); ++it) {
+        cloneD->m_additionalActions.insert(it.key(), it.value() ? it.value()->clone() : nullptr);
+    }
+    return clone;
+}
+
 void WidgetAnnotation::store(QDomNode &node, QDomDocument &document) const
 {
     // recurse to parent objects storing properties
@@ -4048,6 +4269,20 @@ RichMediaAnnotation::RichMediaAnnotation(const QDomNode &description)
 
 RichMediaAnnotation::~RichMediaAnnotation()
 {
+}
+
+Annotation *RichMediaAnnotation::clone() const
+{
+    RichMediaAnnotation *clone = new RichMediaAnnotation();
+    copyBaseMembersTo(clone);
+    RichMediaAnnotationPrivate *cloneD = static_cast<RichMediaAnnotationPrivate *>(clone->d_ptr);
+    const RichMediaAnnotationPrivate *d = static_cast<const RichMediaAnnotationPrivate *>(d_ptr);
+    // Movie has no public copy API: re-create from the URL when available.
+    if (d->movie && !d->movie->url().isEmpty()) {
+        cloneD->movie = new Okular::Movie(d->movie->url());
+    }
+    // embeddedFile has no public copy API: not copied.
+    return clone;
 }
 
 void RichMediaAnnotation::store(QDomNode &node, QDomDocument &document) const

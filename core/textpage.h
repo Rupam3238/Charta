@@ -130,6 +130,9 @@ public:
      */
     ~TextPage();
 
+    /// Returns a deep copy of this text page. The copy is independent of the original.
+    TextPage *clone() const;
+
     /**
      * Appends the given @p text with the given @p area as new
      * @ref TextEntity to the page.

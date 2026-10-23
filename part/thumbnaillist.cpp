@@ -62,10 +62,10 @@ QSize ThumbnailsBox::sizeHint() const
 }
 
 // The bar shown at the bottom of the list while pages are being selected
-class SelectionBar : public QWidget
+class ThumbnailSelectionBar : public QWidget
 {
 public:
-    explicit SelectionBar(QWidget *parent)
+    explicit ThumbnailSelectionBar(QWidget *parent)
         : QWidget(parent)
     {
         setAutoFillBackground(true);
@@ -143,7 +143,7 @@ public:
     // Selection mode: pages are ticked, then deleted or moved together
     bool m_selectMode;
     QSet<int> m_selectedPageNumbers;
-    SelectionBar *m_selectionBar;
+    ThumbnailSelectionBar *m_selectionBar;
 
     // Mouse press (click / long press)
     QTimer *m_longPressTimer;
@@ -350,7 +350,7 @@ ThumbnailWidget *ThumbnailListPrivate::itemFor(const QPoint p) const
 
 void ThumbnailListPrivate::createSelectionBar()
 {
-    m_selectionBar = new SelectionBar(q);
+    m_selectionBar = new ThumbnailSelectionBar(q);
     m_selectionBar->hide();
     connect(m_selectionBar->done, &QToolButton::clicked, this, [this]() { setSelectMode(false); });
     connect(m_selectionBar->selectAll, &QToolButton::clicked, this, [this]() { selectAllPages(); });
@@ -424,7 +424,8 @@ void ThumbnailListPrivate::updateSelectionHighlights()
 
 void ThumbnailListPrivate::updateSelectionBar()
 {
-    if (!m_selectionBar) {
+    if (!m_selectionBar || !m_selectionBar->label || !m_selectionBar->del ||
+        !m_selectionBar->add || !m_selectionBar->selectAll) {
         return;
     }
     const int count = m_selectedPageNumbers.size();
@@ -1231,9 +1232,12 @@ void ThumbnailListPrivate::contextMenuEvent(QContextMenuEvent *e)
         const QList<int> selectedPages = q->selectedPageNumbers();
         QAction *deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")), i18np("Delete %1 selected page", "Delete %1 selected pages", selectedPages.size()), [this, selectedPages]() { Q_EMIT q->pagesDeleted(selectedPages); });
         deleteAction->setEnabled(!selectedPages.isEmpty() && selectedPages.size() < pageCount);
+        QAction *duplicateAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), i18np("Duplicate %1 selected page", "Duplicate %1 selected pages", selectedPages.size()), [this, selectedPages]() { Q_EMIT q->pagesDuplicated(selectedPages); });
+        duplicateAction->setEnabled(!selectedPages.isEmpty());
         menu.addAction(QIcon::fromTheme(QStringLiteral("dialog-ok-apply")), i18n("Done selecting"), [this]() { setSelectMode(false); });
     } else {
         menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")), i18n("Add Pages After"), [this, clickedPage]() { Q_EMIT q->pageAddedAfter(clickedPage); });
+        menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), i18np("Duplicate Page", "Duplicate Pages", 1), [this, clickedPage]() { Q_EMIT q->pagesDuplicated(QList<int>() << clickedPage); });
         QAction *deleteAction = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-delete")), i18n("Delete this page"), [this, clickedPage]() { Q_EMIT q->pagesDeleted(QList<int>() << clickedPage); });
         deleteAction->setEnabled(pageCount > 1);
         menu.addAction(QIcon::fromTheme(QStringLiteral("edit-select")), i18n("Select"), [this, clickedPage]() {

@@ -778,6 +778,16 @@ public:
     virtual SubType subType() const = 0;
 
     /**
+     * Returns a deep copy of this annotation. The copy is independent of the
+     * original. Subclasses must override this; the base implementation returns
+     * nullptr (e.g. for generator-provided annotation subclasses that do not
+     * support deep copying).
+     *
+     * @since 25.12
+     */
+    virtual Annotation *clone() const;
+
+    /**
      * Stores the annotation as xml in @p document under the given parent @p node.
      */
     virtual void store(QDomNode &node, QDomDocument &document) const;
@@ -816,6 +826,9 @@ public:
      * @since 24.12
      */
     const void *nativeData() const;
+
+    /** Copies the AnnotationPrivate base members to @p clone. */
+    void copyBaseMembersTo(Annotation *clone) const;
 
 protected:
     /// @cond PRIVATE
@@ -1032,6 +1045,9 @@ public:
      */
     void store(QDomNode &node, QDomDocument &document) const override;
 
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
+
 private:
     Q_DECLARE_PRIVATE(TextAnnotation)
     Q_DISABLE_COPY(TextAnnotation)
@@ -1196,6 +1212,9 @@ public:
      */
     void store(QDomNode &node, QDomDocument &document) const override;
 
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
+
 private:
     Q_DECLARE_PRIVATE(LineAnnotation)
     Q_DISABLE_COPY(LineAnnotation)
@@ -1256,6 +1275,9 @@ public:
      * under the given parent @p node.
      */
     void store(QDomNode &node, QDomDocument &document) const override;
+
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
 
 private:
     Q_DECLARE_PRIVATE(GeomAnnotation)
@@ -1418,6 +1440,9 @@ public:
      */
     void store(QDomNode &node, QDomDocument &document) const override;
 
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
+
 private:
     Q_DECLARE_PRIVATE(HighlightAnnotation)
     Q_DISABLE_COPY(HighlightAnnotation)
@@ -1461,6 +1486,9 @@ public:
      * under the given parent @p node.
      */
     void store(QDomNode &node, QDomDocument &document) const override;
+
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
 
 private:
     Q_DECLARE_PRIVATE(StampAnnotation)
@@ -1531,6 +1559,9 @@ public:
      */
     void store(QDomNode &node, QDomDocument &document) const override;
 
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
+
 private:
     Q_DECLARE_PRIVATE(SignatureAnnotation)
     Q_DISABLE_COPY(SignatureAnnotation)
@@ -1598,6 +1629,9 @@ public:
      */
     void store(QDomNode &node, QDomDocument &document) const override;
 
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
+
 private:
     Q_DECLARE_PRIVATE(InkAnnotation)
     Q_DISABLE_COPY(InkAnnotation)
@@ -1649,6 +1683,9 @@ public:
      * under the given parent @p node.
      */
     void store(QDomNode &node, QDomDocument &document) const override;
+
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
 
 private:
     Q_DECLARE_PRIVATE(CaretAnnotation)
@@ -1702,6 +1739,9 @@ public:
      * under the given parent @p node.
      */
     void store(QDomNode &node, QDomDocument &document) const override;
+
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
 
 private:
     Q_DECLARE_PRIVATE(FileAttachmentAnnotation)
@@ -1763,6 +1803,9 @@ public:
      */
     void store(QDomNode &node, QDomDocument &document) const override;
 
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
+
 private:
     Q_DECLARE_PRIVATE(SoundAnnotation)
     Q_DISABLE_COPY(SoundAnnotation)
@@ -1807,6 +1850,9 @@ public:
      * under the given @p parentNode.
      */
     void store(QDomNode &parentNode, QDomDocument &document) const override;
+
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
 
 private:
     Q_DECLARE_PRIVATE(MovieAnnotation)
@@ -1878,6 +1924,9 @@ public:
      */
     Action *additionalAction(AdditionalActionType type) const;
 
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
+
 private:
     Q_DECLARE_PRIVATE(ScreenAnnotation)
     Q_DISABLE_COPY(ScreenAnnotation)
@@ -1932,6 +1981,9 @@ public:
      * @since 0.16 (KDE 4.10)
      */
     Action *additionalAction(AdditionalActionType type) const;
+
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
 
 private:
     Q_DECLARE_PRIVATE(WidgetAnnotation)
@@ -1993,6 +2045,9 @@ public:
      * Gets the embedded file object.
      */
     EmbeddedFile *embeddedFile() const;
+
+    /** Returns a deep copy of this annotation. */
+    Annotation *clone() const override;
 
 private:
     Q_DECLARE_PRIVATE(RichMediaAnnotation)

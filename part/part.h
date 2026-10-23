@@ -602,6 +602,7 @@ private:
 private Q_SLOTS:
     // Document builder: page management, all the page numbers are 0-based
     void slotDeletePages(const QList<int> &pageNumbers);
+    void slotDuplicatePages(const QList<int> &pageNumbers);
     void slotInsertPageBefore(int pageNumber);
     void slotInsertPageAfter(int pageNumber);
     void slotAddPage(const NewPageDialog::NewPageData &data);

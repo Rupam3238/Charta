@@ -57,6 +57,17 @@ public:
     virtual ~FormField();
 
     /**
+     * Returns a deep copy of this form field. The copy is independent of the
+     * original. The base implementation returns nullptr: the concrete form
+     * field types live in the generator backends (e.g. Poppler) and wrap
+     * native objects that are not copyable through the public API, so they
+     * must override this to provide a real deep copy.
+     *
+     * @since 25.12
+     */
+    virtual FormField *clone() const;
+
+    /**
      * The type of the field.
      */
     FieldType type() const;
@@ -257,6 +268,8 @@ public:
 
     ~FormFieldButton() override;
 
+    FormField *clone() const override;
+
     /**
       The particular type of the button field.
      */
@@ -319,6 +332,8 @@ public:
     };
 
     ~FormFieldText() override;
+
+    FormField *clone() const override;
 
     /**
      * The particular type of the text field.
@@ -429,6 +444,8 @@ public:
     };
 
     ~FormFieldChoice() override;
+
+    FormField *clone() const override;
 
     /**
      * The particular type of the choice field.
@@ -572,6 +589,8 @@ public:
     };
 
     ~FormFieldSignature() override;
+
+    FormField *clone() const override;
 
     /**
      * The signature type

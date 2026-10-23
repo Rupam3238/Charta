@@ -107,6 +107,90 @@ PagePrivate *PagePrivate::get(Page *page)
     return page ? page->d : nullptr;
 }
 
+PagePrivate *PagePrivate::clone(Page *newPage) const
+{
+    PagePrivate *cloneD = new PagePrivate(newPage, m_number, m_width, m_height, m_orientation);
+
+    // Scalar members.
+    cloneD->m_sourceNumber = m_sourceNumber;
+    cloneD->m_blankColor = m_blankColor;
+    cloneD->m_rotation = m_rotation;
+    cloneD->m_boundingBox = m_boundingBox;
+    cloneD->m_isBoundingBoxKnown = m_isBoundingBoxKnown;
+    cloneD->m_annotationGeneration = m_annotationGeneration;
+    cloneD->m_duration = m_duration;
+    cloneD->m_label = m_label;
+    // m_page is set by the constructor to newPage.
+    // m_doc is intentionally left nullptr: it is set by the new Page's document on insertPage().
+
+    // Text page: deep copy via TextPage::clone(), then re-point the back-pointer at the new page.
+    if (m_text) {
+        cloneD->m_text = m_text->clone();
+        cloneD->m_text->d->m_page = newPage;
+    }
+
+    // Transition: PageTransition has a copy ctor.
+    if (m_transition) {
+        cloneD->m_transition = new PageTransition(*m_transition);
+    }
+
+    // Text selection highlight.
+    if (m_textSelections) {
+        cloneD->m_textSelections = new HighlightAreaRect(*m_textSelections);
+    }
+
+    // Form fields: deep copy per subclass via FormField::clone().
+    for (FormField *ff : std::as_const(formfields)) {
+        if (FormField *clonedField = ff->clone()) {
+            cloneD->formfields.append(clonedField);
+            clonedField->d_ptr->m_page = cloneD;
+        }
+    }
+
+    // Page opening/closing actions: deep copy per subclass via Action::clone().
+    if (m_openingAction) {
+        cloneD->m_openingAction = m_openingAction->clone();
+    }
+    if (m_closingAction) {
+        cloneD->m_closingAction = m_closingAction->clone();
+    }
+
+    // Annotations: deep copy per subclass via Annotation::clone().
+    QMap<Annotation *, Annotation *> annotationMap;
+    for (Annotation *annotation : std::as_const(m_page->m_annotations)) {
+        Annotation *cloned = annotation->clone();
+        if (!cloned) {
+            qCWarning(OkularCoreDebug) << "PagePrivate::clone: failed to clone annotation of type"
+                                       << annotation->subType();
+            continue;
+        }
+        annotationMap.insert(annotation, cloned);
+        // Re-point the annotation back-pointer at the new page (no re-transformation: the new page
+        // has the same rotation as the original one, and the transformed boundary is copied as-is).
+        cloned->d_ptr->m_page = cloneD;
+        newPage->m_annotations.append(cloned);
+        newPage->m_rects.append(new AnnotationObjectRect(cloned));
+    }
+    // Wire the revision links (previousAnnotation / revision children) so the clone is
+    // self-contained and does not point at annotations of the original page.
+    for (Annotation *cloned : std::as_const(newPage->m_annotations)) {
+        if (cloned->previousAnnotation() && annotationMap.contains(cloned->previousAnnotation())) {
+            cloned->setPreviousAnnotation(annotationMap.value(cloned->previousAnnotation()));
+        }
+        for (Okular::Annotation::Revision &revision : cloned->revisions()) {
+            if (revision.annotation() && annotationMap.contains(revision.annotation())) {
+                revision.setAnnotation(annotationMap.value(revision.annotation()));
+            }
+        }
+    }
+
+    // QDomDocument blobs: copied by value (deep copy of the DOM tree).
+    cloneD->restoredLocalAnnotationList = restoredLocalAnnotationList;
+    cloneD->restoredFormFieldList = restoredFormFieldList;
+
+    return cloneD;
+}
+
 void PagePrivate::imageRotationDone(RotationJob *job)
 {
     TilesManager *tm = tilesManager(job->observer());
@@ -228,6 +312,16 @@ Page::~Page()
 
         delete d;
     }
+}
+
+Page *Page::clone() const
+{
+    PagePrivate *d = PagePrivate::get(const_cast<Page *>(this));
+    Page *newPage = new Page(static_cast<uint>(d->m_number), d->m_width, d->m_height, d->m_orientation);
+    // Replace the private created by the constructor with a deep copy.
+    delete newPage->d;
+    newPage->d = d->clone(newPage);
+    return newPage;
 }
 
 int Page::number() const

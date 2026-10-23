@@ -45,6 +45,12 @@ FormField::~FormField()
     delete d_ptr;
 }
 
+FormField *FormField::clone() const
+{
+    // Base implementation: subclasses must override to provide a real deep copy.
+    return nullptr;
+}
+
 FormField::FieldType FormField::type() const
 {
     Q_D(const FormField);
@@ -199,6 +205,14 @@ FormFieldButton::~FormFieldButton()
 {
 }
 
+FormField *FormFieldButton::clone() const
+{
+    // The concrete form field types live in the generator backends (e.g. Poppler)
+    // and wrap native objects that are not copyable through the public API, so a
+    // real deep copy must be implemented there. Return nullptr for now.
+    return nullptr;
+}
+
 void FormFieldButton::setState(bool)
 {
 }
@@ -237,6 +251,14 @@ FormFieldText::FormFieldText()
 
 FormFieldText::~FormFieldText()
 {
+}
+
+FormField *FormFieldText::clone() const
+{
+    // The concrete form field types live in the generator backends (e.g. Poppler)
+    // and wrap native objects that are not copyable through the public API, so a
+    // real deep copy must be implemented there. Return nullptr for now.
+    return nullptr;
 }
 
 void FormFieldText::setText(const QString &)
@@ -332,6 +354,14 @@ FormFieldChoice::FormFieldChoice()
 
 FormFieldChoice::~FormFieldChoice()
 {
+}
+
+FormField *FormFieldChoice::clone() const
+{
+    // The concrete form field types live in the generator backends (e.g. Poppler)
+    // and wrap native objects that are not copyable through the public API, so a
+    // real deep copy must be implemented there. Return nullptr for now.
+    return nullptr;
 }
 
 bool FormFieldChoice::isEditable() const
@@ -446,4 +476,12 @@ FormFieldSignature::FormFieldSignature()
 
 FormFieldSignature::~FormFieldSignature()
 {
+}
+
+FormField *FormFieldSignature::clone() const
+{
+    // The concrete form field types live in the generator backends (e.g. Poppler)
+    // and wrap native objects that are not copyable through the public API, so a
+    // real deep copy must be implemented there. Return nullptr for now.
+    return nullptr;
 }

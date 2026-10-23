@@ -303,6 +303,20 @@ public:
     QList<FormField *> formFields() const;
 
     /**
+     * Returns a deep copy of this page. The copy is independent of the
+     * original: annotations, form fields, text page, transition and actions
+     * are deep-copied, while observer-specific render state (pixmaps, tiles
+     * managers) is not copied and is regenerated on demand.
+     *
+     * The returned page is newly allocated and has no document set yet; it is
+     * meant to be handed over to Document::insertPage()/insertPages(), which
+     * takes ownership.
+     *
+     * @since 25.12
+     */
+    Page *clone() const;
+
+    /**
      * Sets the region described by @p rect with @p pixmap for the
      * given @p observer.
      * If @p rect is not set (default) the @p pixmap is set to the entire

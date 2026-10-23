@@ -60,6 +60,10 @@ public:
      */
     virtual ~Action();
 
+    /// Returns a deep copy of this action. The copy is independent of the original.
+    /// Subclasses must override this; the base implementation returns nullptr.
+    virtual Action *clone() const;
+
     /**
      * Returns the type of the action. Every inherited class must return
      * an unique identifier.
@@ -183,6 +187,9 @@ public:
      */
     QString actionTip() const override;
 
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
+
     /**
      * Returns whether the goto action points to an external document.
      */
@@ -239,6 +246,9 @@ public:
      */
     QString actionTip() const override;
 
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
+
     /**
      * Returns the file name of the application to execute.
      */
@@ -282,6 +292,9 @@ public:
      * Returns the action tip.
      */
     QString actionTip() const override;
+
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
 
     /**
      * Returns the url to browse.
@@ -342,6 +355,9 @@ public:
      */
     QString actionTip() const override;
 
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
+
     /**
      * Returns the type of action.
      */
@@ -383,6 +399,9 @@ public:
      * Returns the action tip.
      */
     QString actionTip() const override;
+
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
 
     /**
      * Returns the volume of the sound.
@@ -445,6 +464,9 @@ public:
      */
     QString actionTip() const override;
 
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
+
     /**
      * Returns the type of action.
      */
@@ -492,6 +514,9 @@ public:
      * Returns the action tip.
      */
     QString actionTip() const override;
+
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
 
     /**
      * Returns the operation type.
@@ -558,6 +583,9 @@ public:
      */
     QString actionTip() const override;
 
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
+
     /**
      * Returns the operation type.
      */
@@ -608,6 +636,9 @@ public:
      * Returns the action type.
      */
     ActionType actionType() const override;
+
+    /** Returns a deep copy of this action. */
+    Action *clone() const override;
 
 private:
     Q_DISABLE_COPY(BackendOpaqueAction)

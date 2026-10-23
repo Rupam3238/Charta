@@ -182,6 +182,11 @@ TextPage::~TextPage()
     delete d;
 }
 
+TextPage *TextPage::clone() const
+{
+    return new TextPage(d->m_words);
+}
+
 void TextPage::append(const QString &text, const NormalizedRect &area)
 {
     if (!text.isEmpty()) {

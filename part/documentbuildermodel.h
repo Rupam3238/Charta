@@ -132,6 +132,10 @@ public:
     /// which moveRows() cannot express.
     bool moveEntriesBefore(const QList<QUuid> &ids, int beforeRow);
 
+    /// Duplicates every entry whose id is in @p ids, inserting each copy right after its original.
+    /// Returns the new entry ids (empty when nothing was duplicated).
+    QList<QUuid> duplicateEntries(const QList<QUuid> &ids);
+
     /// Moves every selected entry one slot up (@p delta < 0) or down (@p delta > 0), swapping with
     /// its unselected neighbour. A non-contiguous selection steps item by item instead of being
     /// gathered into one block. Returns false when nothing could move.

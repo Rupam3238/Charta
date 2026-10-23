@@ -52,6 +52,12 @@ QString Action::actionTip() const
     return QLatin1String("");
 }
 
+Action *Action::clone() const
+{
+    // Base implementation: subclasses must override to provide a real deep copy.
+    return nullptr;
+}
+
 void Action::setNativeId(const QVariant &id)
 {
     Q_D(Action);
@@ -126,6 +132,23 @@ GotoAction::~GotoAction()
 {
 }
 
+Action *GotoAction::clone() const
+{
+    Q_D(const GotoAction);
+    GotoAction *copy;
+    if (!d->m_dest.isEmpty()) {
+        copy = new GotoAction(d->m_extFileName, d->m_dest);
+    } else {
+        copy = new GotoAction(d->m_extFileName, d->m_vp);
+    }
+    QList<Action *> nexts;
+    for (Action *a : nextActions()) {
+        nexts.append(a->clone());
+    }
+    copy->setNextActions(nexts);
+    return copy;
+}
+
 Action::ActionType GotoAction::actionType() const
 {
     return Goto;
@@ -186,6 +209,18 @@ ExecuteAction::~ExecuteAction()
 {
 }
 
+Action *ExecuteAction::clone() const
+{
+    Q_D(const ExecuteAction);
+    ExecuteAction *copy = new ExecuteAction(d->m_fileName, d->m_parameters);
+    QList<Action *> nexts;
+    for (Action *a : nextActions()) {
+        nexts.append(a->clone());
+    }
+    copy->setNextActions(nexts);
+    return copy;
+}
+
 Action::ActionType ExecuteAction::actionType() const
 {
     return Execute;
@@ -232,6 +267,18 @@ BrowseAction::~BrowseAction()
 {
 }
 
+Action *BrowseAction::clone() const
+{
+    Q_D(const BrowseAction);
+    BrowseAction *copy = new BrowseAction(d->m_url);
+    QList<Action *> nexts;
+    for (Action *a : nextActions()) {
+        nexts.append(a->clone());
+    }
+    copy->setNextActions(nexts);
+    return copy;
+}
+
 Action::ActionType BrowseAction::actionType() const
 {
     return Browse;
@@ -273,6 +320,18 @@ DocumentAction::DocumentAction(enum DocumentActionType documentActionType)
 
 DocumentAction::~DocumentAction()
 {
+}
+
+Action *DocumentAction::clone() const
+{
+    Q_D(const DocumentAction);
+    DocumentAction *copy = new DocumentAction(d->m_type);
+    QList<Action *> nexts;
+    for (Action *a : nextActions()) {
+        nexts.append(a->clone());
+    }
+    copy->setNextActions(nexts);
+    return copy;
 }
 
 DocumentAction::DocumentActionType DocumentAction::documentActionType() const
@@ -355,6 +414,31 @@ SoundAction::~SoundAction()
 {
 }
 
+Action *SoundAction::clone() const
+{
+    Q_D(const SoundAction);
+    Okular::Sound *sound = nullptr;
+    if (d->m_sound) {
+        // Re-create the sound so the clone does not share the original's Sound object.
+        if (d->m_sound->soundType() == Okular::Sound::Embedded) {
+            sound = new Okular::Sound(d->m_sound->data());
+        } else {
+            sound = new Okular::Sound(d->m_sound->url());
+        }
+        sound->setSamplingRate(d->m_sound->samplingRate());
+        sound->setChannels(d->m_sound->channels());
+        sound->setBitsPerSample(d->m_sound->bitsPerSample());
+        sound->setSoundEncoding(d->m_sound->soundEncoding());
+    }
+    SoundAction *copy = new SoundAction(d->m_volume, d->m_sync, d->m_repeat, d->m_mix, sound);
+    QList<Action *> nexts;
+    for (Action *a : nextActions()) {
+        nexts.append(a->clone());
+    }
+    copy->setNextActions(nexts);
+    return copy;
+}
+
 Action::ActionType SoundAction::actionType() const
 {
     return Sound;
@@ -420,6 +504,18 @@ ScriptAction::~ScriptAction()
 {
 }
 
+Action *ScriptAction::clone() const
+{
+    Q_D(const ScriptAction);
+    ScriptAction *copy = new ScriptAction(d->m_scriptType, d->m_script);
+    QList<Action *> nexts;
+    for (Action *a : nextActions()) {
+        nexts.append(a->clone());
+    }
+    copy->setNextActions(nexts);
+    return copy;
+}
+
 Action::ActionType ScriptAction::actionType() const
 {
     return Script;
@@ -471,6 +567,19 @@ MovieAction::MovieAction(OperationType operation)
 
 MovieAction::~MovieAction()
 {
+}
+
+Action *MovieAction::clone() const
+{
+    Q_D(const MovieAction);
+    // The associated annotation is a back-pointer owned by the annotation itself: not copied.
+    MovieAction *copy = new MovieAction(d->m_operation);
+    QList<Action *> nexts;
+    for (Action *a : nextActions()) {
+        nexts.append(a->clone());
+    }
+    copy->setNextActions(nexts);
+    return copy;
 }
 
 Action::ActionType MovieAction::actionType() const
@@ -530,6 +639,20 @@ RenditionAction::RenditionAction(OperationType operation, Okular::Movie *movie, 
 
 RenditionAction::~RenditionAction()
 {
+}
+
+Action *RenditionAction::clone() const
+{
+    Q_D(const RenditionAction);
+    // The associated movie is owned by the screen annotation: shared, not deep-copied here.
+    // The associated annotation is a back-pointer: not copied.
+    RenditionAction *copy = new RenditionAction(d->m_operation, d->m_movie, d->m_scriptType, d->m_script);
+    QList<Action *> nexts;
+    for (Action *a : nextActions()) {
+        nexts.append(a->clone());
+    }
+    copy->setNextActions(nexts);
+    return copy;
 }
 
 Action::ActionType RenditionAction::actionType() const
@@ -600,6 +723,11 @@ ScreenAnnotation *RenditionAction::annotation() const
 BackendOpaqueAction::BackendOpaqueAction()
     : Action(*new ActionPrivate())
 {
+}
+
+Action *BackendOpaqueAction::clone() const
+{
+    return new BackendOpaqueAction();
 }
 
 Action::ActionType BackendOpaqueAction::actionType() const

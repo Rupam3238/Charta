@@ -2608,6 +2608,54 @@ bool Document::movePages(const QList<int> &indices, int to)
     return true;
 }
 
+bool Document::duplicatePage(int index)
+{
+    if (!canModifyPages() || index < 0 || index >= (int)d->m_pagesVector.size()) {
+        return false;
+    }
+
+    Page *copy = d->m_pagesVector[index]->clone();
+    if (!copy) {
+        return false;
+    }
+
+    // insertPage wraps the insertion in a PageStructureCommand for undo/redo
+    return insertPage(index + 1, copy);
+}
+
+bool Document::duplicatePages(const QList<int> &indices)
+{
+    if (!canModifyPages() || indices.isEmpty()) {
+        return false;
+    }
+
+    const int count = d->m_pagesVector.size();
+    QSet<int> indexSet;
+    for (const int index : indices) {
+        if (index < 0 || index >= count) {
+            return false;
+        }
+        indexSet.insert(index);
+    }
+    if (indexSet.isEmpty()) {
+        return false;
+    }
+
+    // Process descending so insertions do not shift the remaining originals.
+    QList<int> sorted = indexSet.values();
+    std::sort(sorted.begin(), sorted.end(), std::greater<int>());
+
+    bool ok = true;
+    for (const int index : std::as_const(sorted)) {
+        Page *copy = d->m_pagesVector[index]->clone();
+        if (!copy || !insertPage(index + 1, copy)) {
+            ok = false;
+            break;
+        }
+    }
+    return ok;
+}
+
 int DocumentPrivate::findFieldPageNumber(Okular::FormField *field)
 {
     // Lookup the page of the FormField

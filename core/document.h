@@ -381,6 +381,30 @@ public:
     bool movePages(const QList<int> &indices, int to);
 
     /**
+     * Duplicates the page at @p index (0-based), inserting the copy right after
+     * the original. The document takes ownership of the copy.
+     *
+     * Returns false if pages cannot be modified, @p index is out of range,
+     * or the page could not be cloned or inserted.
+     *
+     * @since 26.08
+     */
+    bool duplicatePage(int index);
+
+    /**
+     * Duplicates all the pages in @p indices (0-based), inserting each copy
+     * right after its original. Indices are processed in descending order so
+     * that insertions do not shift the position of the remaining originals.
+     * Each insertion is wrapped in a PageStructureCommand and is undoable.
+     *
+     * Returns false if pages cannot be modified, the list is empty, any index
+     * is out of range, or any page could not be cloned or inserted.
+     *
+     * @since 26.08
+     */
+    bool duplicatePages(const QList<int> &indices);
+
+    /**
      * Returns the url of the currently opened document.
      */
     QUrl currentDocument() const;

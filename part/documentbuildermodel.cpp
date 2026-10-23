@@ -773,6 +773,38 @@ bool DocumentBuilderModel::moveEntriesByStep(const QList<QUuid> &ids, int delta)
     return true;
 }
 
+QList<QUuid> DocumentBuilderModel::duplicateEntries(const QList<QUuid> &ids)
+{
+    if (ids.isEmpty()) {
+        return {};
+    }
+
+    const QSet<QUuid> wanted(ids.constBegin(), ids.constEnd());
+    QList<QUuid> newIds;
+
+    // Bottom-to-top: inserting a copy after row N only shifts rows > N, which we have already
+    // processed, so the rows we still need to visit keep their indices.
+    for (int row = m_entries.size() - 1; row >= 0; --row) {
+        const BuilderEntry &entry = m_entries.at(row);
+        if (!wanted.contains(entry.id)) {
+            continue;
+        }
+        BuilderEntry copy = entry;
+        copy.id = QUuid::createUuid();
+
+        const int insertAt = row + 1;
+        beginInsertRows(QModelIndex(), insertAt, insertAt);
+        m_entries.insert(insertAt, copy);
+        endInsertRows();
+
+        newIds.prepend(copy.id); // restore input order
+    }
+
+    if (!newIds.isEmpty()) {
+        Q_EMIT countsChanged();
+    }
+    return newIds;
+}
 QStringList DocumentBuilderModel::mimeTypes() const
 {
     return QStringList() << QString::fromLatin1(kEntryMimeType);

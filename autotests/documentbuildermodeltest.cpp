@@ -126,6 +126,9 @@ private Q_SLOTS:
     void pagesForExportFollowsTheModelOrder();
     void pagesForExportHonoursTheSelection();
     void pagesForExportFollowsReordering();
+    void duplicateEntriesCopiesSelectedPages();
+    void duplicateEntriesScatteredSelectionPreservesOrder();
+    void duplicateEntriesEmptyDoesNothing();
     void sameSourceBehindTwoPathsIsSharedOnce();
     void corruptPdfIsRejected();
     void importingLeavesTheSourceFileUntouched();
@@ -440,6 +443,56 @@ void DocumentBuilderModelTest::pagesForExportFollowsReordering()
     QCOMPARE(pages[0].sourcePage, 1);
     QCOMPARE(pages[1].sourcePage, 2);
     QCOMPARE(pages[2].sourcePage, 0);
+}
+
+void DocumentBuilderModelTest::duplicateEntriesCopiesSelectedPages()
+{
+    DocumentBuilderModel model;
+    QString error;
+    QCOMPARE(model.addPdf(dataFile(QStringLiteral("simple-multipage.pdf")), &error, QList<int>() << 0 << 1 << 2), 3);
+
+    const QList<QUuid> ids = model.entryIds();
+    QCOMPARE(ids.size(), 3);
+
+    const QList<QUuid> copies = model.duplicateEntries(ids);
+    QCOMPARE(copies.size(), 3);
+    QCOMPARE(model.pageCount(), 6);
+    QCOMPARE(model.rowCount(), 7); // + the add tile
+
+    // Each copy sits right after its original, in the same order.
+    QCOMPARE(sourcePages(model), (QList<int>() << 0 << 0 << 1 << 1 << 2 << 2));
+    QVERIFY(copies.at(0) != ids.at(0));
+    QVERIFY(copies.at(1) != ids.at(1));
+    QVERIFY(copies.at(2) != ids.at(2));
+}
+
+void DocumentBuilderModelTest::duplicateEntriesScatteredSelectionPreservesOrder()
+{
+    DocumentBuilderModel model;
+    QString error;
+    QCOMPARE(model.addPdf(dataFile(QStringLiteral("simple-multipage.pdf")), &error, QList<int>() << 0 << 1 << 2), 3);
+
+    // Duplicate only the first and last page (scattered selection).
+    const QList<QUuid> ids = QList<QUuid>() << model.entryIdAt(0) << model.entryIdAt(2);
+    const QList<QUuid> copies = model.duplicateEntries(ids);
+    QCOMPARE(copies.size(), 2);
+    QCOMPARE(model.pageCount(), 5);
+
+    // Copies return in input order; each sits right after its original.
+    QCOMPARE(copies.at(0), model.entryIdAt(1)); // copy of page 0 sits at row 1
+    QCOMPARE(copies.at(1), model.entryIdAt(4)); // copy of page 2 sits at row 4
+    QCOMPARE(sourcePages(model), (QList<int>() << 0 << 0 << 1 << 2 << 2));
+}
+
+void DocumentBuilderModelTest::duplicateEntriesEmptyDoesNothing()
+{
+    DocumentBuilderModel model;
+    QString error;
+    QCOMPARE(model.addPdf(dataFile(QStringLiteral("simple-multipage.pdf")), &error, QList<int>() << 0 << 1), 2);
+
+    QCOMPARE(model.duplicateEntries(QList<QUuid>()), QList<QUuid>());
+    QCOMPARE(model.pageCount(), 2);
+    QCOMPARE(sourcePages(model), (QList<int>() << 0 << 1));
 }
 
 void DocumentBuilderModelTest::sameSourceBehindTwoPathsIsSharedOnce()
