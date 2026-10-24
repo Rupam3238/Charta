@@ -174,6 +174,9 @@ public:
     int m_sourceNumber;
     // background color of a page added by the user (only meaningful if m_sourceNumber < 0)
     QColor m_blankColor;
+    // true for pages created by Page::clone(): they share m_sourceNumber with the original page, which
+    // stays the only owner of the generator's native page (and its native annotations)
+    bool m_isDuplicate = false;
     Rotation m_orientation;
     double m_width, m_height;
     DocumentPrivate *m_doc;

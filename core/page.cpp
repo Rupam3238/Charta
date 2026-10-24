@@ -114,6 +114,7 @@ PagePrivate *PagePrivate::clone(Page *newPage) const
 
     // Scalar members.
     cloneD->m_sourceNumber = m_sourceNumber;
+    cloneD->m_isDuplicate = true;
     cloneD->m_blankColor = m_blankColor;
     cloneD->m_rotation = m_rotation;
     cloneD->m_boundingBox = m_boundingBox;
@@ -432,6 +433,11 @@ int Page::sourceNumber() const
 bool Page::isBlank() const
 {
     return d->m_sourceNumber < 0;
+}
+
+bool Page::isDuplicate() const
+{
+    return d->m_isDuplicate;
 }
 
 QColor Page::blankColor() const

@@ -1337,6 +1337,15 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     // note: thread safety is set on 'false' for the GUI (this) thread
     std::unique_ptr<Poppler::Page> p = pdfdoc->page(page->sourceNumber());
 
+    // A duplicated page renders the same native page as its original, including the native annotations
+    // that belong to the original. The duplicate has its own deep-copied annotations which Okular paints
+    // itself, so hide the native ones to keep the two pages independent (and avoid drawing them twice).
+    const bool hideNativeAnnotations = page->isDuplicate() && !page->annotations().isEmpty();
+    const bool hadHideAnnotations = pdfdoc->renderHints().testFlag(Poppler::Document::HideAnnotations);
+    if (hideNativeAnnotations) {
+        pdfdoc->setRenderHint(Poppler::Document::HideAnnotations, true);
+    }
+
     // 2. Take data from outputdev and attach it to the Page
     QImage img;
     if (p) {
@@ -1362,6 +1371,10 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     } else {
         img = QImage(request->width(), request->height(), QImage::Format_Mono);
         img.fill(Qt::white);
+    }
+
+    if (hideNativeAnnotations) {
+        pdfdoc->setRenderHint(Poppler::Document::HideAnnotations, hadHideAnnotations);
     }
 
     if (p && genObjectRects) {

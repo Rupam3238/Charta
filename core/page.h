@@ -91,6 +91,15 @@ public:
     bool isBlank() const;
 
     /**
+     * Returns whether this page was created by duplicating another page. A duplicate
+     * shares its sourceNumber() with the original, so the generator's own page object
+     * (and any native annotations on it) belongs to the original page only: annotation
+     * changes on a duplicate are never forwarded to the AnnotationProxy, and generators
+     * should not draw native annotations on a duplicate that has its own annotations.
+     */
+    bool isDuplicate() const;
+
+    /**
      * Returns the background color of a blank page.
      */
     QColor blankColor() const;

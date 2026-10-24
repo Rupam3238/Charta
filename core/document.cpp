@@ -2326,7 +2326,16 @@ void DocumentPrivate::generateBlankPagePixmap(PixmapRequest *request)
 int DocumentPrivate::proxyPageNumber(int page) const
 {
     const Page *p = m_pagesVector.value(page, nullptr);
-    return p ? p->d->m_sourceNumber : -1;
+    if (!p) {
+        return -1;
+    }
+    // A duplicated page shares its source page with the original one. The generator's native page (and the
+    // native annotations on it) belongs to the original, so annotations of a duplicate are Okular-owned:
+    // returning -1 keeps every proxy notification away from the original's native page.
+    if (p->d->m_isDuplicate) {
+        return -1;
+    }
+    return p->d->m_sourceNumber;
 }
 
 void DocumentPrivate::renumberPages()
