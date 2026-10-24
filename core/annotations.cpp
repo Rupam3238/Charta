@@ -853,9 +853,12 @@ void Annotation::copyBaseMembersTo(Annotation *clone) const
     cloneD->m_window = d->m_window;
     cloneD->m_previousRevision = d->m_previousRevision;
     cloneD->m_revisions = d->m_revisions;
-    cloneD->m_disposeFunc = d->m_disposeFunc;
-    cloneD->m_nativeId = d->m_nativeId;
-    cloneD->m_nativeData = d->m_nativeData;
+    // A clone must not share the original's native (generator-specific) payload or its dispose
+    // callback: both refer to the original annotation's backing object and would lead to a
+    // double free / use-after-free when the clone is destroyed (e.g. after a page duplication).
+    cloneD->m_disposeFunc = nullptr;
+    cloneD->m_nativeId = QVariant();
+    cloneD->m_nativeData.reset();
     // m_page is intentionally not copied: it is set by the page that owns the clone.
 }
 
