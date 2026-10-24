@@ -727,7 +727,15 @@ BackendOpaqueAction::BackendOpaqueAction()
 
 Action *BackendOpaqueAction::clone() const
 {
-    return new BackendOpaqueAction();
+    BackendOpaqueAction *clone = new BackendOpaqueAction();
+    QList<Action *> clonedNextActions;
+    for (Action *action : nextActions()) {
+        if (Action *clonedAction = action ? action->clone() : nullptr) {
+            clonedNextActions.append(clonedAction);
+        }
+    }
+    clone->setNextActions(clonedNextActions);
+    return clone;
 }
 
 Action::ActionType BackendOpaqueAction::actionType() const

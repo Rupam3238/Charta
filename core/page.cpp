@@ -9,6 +9,7 @@
 
 #include "page.h"
 #include "page_p.h"
+#include "sourcereference.h"
 
 // qt/kde includes
 #include <QDomDocument>
@@ -147,14 +148,6 @@ PagePrivate *PagePrivate::clone(Page *newPage) const
         }
     }
 
-    // Page opening/closing actions: deep copy per subclass via Action::clone().
-    if (m_openingAction) {
-        cloneD->m_openingAction = m_openingAction->clone();
-    }
-    if (m_closingAction) {
-        cloneD->m_closingAction = m_closingAction->clone();
-    }
-
     // Annotations: deep copy per subclass via Annotation::clone().
     QMap<Annotation *, Annotation *> annotationMap;
     for (Annotation *annotation : std::as_const(m_page->m_annotations)) {
@@ -171,15 +164,117 @@ PagePrivate *PagePrivate::clone(Page *newPage) const
         newPage->m_annotations.append(cloned);
         newPage->m_rects.append(new AnnotationObjectRect(cloned));
     }
+    // Page opening/closing actions: deep copy per subclass via Action::clone(), remapping
+    // any annotation they reference to the cloned annotation.
+    if (m_openingAction) {
+        Action *clonedAction = m_openingAction->clone();
+        if (auto *movieAction = dynamic_cast<MovieAction *>(clonedAction)) {
+            if (auto *originalMovieAction = dynamic_cast<MovieAction *>(m_openingAction)) {
+                if (MovieAnnotation *originalAnnotation = originalMovieAction->annotation()) {
+                    if (annotationMap.contains(originalAnnotation)) {
+                        movieAction->setAnnotation(static_cast<MovieAnnotation *>(annotationMap.value(originalAnnotation)));
+                    }
+                }
+            }
+        } else if (auto *renditionAction = dynamic_cast<RenditionAction *>(clonedAction)) {
+            if (auto *originalRenditionAction = dynamic_cast<RenditionAction *>(m_openingAction)) {
+                if (ScreenAnnotation *originalAnnotation = originalRenditionAction->annotation()) {
+                    if (annotationMap.contains(originalAnnotation)) {
+                        renditionAction->setAnnotation(static_cast<ScreenAnnotation *>(annotationMap.value(originalAnnotation)));
+                    }
+                }
+            }
+        }
+        cloneD->m_openingAction = clonedAction;
+    }
+    if (m_closingAction) {
+        Action *clonedAction = m_closingAction->clone();
+        if (auto *movieAction = dynamic_cast<MovieAction *>(clonedAction)) {
+            if (auto *originalMovieAction = dynamic_cast<MovieAction *>(m_closingAction)) {
+                if (MovieAnnotation *originalAnnotation = originalMovieAction->annotation()) {
+                    if (annotationMap.contains(originalAnnotation)) {
+                        movieAction->setAnnotation(static_cast<MovieAnnotation *>(annotationMap.value(originalAnnotation)));
+                    }
+                }
+            }
+        } else if (auto *renditionAction = dynamic_cast<RenditionAction *>(clonedAction)) {
+            if (auto *originalRenditionAction = dynamic_cast<RenditionAction *>(m_closingAction)) {
+                if (ScreenAnnotation *originalAnnotation = originalRenditionAction->annotation()) {
+                    if (annotationMap.contains(originalAnnotation)) {
+                        renditionAction->setAnnotation(static_cast<ScreenAnnotation *>(annotationMap.value(originalAnnotation)));
+                    }
+                }
+            }
+        }
+        cloneD->m_closingAction = clonedAction;
+    }
+
+    // Deep-copy non-annotation object rects (links, images, source references) so the
+    // duplicate does not lose them. Annotation rects are recreated above.
+    for (ObjectRect *rect : std::as_const(m_page->m_rects)) {
+        if (rect->objectType() == ObjectRect::OAnnotation) {
+            continue;
+        }
+
+        ObjectRect *clonedRect = nullptr;
+        const QPolygonF geometry = rect->region().toFillPolygon();
+
+        if (rect->objectType() == ObjectRect::Action) {
+            Action *originalAction = static_cast<Action *>(const_cast<void *>(rect->object()));
+            Action *clonedAction = originalAction ? originalAction->clone() : nullptr;
+            if (clonedAction) {
+                if (auto *movieAction = dynamic_cast<MovieAction *>(clonedAction)) {
+                    if (auto *originalMovieAction = dynamic_cast<MovieAction *>(originalAction)) {
+                        if (MovieAnnotation *originalAnnotation = originalMovieAction->annotation()) {
+                            if (annotationMap.contains(originalAnnotation)) {
+                                movieAction->setAnnotation(static_cast<MovieAnnotation *>(annotationMap.value(originalAnnotation)));
+                            }
+                        }
+                    }
+                } else if (auto *renditionAction = dynamic_cast<RenditionAction *>(clonedAction)) {
+                    if (auto *originalRenditionAction = dynamic_cast<RenditionAction *>(originalAction)) {
+                        if (ScreenAnnotation *originalAnnotation = originalRenditionAction->annotation()) {
+                            if (annotationMap.contains(originalAnnotation)) {
+                                renditionAction->setAnnotation(static_cast<ScreenAnnotation *>(annotationMap.value(originalAnnotation)));
+                            }
+                        }
+                    }
+                }
+            }
+            clonedRect = new ObjectRect(geometry, ObjectRect::Action, clonedAction);
+        } else if (rect->objectType() == ObjectRect::SourceRef) {
+            if (const SourceRefObjectRect *sourceRefRect = dynamic_cast<const SourceRefObjectRect *>(rect)) {
+                clonedRect = sourceRefRect->clone();
+            }
+        } else {
+            // Image rects do not own their payload, so sharing the immutable pointer is safe.
+            clonedRect = new NonOwningObjectRect(geometry.boundingRect().left(), geometry.boundingRect().top(),
+                                                 geometry.boundingRect().right(), geometry.boundingRect().bottom(),
+                                                 false, rect->objectType(), const_cast<void *>(rect->object()));
+        }
+
+        if (clonedRect) {
+            newPage->m_rects.append(clonedRect);
+        }
+    }
+
     // Wire the revision links (previousAnnotation / revision children) so the clone is
     // self-contained and does not point at annotations of the original page.
     for (Annotation *cloned : std::as_const(newPage->m_annotations)) {
-        if (cloned->previousAnnotation() && annotationMap.contains(cloned->previousAnnotation())) {
-            cloned->setPreviousAnnotation(annotationMap.value(cloned->previousAnnotation()));
+        if (cloned->previousAnnotation()) {
+            if (annotationMap.contains(cloned->previousAnnotation())) {
+                cloned->setPreviousAnnotation(annotationMap.value(cloned->previousAnnotation()));
+            } else {
+                cloned->setPreviousAnnotation(nullptr);
+            }
         }
         for (Okular::Annotation::Revision &revision : cloned->revisions()) {
-            if (revision.annotation() && annotationMap.contains(revision.annotation())) {
-                revision.setAnnotation(annotationMap.value(revision.annotation()));
+            if (revision.annotation()) {
+                if (annotationMap.contains(revision.annotation())) {
+                    revision.setAnnotation(annotationMap.value(revision.annotation()));
+                } else {
+                    revision.setAnnotation(nullptr);
+                }
             }
         }
     }

@@ -405,6 +405,11 @@ double ObjectRect::distanceSqr(double x, double y, double xScale, double yScale)
     return 0.0;
 }
 
+ObjectRect *ObjectRect::clone() const
+{
+    return nullptr;
+}
+
 ObjectRect::~ObjectRect()
 {
     if (!m_object) {
@@ -481,6 +486,15 @@ SourceRefObjectRect::SourceRefObjectRect(const NormalizedPoint &point, void *src
     m_path.addRect(rect);
 
     m_transformedPath = m_path;
+}
+
+SourceRefObjectRect *SourceRefObjectRect::clone() const
+{
+    SourceReference *originalSourceReference = static_cast<SourceReference *>(m_object);
+    SourceReference *clonedSourceReference = originalSourceReference
+        ? new SourceReference(originalSourceReference->fileName(), originalSourceReference->row(), originalSourceReference->column())
+        : nullptr;
+    return new SourceRefObjectRect(m_point, clonedSourceReference);
 }
 
 QRect SourceRefObjectRect::boundingRect(double xScale, double yScale) const

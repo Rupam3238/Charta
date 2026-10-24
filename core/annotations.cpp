@@ -842,7 +842,9 @@ void Annotation::copyBaseMembersTo(Annotation *clone) const
     cloneD->m_uniqueName = d->m_uniqueName;
     cloneD->m_modifyDate = d->m_modifyDate;
     cloneD->m_creationDate = d->m_creationDate;
-    cloneD->m_flags = d->m_flags;
+    // A duplicate is an Okular-owned annotation: drop the "external/embedded in the
+    // source file" flags so it is no longer tied to the original PDF annotation.
+    cloneD->m_flags = d->m_flags & ~(Annotation::External | Annotation::ExternallyDrawn);
     cloneD->m_boundary = d->m_boundary;
     cloneD->m_transformedBoundary = d->m_transformedBoundary;
     cloneD->m_frameCenter = d->m_frameCenter;
@@ -3948,9 +3950,20 @@ Annotation *MovieAnnotation::clone() const
     copyBaseMembersTo(clone);
     MovieAnnotationPrivate *cloneD = static_cast<MovieAnnotationPrivate *>(clone->d_ptr);
     const MovieAnnotationPrivate *d = static_cast<const MovieAnnotationPrivate *>(d_ptr);
-    // Movie has no public copy API: re-create from the URL when available.
+    // Movie has no public copy API: re-create from the URL when available and copy
+    // all of its public properties so the clone is not a shallow alias.
     if (d->movie && !d->movie->url().isEmpty()) {
-        cloneD->movie = new Okular::Movie(d->movie->url());
+        Okular::Movie *clonedMovie = new Okular::Movie(d->movie->url());
+        clonedMovie->setSize(d->movie->size());
+        clonedMovie->setRotation(d->movie->rotation());
+        clonedMovie->setShowControls(d->movie->showControls());
+        clonedMovie->setPlayMode(d->movie->playMode());
+        clonedMovie->setPlayRepetitions(d->movie->playRepetitions());
+        clonedMovie->setAutoPlay(d->movie->autoPlay());
+        clonedMovie->setStartPaused(d->movie->startPaused());
+        clonedMovie->setShowPosterImage(d->movie->showPosterImage());
+        clonedMovie->setPosterImage(d->movie->posterImage());
+        cloneD->movie = clonedMovie;
     }
     return clone;
 }
@@ -4280,9 +4293,20 @@ Annotation *RichMediaAnnotation::clone() const
     copyBaseMembersTo(clone);
     RichMediaAnnotationPrivate *cloneD = static_cast<RichMediaAnnotationPrivate *>(clone->d_ptr);
     const RichMediaAnnotationPrivate *d = static_cast<const RichMediaAnnotationPrivate *>(d_ptr);
-    // Movie has no public copy API: re-create from the URL when available.
+    // Movie has no public copy API: re-create from the URL when available and copy
+    // all of its public properties so the clone is not a shallow alias.
     if (d->movie && !d->movie->url().isEmpty()) {
-        cloneD->movie = new Okular::Movie(d->movie->url());
+        Okular::Movie *clonedMovie = new Okular::Movie(d->movie->url());
+        clonedMovie->setSize(d->movie->size());
+        clonedMovie->setRotation(d->movie->rotation());
+        clonedMovie->setShowControls(d->movie->showControls());
+        clonedMovie->setPlayMode(d->movie->playMode());
+        clonedMovie->setPlayRepetitions(d->movie->playRepetitions());
+        clonedMovie->setAutoPlay(d->movie->autoPlay());
+        clonedMovie->setStartPaused(d->movie->startPaused());
+        clonedMovie->setShowPosterImage(d->movie->showPosterImage());
+        clonedMovie->setPosterImage(d->movie->posterImage());
+        cloneD->movie = clonedMovie;
     }
     // embeddedFile has no public copy API: not copied.
     return clone;

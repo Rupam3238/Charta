@@ -201,11 +201,16 @@ void DocumentTest::testDuplicatePage()
     const int index = 5;
     QVERIFY(index < (int)originalCount);
 
+    // Add an annotation to the original so the deep copy can be checked.
+    auto *ann = new Okular::TextAnnotation();
+    ann->setContents(QStringLiteral("original-annotation"));
+    const_cast<Okular::Page *>(document->page(index))->addAnnotation(ann);
+    const int originalAnnotations = document->page(index)->annotations().size();
+
     // Snapshot the original before duplicating it.
     const double originalWidth = document->page(index)->width();
     const double originalHeight = document->page(index)->height();
     const Okular::Rotation originalOrientation = document->page(index)->orientation();
-    const int originalAnnotations = document->page(index)->annotations().size();
     const int originalFormFields = document->page(index)->formFields().size();
     const QString originalText = document->page(index)->text();
 
@@ -227,6 +232,28 @@ void DocumentTest::testDuplicatePage()
     QCOMPARE(document->page(index)->annotations().size(), originalAnnotations);
     QCOMPARE(document->page(index)->formFields().size(), originalFormFields);
     QCOMPARE(document->page(index)->text(), originalText);
+
+    // The duplicate must be independent: editing it must not affect the original.
+    auto *dupAnn = new Okular::TextAnnotation();
+    dupAnn->setContents(QStringLiteral("duplicate-only-annotation"));
+    const_cast<Okular::Page *>(document->page(index + 1))->addAnnotation(dupAnn);
+    QCOMPARE(document->page(index + 1)->annotations().size(), originalAnnotations + 1);
+    QCOMPARE(document->page(index)->annotations().size(), originalAnnotations);
+    if (originalAnnotations > 0) {
+        QVERIFY(document->page(index)->annotations().at(0) != document->page(index + 1)->annotations().at(0));
+    }
+
+    // Mutating an existing annotation on the duplicate must not mutate the original.
+    QVERIFY(document->page(index + 1)->annotations().size() > 0);
+    document->page(index + 1)->annotations().at(0)->setContents(QStringLiteral("changed-on-duplicate"));
+    QCOMPARE(document->page(index)->annotations().at(0)->contents(), QStringLiteral("original-annotation"));
+
+    // Adding an annotation to the original after duplication must not appear on the duplicate.
+    auto *laterAnn = new Okular::TextAnnotation();
+    laterAnn->setContents(QStringLiteral("later-on-original"));
+    const_cast<Okular::Page *>(document->page(index))->addAnnotation(laterAnn);
+    QCOMPARE(document->page(index)->annotations().size(), originalAnnotations + 1);
+    QCOMPARE(document->page(index + 1)->annotations().size(), originalAnnotations + 1);
 
     // Invalid indices are rejected and leave the document unchanged.
     QVERIFY(!document->duplicatePage(-1));

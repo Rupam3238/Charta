@@ -499,6 +499,11 @@ public:
      */
     virtual ~ObjectRect();
 
+    /**
+     * Creates a shallow copy of this object rect's geometry and payload.
+     * Subclasses with owned payloads override this to deep-copy them.
+     */
+    virtual ObjectRect *clone() const;
     ObjectRect(const ObjectRect &o) = delete;
     ObjectRect &operator=(const ObjectRect &o) = delete;
 
@@ -611,6 +616,8 @@ public:
      * @param srcRef The storable source reference object.
      */
     SourceRefObjectRect(const NormalizedPoint &point, void *srcRef);
+
+    SourceRefObjectRect *clone() const override;
 
     /**
      * Returns the bounding rect of the source reference object rectangle for the
