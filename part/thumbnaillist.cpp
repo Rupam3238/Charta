@@ -665,6 +665,28 @@ void ThumbnailList::showEvent(QShowEvent *event)
     // request fires while this panel is still hidden. Ask again now that the panel is on screen and
     // the viewport has a real size, instead of waiting for the user to scroll.
     d->delayedRequestVisiblePixmaps(0);
+
+    // While the panel was hidden its viewport had no real size, so the scroll position computed by
+    // notifySetup()/notifyCurrentPageChanged() was meaningless and the list stayed at the first page.
+    // Once the layout of the freshly shown panel is done, center the current page.
+    QTimer::singleShot(0, this, [this]() {
+        if (!isVisible() || d->m_thumbnails.isEmpty()) {
+            return;
+        }
+        ThumbnailWidget *current = d->m_selected;
+        if (!current) {
+            const int currentPage = d->m_document->viewport().pageNumber;
+            for (ThumbnailWidget *t : std::as_const(d->m_thumbnails)) {
+                if (t->pageNumber() == currentPage) {
+                    current = t;
+                    break;
+                }
+            }
+        }
+        if (current) {
+            verticalScrollBar()->setValue(current->pos().y() + current->height() / 2 - viewport()->height() / 2);
+        }
+    });
 }
 
 ThumbnailList::~ThumbnailList()

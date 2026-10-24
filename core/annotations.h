@@ -1619,6 +1619,13 @@ public:
     QRectF appearanceBoundingBox() const;
 
     /**
+     * Returns appearanceStream() with its fill color replaced by the annotation's current style color.
+     * The stored stream has the creation color baked in, so a generator must use this variant when it
+     * writes the appearance, otherwise a color change (or its undo/redo) would not reach the file.
+     */
+    QByteArray styledAppearanceStream() const;
+
+    /**
      * Returns the sub type of the ink annotation.
      */
     SubType subType() const override;

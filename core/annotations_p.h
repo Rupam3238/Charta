@@ -51,6 +51,17 @@ public:
     virtual AnnotationPrivate *getNewAnnotationPrivate() = 0;
 
     /**
+     * Annotation::setAnnotationProperties() (used by every undo/redo of a property change) replaces the whole
+     * private object with a fresh one filled from XML. Session-only state that is not part of the XML
+     * (generator appearance streams, pressure profiles, ...) would be lost; subclasses override this to take
+     * it over from @p previous. Called after the XML has been applied to the new object.
+     */
+    virtual void adoptSessionStateFrom(const AnnotationPrivate *previous)
+    {
+        Q_UNUSED(previous)
+    }
+
+    /**
      * Maps subtype content from @p oldFrame to @p newFrame.  The default is a
      * no-op for annotations whose appearance is generated from the frame.
      */

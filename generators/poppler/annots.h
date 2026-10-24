@@ -15,8 +15,10 @@
 #include <poppler-version.h>
 
 #include <QMutex>
+#include <QString>
 
-#include <unordered_map>
+#include <map>
+#include <memory>
 
 #include "core/annotations.h"
 
@@ -45,7 +47,11 @@ private:
     Poppler::Document *ppl_doc;
     QMutex *mutex;
     QHash<Okular::Annotation *, Poppler::Annotation *> *annotationsOnOpenHash;
-    std::unordered_map<Okular::Annotation *, std::unique_ptr<Poppler::AnnotationAppearance>> deletedAnnotationAppearances;
+    // Appearances of removed annotations, so that undoing the removal brings back the exact same look.
+    // Keyed by the annotation's unique name and NOT by its address: an Okular::Annotation that is removed and then
+    // never restored gets deleted, and a stroke drawn later can be allocated at the very same address. With a pointer
+    // key the new stroke found the stale entry and was given the appearance of the deleted one.
+    std::map<QString, std::unique_ptr<Poppler::AnnotationAppearance>> deletedAnnotationAppearances;
 };
 
 #endif

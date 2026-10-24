@@ -548,7 +548,8 @@ static QByteArray pdfNumber(qreal value)
 
 static void setInkAppearanceStream(const Okular::InkAnnotation *okularAnnotation, Poppler::InkAnnotation *popplerAnnotation, const Poppler::Page *page)
 {
-    QByteArray appearance = okularAnnotation->appearanceStream();
+    // The stored stream has the creation color baked in: always write the one matching the current style color
+    QByteArray appearance = okularAnnotation->styledAppearanceStream();
     QRectF boundingBox = okularAnnotation->appearanceBoundingBox().normalized();
 
     const double frameRotation = okularAnnotation->frame().rotation;
@@ -914,11 +915,13 @@ void PopplerAnnotationProxy::notifyAddition(Okular::Annotation *okl_ann, int pag
         return;
     }
 
-    if (auto appearance = deletedAnnotationAppearances.find(okl_ann); appearance != deletedAnnotationAppearances.end()) {
-        if (appearance->second) {
-            ppl_ann->setAnnotationAppearance(*appearance->second);
+    if (!okl_ann->uniqueName().isEmpty()) {
+        if (auto appearance = deletedAnnotationAppearances.find(okl_ann->uniqueName()); appearance != deletedAnnotationAppearances.end()) {
+            if (appearance->second) {
+                ppl_ann->setAnnotationAppearance(*appearance->second);
+            }
+            deletedAnnotationAppearances.erase(appearance);
         }
-        deletedAnnotationAppearances.erase(appearance);
     }
 
     okl_ann->setFlags(okl_ann->flags() | Okular::Annotation::ExternallyDrawn);
@@ -1076,7 +1079,9 @@ void PopplerAnnotationProxy::notifyRemoval(Okular::Annotation *okl_ann, int page
 
     std::unique_ptr<Poppler::Page> ppl_page = ppl_doc->page(page);
     annotationsOnOpenHash->remove(okl_ann);
-    deletedAnnotationAppearances[okl_ann] = ppl_ann->annotationAppearance();
+    if (!okl_ann->uniqueName().isEmpty()) {
+        deletedAnnotationAppearances[okl_ann->uniqueName()] = ppl_ann->annotationAppearance();
+    }
     ppl_page->removeAnnotation(ppl_ann); // Also destroys ppl_ann
 
     okl_ann->setNativeId(QVariant::fromValue(0)); // So that we don't double-free in disposeAnnotation

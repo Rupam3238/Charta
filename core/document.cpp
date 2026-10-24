@@ -5942,6 +5942,12 @@ bool Document::swapBackingFile(const QString &newFileName, const QUrl &url)
                         }
                         if (compatible) {
                             newInk->setSessionPressures(pressures, (*match)->sessionPressureStrokeWidth());
+                            // The reloaded annotation only knows the appearance Poppler wrote into the file. Keep the
+                            // pressure-shaped stream too, otherwise the first color change, move or undo/redo after a
+                            // save would let Poppler regenerate a uniform-width appearance.
+                            if (!(*match)->appearanceStream().isEmpty() && newInk->appearanceStream().isEmpty() && qFuzzyCompare(1.0 + (*match)->frame().rotation, 1.0 + newInk->frame().rotation)) {
+                                newInk->setAppearanceStream((*match)->appearanceStream(), (*match)->appearanceBoundingBox());
+                            }
                         }
                     }
                 }

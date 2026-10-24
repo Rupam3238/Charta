@@ -1357,11 +1357,15 @@ void Annotation::setAnnotationProperties(const QDomNode &node)
 
     // Replace AnnotationPrivate object with a fresh copy
     AnnotationPrivate *new_d_ptr = d_ptr->getNewAnnotationPrivate();
-    delete (d_ptr);
+    AnnotationPrivate *previous_d_ptr = d_ptr;
     d_ptr = new_d_ptr;
 
     // Set the annotations properties from node
     d_ptr->setAnnotationProperties(node);
+
+    // Take over session-only state that the XML does not carry (e.g. ink pressure profile and appearance stream)
+    d_ptr->adoptSessionStateFrom(previous_d_ptr);
+    delete previous_d_ptr;
 
     // Restore internal properties
     d_ptr->m_page = p;
@@ -3247,7 +3251,10 @@ public:
     void rotateContent(double delta, const NormalizedPoint &center) override;
     bool canBeResized() const override;
     void setAnnotationProperties(const QDomNode &node) override;
+    void adoptSessionStateFrom(const AnnotationPrivate *previous) override;
     AnnotationPrivate *getNewAnnotationPrivate() override;
+
+    bool pressuresMatchPaths(const QList<QList<qreal>> &pressures) const;
 
     QList<QList<NormalizedPoint>> m_inkPaths;
     QList<QList<NormalizedPoint>> m_transformedInkPaths;
@@ -3279,7 +3286,9 @@ Annotation *InkAnnotation::clone() const
     const InkAnnotationPrivate *d = static_cast<const InkAnnotationPrivate *>(d_ptr);
     cloneD->m_inkPaths = d->m_inkPaths;
     cloneD->m_transformedInkPaths = d->m_transformedInkPaths;
-    // m_sessionPressures and m_sessionPressureStrokeWidth are session-only: not copied.
+    // The pressure profile belongs to the stroke geometry: without it the copy would be drawn with a uniform width
+    cloneD->m_sessionPressures = d->m_sessionPressures;
+    cloneD->m_sessionPressureStrokeWidth = d->m_sessionPressureStrokeWidth;
     cloneD->m_appearanceStream = d->m_appearanceStream;
     cloneD->m_appearanceBoundingBox = d->m_appearanceBoundingBox;
     return clone;
@@ -3335,6 +3344,48 @@ QByteArray InkAnnotation::appearanceStream() const
     return d->m_appearanceStream;
 }
 
+QByteArray InkAnnotation::styledAppearanceStream() const
+{
+    Q_D(const InkAnnotation);
+    // The stream written by the freehand tool starts with "q\n<r> <g> <b> rg\n"
+    static const QByteArray prefix("q\n");
+    static const QByteArray fillOperator(" rg\n");
+    if (!d->m_appearanceStream.startsWith(prefix)) {
+        return d->m_appearanceStream;
+    }
+    const int operatorPos = d->m_appearanceStream.indexOf(fillOperator, prefix.size());
+    if (operatorPos < 0) {
+        return d->m_appearanceStream;
+    }
+    // Only a plain "number number number" operand list may be replaced
+    const QList<QByteArray> operands = d->m_appearanceStream.mid(prefix.size(), operatorPos - prefix.size()).split(' ');
+    bool allNumbers = operands.size() == 3;
+    for (int i = 0; allNumbers && i < operands.size(); ++i) {
+        bool ok = false;
+        operands.at(i).toDouble(&ok);
+        allNumbers = ok;
+    }
+    if (!allNumbers) {
+        return d->m_appearanceStream;
+    }
+
+    const QColor color = style().color();
+    auto number = [](qreal value) {
+        QByteArray text = QByteArray::number(value, 'f', 6);
+        while (text.endsWith('0')) {
+            text.chop(1);
+        }
+        if (text.endsWith('.')) {
+            text.chop(1);
+        }
+        return text;
+    };
+    QByteArray result = prefix;
+    result += number(color.redF()) + ' ' + number(color.greenF()) + ' ' + number(color.blueF());
+    result += d->m_appearanceStream.mid(operatorPos);
+    return result;
+}
+
 QRectF InkAnnotation::appearanceBoundingBox() const
 {
     Q_D(const InkAnnotation);
@@ -3361,10 +3412,26 @@ void InkAnnotation::store(QDomNode &node, QDomDocument &document) const
         return;
     }
 
+    // The pressure profile is kept in the properties snapshot so that undo/redo of a property change restores it
+    const bool storePressures = d->m_sessionPressureStrokeWidth > 0.0 && d->pressuresMatchPaths(d->m_sessionPressures);
+    if (storePressures) {
+        inkElement.setAttribute(QStringLiteral("pressureWidth"), QString::number(d->m_sessionPressureStrokeWidth, 'g', 10));
+    }
+
+    int pathIndex = 0;
     QList<QList<NormalizedPoint>>::const_iterator pIt = d->m_inkPaths.begin(), pEnd = d->m_inkPaths.end();
-    for (; pIt != pEnd; ++pIt) {
+    for (; pIt != pEnd; ++pIt, ++pathIndex) {
         QDomElement pathElement = document.createElement(QStringLiteral("path"));
         inkElement.appendChild(pathElement);
+        if (storePressures) {
+            QStringList values;
+            const QList<qreal> &pressurePath = d->m_sessionPressures.at(pathIndex);
+            values.reserve(pressurePath.size());
+            for (qreal pressure : pressurePath) {
+                values.append(QString::number(pressure, 'g', 6));
+            }
+            pathElement.setAttribute(QStringLiteral("pressures"), values.join(QLatin1Char(' ')));
+        }
         const QList<NormalizedPoint> &path = *pIt;
         for (const NormalizedPoint &point : path) {
             QDomElement pointElement = document.createElement(QStringLiteral("point"));
@@ -3468,10 +3535,49 @@ bool InkAnnotationPrivate::canBeResized() const
     return true;
 }
 
+bool InkAnnotationPrivate::pressuresMatchPaths(const QList<QList<qreal>> &pressures) const
+{
+    if (pressures.size() != m_inkPaths.size() || pressures.isEmpty()) {
+        return false;
+    }
+    for (qsizetype i = 0; i < pressures.size(); ++i) {
+        if (pressures.at(i).size() != m_inkPaths.at(i).size() || pressures.at(i).size() < 2) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void InkAnnotationPrivate::adoptSessionStateFrom(const AnnotationPrivate *previous)
+{
+    const auto *old = static_cast<const InkAnnotationPrivate *>(previous);
+
+    // Pressures from the XML win; otherwise keep the previous ones as long as they still describe these paths
+    if (m_sessionPressures.isEmpty() && pressuresMatchPaths(old->m_sessionPressures)) {
+        m_sessionPressures = old->m_sessionPressures;
+        m_sessionPressureStrokeWidth = old->m_sessionPressureStrokeWidth;
+    }
+
+    // The appearance stream is relative to the bounding box, which does not change here, but it is only valid for
+    // the same stroke geometry: drop it if the restored paths do not match the ones it was generated from.
+    if (!old->m_appearanceStream.isEmpty() && old->m_inkPaths.size() == m_inkPaths.size()) {
+        bool sameShape = true;
+        for (qsizetype i = 0; sameShape && i < m_inkPaths.size(); ++i) {
+            sameShape = old->m_inkPaths.at(i).size() == m_inkPaths.at(i).size();
+        }
+        if (sameShape) {
+            m_appearanceStream = old->m_appearanceStream;
+            m_appearanceBoundingBox = old->m_appearanceBoundingBox;
+        }
+    }
+}
+
 void InkAnnotationPrivate::setAnnotationProperties(const QDomNode &node)
 {
     Okular::AnnotationPrivate::setAnnotationProperties(node);
     m_inkPaths.clear();
+    m_sessionPressures.clear();
+    m_sessionPressureStrokeWidth = 0.0;
 
     // loop through the whole children looking for a 'ink' element
     QDomNode subNode = node.firstChild();
@@ -3481,6 +3587,10 @@ void InkAnnotationPrivate::setAnnotationProperties(const QDomNode &node)
         if (e.tagName() != QLatin1String("ink")) {
             continue;
         }
+
+        const qreal storedPressureWidth = e.attribute(QStringLiteral("pressureWidth")).toDouble();
+        QList<QList<qreal>> storedPressures;
+        bool pressuresUsable = storedPressureWidth > 0.0;
 
         // parse the 'path' subnodes
         QDomNode pathNode = e.firstChild();
@@ -3512,7 +3622,22 @@ void InkAnnotationPrivate::setAnnotationProperties(const QDomNode &node)
             // add the path to the path list if it contains at least 2 nodes
             if (path.count() >= 2) {
                 m_inkPaths.append(path);
+                if (pressuresUsable) {
+                    QList<qreal> pressurePath;
+                    const QStringList values = pathElement.attribute(QStringLiteral("pressures")).split(QLatin1Char(' '), Qt::SkipEmptyParts);
+                    pressurePath.reserve(values.size());
+                    for (const QString &value : values) {
+                        pressurePath.append(value.toDouble());
+                    }
+                    pressuresUsable = pressurePath.size() == path.size();
+                    storedPressures.append(pressurePath);
+                }
             }
+        }
+
+        if (pressuresUsable && pressuresMatchPaths(storedPressures)) {
+            m_sessionPressures = storedPressures;
+            m_sessionPressureStrokeWidth = storedPressureWidth;
         }
 
         // loading complete
