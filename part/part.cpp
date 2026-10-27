@@ -1343,23 +1343,9 @@ void Part::setupViewerActions()
 
 void Part::setViewerShortcuts()
 {
-    KActionCollection *ac = actionCollection();
-
-    ac->setDefaultShortcut(m_gotoPage, QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_G));
-    ac->setDefaultShortcut(m_find, QKeySequence());
-
-    ac->setDefaultShortcut(m_findNext, QKeySequence());
-    ac->setDefaultShortcut(m_findPrev, QKeySequence());
-
-    ac->setDefaultShortcut(m_addBookmark, QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_B));
-
-    ac->setDefaultShortcut(m_beginningOfDocument, QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Home));
-    ac->setDefaultShortcut(m_endOfDocument, QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_End));
-
-    QAction *action = static_cast<QAction *>(ac->action(QStringLiteral("file_reload")));
-    if (action) {
-        ac->setDefaultShortcut(action, QKeySequence(Qt::ALT | Qt::Key_F5));
-    }
+    // No default keyboard shortcuts assigned here.
+    // Core navigation (arrows, PgUp/PgDn, Space, Home/End) runs in PageView::keyPressEvent.
+    // Zoom: Ctrl++ / Ctrl+- / Ctrl+0. Find: Ctrl+F / /. Cancel: Esc.
 }
 
 void Part::setupActions()
@@ -1376,14 +1362,14 @@ void Part::setupActions()
     m_pasteAnnotation = ac->addAction(QStringLiteral("annotation_paste"));
     m_pasteAnnotation->setText(i18n("Paste Annotation"));
     m_pasteAnnotation->setIcon(QIcon::fromTheme(QStringLiteral("edit-paste")));
-    ac->setDefaultShortcut(m_pasteAnnotation, QKeySequence(Qt::CTRL | Qt::Key_V));
+
     connect(m_pasteAnnotation, &QAction::triggered, this, &Part::slotPasteAnnotation);
     m_pasteAnnotation->setEnabled(false);
 
     // Copy-without-line-breaks action
     m_copyWithoutLineBreaks = ac->addAction(QStringLiteral("edit_copy_without_line_breaks"));
     m_copyWithoutLineBreaks->setText(i18n("Copy Text (Without line breaks)"));
-    ac->setDefaultShortcut(m_copyWithoutLineBreaks, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C));
+
     m_copyWithoutLineBreaks->setIcon(QIcon::fromTheme(QStringLiteral("edit-copy")));
     connect(m_copyWithoutLineBreaks, &QAction::triggered, this, [this]() { m_pageView->copyTextSelection(PageView::TextCopyMode::WithoutLineBreaks); });
     m_copyWithoutLineBreaks->setEnabled(false);

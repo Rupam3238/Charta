@@ -809,7 +809,12 @@ public:
                 const QRect realrect = tmprect.geometry((int)xScale, (int)yScale).normalized();
                 const QColor color = m_annotElement.hasAttribute(QStringLiteral("color")) ? QColor(m_annotElement.attribute(QStringLiteral("color"))) : m_engineColor;
                 const qreal width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("1")).toDouble() * xScale / pagewidth;
-                painter->setPen(QPen(color, qMax<qreal>(1.0, width)));
+                const bool dashed = m_annotElement.attribute(QStringLiteral("lineStyle")) == QLatin1String("dashed");
+                QPen shapePen(color, qMax<qreal>(1.0, width), dashed ? Qt::CustomDashLine : Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
+                if (dashed) {
+                    shapePen.setDashPattern({2.5, 1.5});
+                }
+                painter->setPen(shapePen);
                 painter->setBrush(m_annotElement.hasAttribute(QStringLiteral("innerColor")) ? QBrush(QColor(m_annotElement.attribute(QStringLiteral("innerColor")))) : Qt::NoBrush);
                 if (annotationType == QLatin1String("GeomCircle")) {
                     painter->drawEllipse(realrect);
@@ -1330,7 +1335,13 @@ public:
         const auto makeLinePen = [this, xScale] {
             const QColor color = m_annotElement.hasAttribute(QStringLiteral("color")) ? QColor(m_annotElement.attribute(QStringLiteral("color"))) : m_engineColor;
             const qreal width = m_annotElement.attribute(QStringLiteral("width"), QStringLiteral("2")).toDouble() * xScale / pagewidth;
-            return QPen(color, qMax<qreal>(0.5, width), Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin);
+            const bool dashed = m_annotElement.attribute(QStringLiteral("lineStyle")) == QLatin1String("dashed");
+            QPen pen(color, qMax<qreal>(0.5, width), dashed ? Qt::CustomDashLine : Qt::SolidLine, dashed ? Qt::FlatCap : Qt::SquareCap, Qt::MiterJoin);
+            if (dashed) {
+                // Qt dash lengths are in pen widths: same 2.5 / 1.5 ratio as the dashes written to the PDF
+                pen.setDashPattern({2.5, 1.5});
+            }
+            return pen;
         };
 
         if (m_block && points.count() == 2) {

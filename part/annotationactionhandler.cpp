@@ -1194,6 +1194,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         styleRow->addWidget(new QLabel(i18n("Stroke style"), contents));
         styleRow->addStretch(1);
         auto *styleGroup = new QButtonGroup(contents);
+        styleGroup->setExclusive(true);
         const QColor lineColor = contents->palette().color(QPalette::WindowText);
         for (const bool dashed : {false, true}) {
             auto *button = new QToolButton(contents);
@@ -1210,10 +1211,20 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             button->setIconSize(QSize(26, 16));
             button->setToolTip(dashed ? i18n("Dashed") : i18n("Solid"));
             button->setChecked(drawingToolSettings.value(key).dashed == dashed);
+            // make the active mode obvious: ring and fill on the checked button, nothing on the other one
+            button->setStyleSheet(QStringLiteral("QToolButton { border: 2px solid transparent; border-radius: 4px; background: transparent; }"
+                                                 "QToolButton:hover { background: palette(midlight); }"
+                                                 "QToolButton:checked { border: 2px solid palette(highlight); background: palette(midlight); }"));
             styleGroup->addButton(button);
             styleRow->addWidget(button);
-            QObject::connect(button, &QToolButton::clicked, q, [this, key, dashed, selectedAnnotation, &selectedAnnotationChanged, &selectedLineStyleChanged]() {
+            QObject::connect(button, &QToolButton::clicked, q, [this, key, dashed, button, styleGroup, selectedAnnotation, &selectedAnnotationChanged, &selectedLineStyleChanged]() {
                 drawingToolSettings[key].dashed = dashed;
+                button->setChecked(true);
+                for (auto *other : styleGroup->buttons()) {
+                    if (other != button) {
+                        other->setChecked(false);
+                    }
+                }
                 if (selectedAnnotation) {
                     selectedAnnotationChanged = true;
                     selectedLineStyleChanged = true;
@@ -2230,27 +2241,8 @@ AnnotationActionHandler::AnnotationActionHandler(PageViewAnnotator *parent, KAct
     ac->addAction(QStringLiteral("annotation_settings_advanced"), d->aAdvancedSettings);
     ac->addAction(QStringLiteral("annotation_cycle_color"), d->aColorCycle);
 
-    ac->setDefaultShortcut(d->aToolBarVisibility, Qt::Key_F6);
-    ac->setDefaultShortcut(aHighlighter, Qt::ALT | Qt::Key_1);
-    ac->setDefaultShortcut(aUnderline, Qt::ALT | Qt::Key_2);
-    ac->setDefaultShortcut(aSquiggle, Qt::ALT | Qt::Key_3);
-    ac->setDefaultShortcut(aStrikeout, Qt::ALT | Qt::Key_4);
-    ac->setDefaultShortcut(aTypewriter, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_T));
-    ac->setDefaultShortcut(aInlineNote, Qt::ALT | Qt::Key_6);
-    ac->setDefaultShortcut(aPopupNote, Qt::ALT | Qt::Key_7);
-    ac->setDefaultShortcut(aFreehandLine, Qt::Key_1);
-    ac->setDefaultShortcut(aArrow, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_A));
-    ac->setDefaultShortcut(aRectangle, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_R));
-    ac->setDefaultShortcut(d->aBrowseTool, QKeySequence(Qt::CTRL | Qt::Key_1));
-    ac->setDefaultShortcut(d->aDrawingBrowse, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_B));
-    ac->setDefaultShortcut(d->aSelectTool, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_S));
-    ac->setDefaultShortcut(d->aLassoSelectTool, QKeySequence(Qt::Key_B));
-    ac->setDefaultShortcut(d->aEraserTool, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_E));
-    ac->setDefaultShortcut(aStraightLine, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_L));
-    ac->setDefaultShortcut(aEllipse, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_O));
-    ac->setDefaultShortcut(aPolygon, QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_P));
-    ac->setDefaultShortcut(d->aAddToQuickTools, QKeySequence((Qt::CTRL | Qt::SHIFT) | Qt::Key_B));
-    ac->setDefaultShortcut(d->aColorCycle, QKeySequence(Qt::Key_C));
+    // No default keyboard shortcuts for annotation tools; use the toolbar.
+    // Temporary tools (hold Space=pan, E=eraser) still work via the key filter.
     d->updateConfigActions();
 
     connect(Okular::Settings::self(), &Okular::Settings::primaryAnnotationToolBarChanged, this, &AnnotationActionHandler::setupAnnotationToolBarVisibilityAction);
