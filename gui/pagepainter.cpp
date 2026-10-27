@@ -709,7 +709,9 @@ void PagePainter::paintCroppedPageOnPainter(QPainter *destPainter,
                     r.adjust(width, width, -width, -width);
                     const QColor color = geom->geometricalInnerColor();
                     mixedPainter->setPen(Qt::NoPen);
-                    mixedPainter->setBrush(QColor(color.red(), color.green(), color.blue(), qRound(opacity * color.alphaF())));
+                    QColor fillColor = color;
+                    fillColor.setAlphaF(qBound(0.0, double(opacity) * color.alphaF(), 1.0));
+                    mixedPainter->setBrush(fillColor);
                     if (geom->geometricalType() == Okular::GeomAnnotation::InscribedSquare) {
                         mixedPainter->drawRect(r);
                     } else {

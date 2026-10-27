@@ -5896,12 +5896,19 @@ bool Document::swapBackingFile(const QString &newFileName, const QUrl &url)
                 return true;
             };
 
+            bool refreshFailed = false;
             for (int i = 0; i < d->m_undoStack->count(); ++i) {
                 // Trust me on the const_cast ^_^
                 QUndoCommand *uc = const_cast<QUndoCommand *>(d->m_undoStack->command(i));
                 if (!refreshUndoCommand(refreshUndoCommand, uc)) {
-                    return false;
+                    refreshFailed = true;
+                    break;
                 }
+            }
+            if (refreshFailed) {
+                // Some command points at an annotation that the reload is about to free (e.g. one on a duplicated page).
+                // Keeping it would leave a dangling pointer in the history: drop the history instead.
+                d->m_undoStack->clear();
             }
 
             for (int i = 0; i < d->m_pagesVector.count(); ++i) {

@@ -152,6 +152,7 @@ public:
     void setAnnotationColor(const QColor &color);
     void setAnnotationInnerColor(const QColor &color);
     void setAnnotationOpacity(double opacity);
+    void setAnnotationLineStyle(bool dashed);
     void setAnnotationFont(const QFont &font);
     bool showAnnotationSettings(const QList<Okular::Annotation *> &annotations, int pageNumber, QWidget *anchorWidget);
 

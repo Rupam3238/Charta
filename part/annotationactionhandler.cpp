@@ -33,6 +33,7 @@
 #include <QInputDialog>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QButtonGroup>
 #include <QPainter>
 #include <QPen>
 #include <QPointer>
@@ -529,6 +530,7 @@ public:
         QColor fillColor = Qt::transparent;
         int fillOpacity = 0;
         bool partialEraser = false;
+        bool dashed = false;
         bool initialized = false;
     };
     QList<double> widthStandardValues() const;
@@ -667,6 +669,8 @@ public:
     AnnotationWidthPresets::SelectionTracker widthPresetActivation;
 
     QColor currentColor;
+    QList<QColor> colorCycleSnapshot;
+    int colorCycleIndex = -1;
     QColor currentInnerColor;
     QFont currentFont;
     int currentWidth;
@@ -766,6 +770,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
     if (selectedAnnotation) {
         initialSettings.width = selectedAnnotation->style().width() / 0.75;
         initialSettings.color = selectedAnnotation->style().color();
+        initialSettings.dashed = selectedAnnotation->style().lineStyle() == Okular::Annotation::Dashed;
         initialSettings.fillColor = QColor();
         initialSettings.fillOpacity = 0;
         if (selectedAnnotation->subType() == Okular::Annotation::AGeom) {
@@ -785,6 +790,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             if (QColor color(colorAttribute); color.isValid()) {
                 initialSettings.color = color;
             }
+            initialSettings.dashed = annotation.attribute(QStringLiteral("lineStyle")) == QLatin1String("dashed");
             const QColor fill(annotation.attribute(QStringLiteral("innerColor")));
             if (fill.isValid()) {
                 initialSettings.fillOpacity = qRound(fill.alphaF() * 100.0);
@@ -804,6 +810,7 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
     bool selectedFillColorChanged = false;
     bool selectedFillOpacityChanged = false;
     bool selectedOpacityChanged = false;
+    bool selectedLineStyleChanged = false;
     double selectedOpacity = selectedAnnotation ? selectedAnnotation->style().opacity() : 1.0;
 
     QDialog popup;
@@ -1181,6 +1188,42 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
         });
     };
 
+    if (*kindIt == DrawingToolKind::Line || *kindIt == DrawingToolKind::Arrow || *kindIt == DrawingToolKind::Rectangle || *kindIt == DrawingToolKind::Ellipse || *kindIt == DrawingToolKind::Polygon) {
+        // Stroke style mode: solid (normal) or dashed
+        auto *styleRow = new QHBoxLayout;
+        styleRow->addWidget(new QLabel(i18n("Stroke style"), contents));
+        styleRow->addStretch(1);
+        auto *styleGroup = new QButtonGroup(contents);
+        const QColor lineColor = contents->palette().color(QPalette::WindowText);
+        for (const bool dashed : {false, true}) {
+            auto *button = new QToolButton(contents);
+            button->setCheckable(true);
+            button->setFixedSize(34, 28);
+            QPixmap linePixmap(26, 16);
+            linePixmap.fill(Qt::transparent);
+            {
+                QPainter linePainter(&linePixmap);
+                linePainter.setPen(QPen(lineColor, 2, dashed ? Qt::DashLine : Qt::SolidLine, Qt::FlatCap));
+                linePainter.drawLine(2, 8, 24, 8);
+            }
+            button->setIcon(QIcon(linePixmap));
+            button->setIconSize(QSize(26, 16));
+            button->setToolTip(dashed ? i18n("Dashed") : i18n("Solid"));
+            button->setChecked(drawingToolSettings.value(key).dashed == dashed);
+            styleGroup->addButton(button);
+            styleRow->addWidget(button);
+            QObject::connect(button, &QToolButton::clicked, q, [this, key, dashed, selectedAnnotation, &selectedAnnotationChanged, &selectedLineStyleChanged]() {
+                drawingToolSettings[key].dashed = dashed;
+                if (selectedAnnotation) {
+                    selectedAnnotationChanged = true;
+                    selectedLineStyleChanged = true;
+                } else {
+                    annotator->setAnnotationLineStyle(dashed);
+                }
+            });
+        }
+        layout->addLayout(styleRow);
+    }
     if (*kindIt == DrawingToolKind::Text) {
         auto *fontSizeRow = new QHBoxLayout;
         fontSizeRow->addWidget(new QLabel(i18n("Font size"), contents));
@@ -1355,6 +1398,9 @@ bool AnnotationActionHandlerPrivate::showToolSettings(QAction *action, Okular::D
             if (selectedColorChanged) {
                 annotation->style().setColor(drawingToolSettings.value(key).color);
             }
+            if (selectedLineStyleChanged && (annotation->subType() == Okular::Annotation::AGeom || annotation->subType() == Okular::Annotation::ALine)) {
+                annotation->style().setLineStyle(drawingToolSettings.value(key).dashed ? Okular::Annotation::Dashed : Okular::Annotation::Solid);
+            }
             if (selectedOpacityChanged && annotation->subType() == Okular::Annotation::AInk) {
                 annotation->style().setOpacity(selectedOpacity);
             }
@@ -1465,8 +1511,10 @@ void AnnotationActionHandlerPrivate::parseTool(int toolId)
     updateConfigActions(annotType);
 }
 
-void AnnotationActionHandlerPrivate::updateConfigActions(const QString &annotType)
+void AnnotationActionHandlerPrivate::updateConfigActions(const QString &annotTypeArg)
 {
+    // Callers that just refresh the actions (width, font, temporary tool end) pass no type: keep the one of the selected tool
+    const QString annotType = (annotTypeArg.isEmpty() && selectedBuiltinTool > 0 && !annotator->eraserMode()) ? annotator->builtinTool(selectedBuiltinTool).attribute(QStringLiteral("type")) : annotTypeArg;
     const bool isAnnotationSelected = !annotType.isEmpty();
     const bool isEraser = annotator->eraserMode();
     const bool isTypewriter = annotType == QStringLiteral("typewriter");
@@ -2709,10 +2757,29 @@ void AnnotationActionHandler::slotColorCycle()
         return;
     }
 
-    const QColor nextColor = Okular::AnnotationColorHistory::nextCycledColor(colorHistory, d->currentColor);
-    if (nextColor.isValid() && !Okular::AnnotationColorHistory::colorsEqual(nextColor, d->currentColor)) {
-        d->annotator->setAnnotationColor(nextColor);
+    // Cycling only previews colors: the history is reordered by the next stroke (addRecentColor), not here.
+    const auto sameRgb = [](const QColor &a, const QColor &b) {
+        return a.isValid() && b.isValid() && a.red() == b.red() && a.green() == b.green() && a.blue() == b.blue();
+    };
+    bool sameSnapshot = d->colorCycleSnapshot.size() == colorHistory.size();
+    for (int i = 0; sameSnapshot && i < colorHistory.size(); ++i) {
+        sameSnapshot = sameRgb(d->colorCycleSnapshot.at(i), colorHistory.at(i));
     }
+    const bool indexValid = d->colorCycleIndex >= 0 && d->colorCycleIndex < colorHistory.size() && sameRgb(colorHistory.at(d->colorCycleIndex), d->currentColor);
+    if (!sameSnapshot || !indexValid) {
+        d->colorCycleSnapshot = colorHistory;
+        d->colorCycleIndex = -1;
+        for (int i = 0; i < colorHistory.size(); ++i) {
+            if (sameRgb(colorHistory.at(i), d->currentColor)) {
+                d->colorCycleIndex = i;
+                break;
+            }
+        }
+    }
+    d->colorCycleIndex = (d->colorCycleIndex + 1) % colorHistory.size();
+    const QColor nextColor = colorHistory.at(d->colorCycleIndex);
+    d->currentColor = nextColor;
+    d->annotator->setAnnotationColor(nextColor);
 }
 
 #include "moc_annotationactionhandler.cpp"

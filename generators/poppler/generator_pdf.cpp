@@ -2181,11 +2181,27 @@ bool PDFGenerator::save(const QString &fileName, SaveOptions options, QString *e
     return true;
 }
 
+static bool layoutEntryNeedsOkularAnnotations(const Okular::SaveInterface::PageLayoutEntry &entry)
+{
+    if (!entry.page || entry.page->annotations().isEmpty()) {
+        return false;
+    }
+    if (entry.sourceNumber < 0) {
+        return true;
+    }
+#if HAVE_QPDF
+    // a duplicated page gets its own page object, whose annotations are written from the duplicate's annotations
+    return entry.page->isDuplicate();
+#else
+    return false;
+#endif
+}
+
 static bool writeBlankPageAnnotations(const QString &pdfPath, const QList<Okular::SaveInterface::PageLayoutEntry> &pages, QString *errorText)
 {
     bool hasBlankAnnotations = false;
     for (const Okular::SaveInterface::PageLayoutEntry &entry : pages) {
-        if (entry.sourceNumber < 0 && entry.page && !entry.page->annotations().isEmpty()) {
+        if (layoutEntryNeedsOkularAnnotations(entry)) {
             hasBlankAnnotations = true;
             break;
         }
@@ -2204,7 +2220,7 @@ static bool writeBlankPageAnnotations(const QString &pdfPath, const QList<Okular
 
     for (int i = 0; i < pages.size(); ++i) {
         const Okular::SaveInterface::PageLayoutEntry &entry = pages.at(i);
-        if (entry.sourceNumber < 0 && entry.page && !entry.page->annotations().isEmpty()) {
+        if (layoutEntryNeedsOkularAnnotations(entry)) {
             std::unique_ptr<Poppler::Page> ppl_page = stagedDoc->page(i);
             if (!ppl_page) {
                 continue;
@@ -2267,7 +2283,30 @@ bool PDFGenerator::applyPageLayout(const QString &fileName, const QList<PageLayo
                     }
                     return false;
                 }
-                wanted.push_back(original[entry.sourceNumber]);
+                if (entry.page && entry.page->isDuplicate()) {
+                    // own page object, with the links and form widgets of the original but not its markup annotations:
+                    // the annotations of the duplicate are written afterwards
+                    QPDFObjectHandle sourcePage = original[entry.sourceNumber].getObjectHandle();
+                    QPDFObjectHandle copy = pdf.makeIndirectObject(sourcePage.shallowCopy());
+                    QPDFObjectHandle annots = sourcePage.getKey("/Annots");
+                    if (annots.isArray()) {
+                        std::vector<QPDFObjectHandle> kept;
+                        for (int a = 0; a < annots.getArrayNItems(); ++a) {
+                            QPDFObjectHandle annot = annots.getArrayItem(a);
+                            std::string subtype;
+                            if (annot.isDictionary() && annot.getKey("/Subtype").isName()) {
+                                subtype = annot.getKey("/Subtype").getName();
+                            }
+                            if (subtype == "/Link" || subtype == "/Widget") {
+                                kept.push_back(annot);
+                            }
+                        }
+                        copy.replaceKey("/Annots", QPDFObjectHandle::newArray(kept));
+                    }
+                    wanted.push_back(QPDFPageObjectHelper(copy));
+                } else {
+                    wanted.push_back(original[entry.sourceNumber]);
+                }
             } else {
                 const QString w = QString::number(entry.width, 'f', 3);
                 const QString h = QString::number(entry.height, 'f', 3);

@@ -357,6 +357,11 @@ static Poppler::Annotation::Style okularToPoppler(const Okular::Annotation::Styl
     pStyle.setEffectIntensity(oStyle.effectIntensity());
     pStyle.setWidth(oStyle.width());
     pStyle.setLineStyle(okularToPoppler(oStyle.lineStyle()));
+    if (oStyle.lineStyle() == Okular::Annotation::Dashed) {
+        // dashes that scale with the stroke, so thick strokes do not look solid
+        const double strokeWidth = qMax(1.0, oStyle.width());
+        pStyle.setDashArray(QList<double>{strokeWidth * 2.5, strokeWidth * 1.5});
+    }
     pStyle.setXCorners(oStyle.xCorners());
     pStyle.setYCorners(oStyle.yCorners());
 

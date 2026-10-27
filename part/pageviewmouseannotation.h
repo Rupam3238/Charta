@@ -119,6 +119,9 @@ public:
 
     bool isActive() const;
 
+    /* True if the point (content area coordinates) is on one of the selected annotations. */
+    bool containsPoint(PageViewItem *pageViewItem, const QPoint eventPos) const;
+
     bool isFocused() const;
 
     bool isMoved() const;
@@ -154,6 +157,9 @@ public:
         RH_AllHandles = RH_Top | RH_Right | RH_Bottom | RH_Left
     };
     Q_DECLARE_FLAGS(ResizeHandle, ResizeHandleFlag)
+
+Q_SIGNALS:
+    void selectionChanged();
 
 private:
     void setState(MouseAnnotationState state, const AnnotationDescription &ad);

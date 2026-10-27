@@ -471,8 +471,27 @@ void MouseAnnotation::routeMousePressEvent(PageViewItem *pageViewItem, const QPo
         }
     } else {
         /* qDebug() << "routeMousePressEvent: no annotation under mouse, enter StateInactive"; */
+        // a click outside of the selection ends it
+        m_areaSelectedAnnotations.clear();
         setState(StateInactive, ad);
     }
+}
+
+bool MouseAnnotation::containsPoint(PageViewItem *pageViewItem, const QPoint eventPos) const
+{
+    if (!pageViewItem) {
+        return false;
+    }
+    for (const AnnotationDescription &selected : selectedAnnotations()) {
+        if (!selected.isValid() || selected.pageViewItem != pageViewItem) {
+            continue;
+        }
+        const QRect rect = Okular::AnnotationUtils::annotationGeometry(selected.annotation, pageViewItem->uncroppedWidth(), pageViewItem->uncroppedHeight()).adjusted(-handlePadding, -handlePadding, handlePadding, handlePadding);
+        if (rect.contains(eventPos - pageViewItem->uncroppedGeometry().topLeft())) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void MouseAnnotation::selectAnnotation(PageViewItem *pageViewItem, Okular::Annotation *annotation)
@@ -699,6 +718,7 @@ void MouseAnnotation::selectAnnotationsInRect(PageViewItem *pageViewItem, const 
     }
 
     m_pageView->viewport()->update();
+    Q_EMIT selectionChanged();
 }
 
 void MouseAnnotation::selectAnnotationsInLasso(PageViewItem *pageViewItem, const QPolygonF &selectionPath)
@@ -1096,6 +1116,7 @@ void MouseAnnotation::updateAnnotationPointers()
             selected.annotation = m_document->page(selected.pageNumber)->annotation(selected.annotation->uniqueName());
         }
     }
+    m_areaSelectedAnnotations.removeIf([](const AnnotationDescription &selected) { return !selected.annotation; });
 }
 
 void MouseAnnotation::cancel()
@@ -1117,6 +1138,7 @@ void MouseAnnotation::reset()
     m_focusedAnnotation.invalidate();
     m_mouseOverAnnotation.invalidate();
     m_areaSelectedAnnotations.clear();
+    Q_EMIT selectionChanged();
 }
 
 /* Handle state changes for the focused annotation. */
@@ -1266,6 +1288,7 @@ void MouseAnnotation::setState(MouseAnnotationState state, const AnnotationDescr
     /* qDebug() << "setState: enter " << state; */
     m_state = state;
     m_pageView->updateCursor();
+    Q_EMIT selectionChanged();
 }
 
 /* Get the rectangular boundary of the given annotation, enlarged for space needed by resize handles.

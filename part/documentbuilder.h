@@ -71,12 +71,15 @@ public:
     void setSelectMode(bool on);
     bool isSelectMode() const { return m_selectMode; }
     void setSelectedEntryIds(const QSet<QUuid> &ids);
+    /// The checked cards in the order they were checked (the export order).
+    void setSelectionOrder(const QList<QUuid> &order);
 
 private:
     bool m_showFileNames = true;
     QSize m_cellSize;
     bool m_selectMode = false;
     QSet<QUuid> m_selectedEntryIds;
+    QList<QUuid> m_selectionOrder;
 };
 
 class OKULARPART_EXPORT SelectionBar : public QWidget
@@ -270,6 +273,9 @@ private:
     void setSelectMode(bool on);
     void toggleEntry(const QUuid &id);
     void selectAllEntries();
+    /// The checked cards in select mode, the cards selected in the view otherwise (in document order).
+    QList<QUuid> effectiveSelectedIds() const;
+    QList<int> effectiveSelectedRows() const;
 
     /// Image file patterns the installed Qt image plugins can read (lower-case, sorted).
     static QStringList supportedImagePatterns();
@@ -320,6 +326,7 @@ private:
     // --- Phase 5: checkbox selection mode ---
     bool m_selectMode = false;
     QSet<QUuid> m_selectedEntryIds;
+    QList<QUuid> m_selectionOrder;
     SelectionBar *m_selectionBar = nullptr;
 };
 

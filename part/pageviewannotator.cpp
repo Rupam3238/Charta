@@ -128,6 +128,11 @@ public:
 
         m_center = QPointF(nX * xScale, nY * yScale);
         if (type == Press && button == Left) {
+            if (m_down) {
+                // the release of the previous stroke was lost: finish it first
+                commitPendingDeletions();
+                retireLiveStrokes();
+            }
             m_previousCenter.reset();
             m_down = true;
         }
@@ -190,6 +195,11 @@ public:
     {
         m_previousCenter.reset();
         m_previousPage = nullptr;
+    }
+
+    bool isDown() const
+    {
+        return m_down;
     }
 
     bool hasLiveStrokes(const QRect &contentRect) const
@@ -934,6 +944,9 @@ public:
             if (m_annotElement.hasAttribute(QStringLiteral("width"))) {
                 ann->style().setWidth(m_annotElement.attribute(QStringLiteral("width")).toDouble());
             }
+            if (m_annotElement.attribute(QStringLiteral("lineStyle")) == QLatin1String("dashed")) {
+                ann->style().setLineStyle(Okular::Annotation::Dashed);
+            }
             if (m_annotElement.hasAttribute(QStringLiteral("innerColor"))) {
                 ga->setGeometricalInnerColor(QColor(m_annotElement.attribute(QStringLiteral("innerColor"))));
             }
@@ -1425,6 +1438,9 @@ public:
 
         if (m_annotElement.hasAttribute(QStringLiteral("width"))) {
             ann->style().setWidth(m_annotElement.attribute(QStringLiteral("width")).toDouble());
+        }
+        if (m_annotElement.attribute(QStringLiteral("lineStyle")) == QLatin1String("dashed")) {
+            ann->style().setLineStyle(Okular::Annotation::Dashed);
         }
 
         // set common attributes
@@ -1994,11 +2010,17 @@ void PageViewAnnotator::setEraserMode(bool enabled)
     if (eraserMode() == enabled) {
         return;
     }
+    if (auto *oldEraser = dynamic_cast<EraserEngine *>(m_engine)) {
+        for (const auto &[pageItem, rect] : oldEraser->cancelGesture()) {
+            if (pageItem) {
+                m_pageView->viewport()->update(rect.translated(pageItem->uncroppedGeometry().topLeft()).translated(-m_pageView->contentAreaPosition()));
+            }
+        }
+    }
     if (m_engine) {
         delete m_engine;
         m_engine = nullptr;
     }
-    m_lockedItem = nullptr;
     m_lockedItem = nullptr;
     if (m_lastDrawnRect.isValid()) {
         m_pageView->viewport()->update(m_lastDrawnRect.translated(-m_pageView->contentAreaPosition()));
@@ -2023,6 +2045,13 @@ void PageViewAnnotator::setEraserWidth(double width)
         return;
     }
 
+    if (auto *oldEraser = dynamic_cast<EraserEngine *>(m_engine)) {
+        for (const auto &[pageItem, rect] : oldEraser->cancelGesture()) {
+            if (pageItem) {
+                m_pageView->viewport()->update(rect.translated(pageItem->uncroppedGeometry().topLeft()).translated(-m_pageView->contentAreaPosition()));
+            }
+        }
+    }
     if (m_engine) {
         delete m_engine;
     }
@@ -2358,6 +2387,14 @@ QRect PageViewAnnotator::routeMouseEvent(QMouseEvent *e, PageViewItem *item)
     // Constrain angle if action checked XOR shift button pressed.
     modifiers.constrainRatioAndAngle = (bool(constrainRatioAndAngleActive()) != bool(e->modifiers() & Qt::ShiftModifier));
 
+    // a move without any button while the eraser is still "down" means its release was lost
+    if (eventType == AnnotatorEngine::Move && e->buttons() == Qt::NoButton) {
+        auto *eraser = dynamic_cast<EraserEngine *>(m_engine);
+        if (eraser && eraser->isDown()) {
+            performRouteMouseOrTabletEvent(AnnotatorEngine::Release, AnnotatorEngine::Left, modifiers, e->position(), item);
+        }
+    }
+
     return performRouteMouseOrTabletEvent(eventType, button, modifiers, e->position(), item);
 }
 
@@ -2365,7 +2402,8 @@ QRect PageViewAnnotator::routeTabletEvent(QTabletEvent *e, PageViewItem *item, c
 {
     // Unlike routeMouseEvent, routeTabletEvent must explicitly ignore events it doesn't care about so that
     // the corresponding mouse event will later be delivered.
-    if (!item) {
+    // a release over no page must still reach the engine, or the stroke is never finished
+    if (!item && e->type() != QEvent::TabletRelease) {
         e->ignore();
         return QRect();
     }
@@ -3023,6 +3061,18 @@ void PageViewAnnotator::setAnnotationInnerColor(const QColor &color)
 void PageViewAnnotator::setAnnotationOpacity(double opacity)
 {
     currentAnnotationElement().setAttribute(QStringLiteral("opacity"), QString::number(opacity));
+    saveBuiltinAnnotationTools();
+    selectLastTool();
+}
+
+void PageViewAnnotator::setAnnotationLineStyle(bool dashed)
+{
+    QDomElement annotationElement = currentAnnotationElement();
+    if (dashed) {
+        annotationElement.setAttribute(QStringLiteral("lineStyle"), QStringLiteral("dashed"));
+    } else {
+        annotationElement.removeAttribute(QStringLiteral("lineStyle"));
+    }
     saveBuiltinAnnotationTools();
     selectLastTool();
 }

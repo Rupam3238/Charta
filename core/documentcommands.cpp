@@ -106,10 +106,20 @@ bool AddAnnotationCommand::refreshInternalPageReferences(const QList<Okular::Pag
         // it can have been removed later so the annotation pointer is stored inside a following RemoveAnnotationCommand
         // and thus doesn't need updating because it didn't change
         // because of the document reload
-        auto a = newPagesVector[m_pageNumber]->annotation(m_annotation->uniqueName());
-        if (a) {
-            m_annotation = a;
+        Okular::Page *oldPage = m_docPriv->m_pagesVector.value(m_pageNumber, nullptr);
+        if (!m_annotation || !oldPage || m_pageNumber >= newPagesVector.size()) {
+            return false;
         }
+        if (oldPage->annotationIndex(m_annotation) < 0) {
+            // owned by a later command, not attached to a page: it is not going to be freed by the reload
+            return true;
+        }
+        auto a = newPagesVector[m_pageNumber]->annotation(m_annotation->uniqueName());
+        if (!a) {
+            // the annotation is going to be freed and has no replacement: the history cannot be kept
+            return false;
+        }
+        m_annotation = a;
     }
 
     return true;
@@ -156,10 +166,18 @@ bool RemoveAnnotationCommand::refreshInternalPageReferences(const QList<Okular::
         // and that annotation addition has also been undone so the annotation pointer is stored inside
         // a previous AddAnnotationCommand and thus doesn't need updating because it didn't change
         // because of the document reload
-        auto a = newPagesVector[m_pageNumber]->annotation(m_annotation->uniqueName());
-        if (a) {
-            m_annotation = a;
+        Okular::Page *oldPage = m_docPriv->m_pagesVector.value(m_pageNumber, nullptr);
+        if (!m_annotation || !oldPage || m_pageNumber >= newPagesVector.size()) {
+            return false;
         }
+        if (oldPage->annotationIndex(m_annotation) < 0) {
+            return true;
+        }
+        auto a = newPagesVector[m_pageNumber]->annotation(m_annotation->uniqueName());
+        if (!a) {
+            return false;
+        }
+        m_annotation = a;
     }
 
     return true;

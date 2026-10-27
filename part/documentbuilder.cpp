@@ -216,6 +216,11 @@ void DocumentBuilderDelegate::setSelectedEntryIds(const QSet<QUuid> &ids)
     m_selectedEntryIds = ids;
 }
 
+void DocumentBuilderDelegate::setSelectionOrder(const QList<QUuid> &order)
+{
+    m_selectionOrder = order;
+}
+
 void DocumentBuilderDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
     painter->save();
@@ -282,15 +287,36 @@ void DocumentBuilderDelegate::paint(QPainter *painter, const QStyleOptionViewIte
     // Delete badge (shown when not in select mode) or selection checkbox (shown in select mode).
     if (m_selectMode) {
         const QRect checkRect = checkboxRect(rect);
-        const bool checked = m_selectedEntryIds.contains(index.data(DocumentBuilderModel::EntryIdRole).value<QUuid>());
+        const int order = m_selectionOrder.indexOf(index.data(DocumentBuilderModel::EntryIdRole).value<QUuid>());
+        const bool checked = order >= 0;
         painter->setPen(Qt::NoPen);
         painter->setBrush(QColor(0, 0, 0, 120));
         painter->drawRoundedRect(checkRect, 4, 4);
         painter->setPen(QPen(QColor(0xdc, 0xe3, 0xea), 1.5));
         painter->drawRect(checkRect.adjusted(1, 1, -1, -1));
         if (checked) {
+            // filled box with a tick
+            painter->setPen(Qt::NoPen);
             painter->setBrush(QColor(0x27, 0xbf, 0xd6));
-            painter->drawRoundedRect(checkRect.adjusted(5, 5, -5, -5), 2, 2);
+            painter->drawRoundedRect(checkRect.adjusted(1, 1, -1, -1), 3, 3);
+            painter->setPen(QPen(Qt::white, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter->setBrush(Qt::NoBrush);
+            const QPointF tick[3] = {QPointF(checkRect.left() + checkRect.width() * 0.24, checkRect.top() + checkRect.height() * 0.54),
+                                     QPointF(checkRect.left() + checkRect.width() * 0.43, checkRect.top() + checkRect.height() * 0.73),
+                                     QPointF(checkRect.left() + checkRect.width() * 0.77, checkRect.top() + checkRect.height() * 0.30)};
+            painter->drawPolyline(tick, 3);
+
+            // export order number, next to the box
+            const QRect numberRect(checkRect.left() - checkRect.width() - 4, checkRect.top(), checkRect.width(), checkRect.height());
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(QColor(0x1d, 0x6f, 0x7d));
+            painter->drawEllipse(numberRect);
+            painter->setPen(Qt::white);
+            QFont numberFont = option.font;
+            numberFont.setBold(true);
+            numberFont.setPointSizeF(qMax(7.0, numberFont.pointSizeF() - 2.0));
+            painter->setFont(numberFont);
+            painter->drawText(numberRect, Qt::AlignCenter, QString::number(order + 1));
         }
     } else {
         const QRect deleteRect = deleteBadgeRect(rect);
@@ -856,7 +882,8 @@ void DocumentBuilderView::mousePressEvent(QMouseEvent *event)
             // Checkbox click while in select mode: toggle selection, no drag.
             if (delegate->isSelectMode() && delegate->checkboxRect(visualRect(index)).contains(pos)) {
                 Q_EMIT checkboxToggled(index.data(DocumentBuilderModel::EntryIdRole).value<QUuid>());
-                QListView::mousePressEvent(event);
+                // no default handling: it would collapse the view selection to this one card
+                event->accept();
                 return;
             }
             if (!delegate->checkboxRect(visualRect(index)).contains(pos)
@@ -1117,7 +1144,7 @@ void DocumentBuilderWidget::buildUi()
     connect(m_selectionBar, &SelectionBar::doneClicked, this, [this] { setSelectMode(false); });
     connect(m_selectionBar, &SelectionBar::selectAllClicked, this, &DocumentBuilderWidget::selectAllEntries);
     connect(m_selectionBar, &SelectionBar::deleteClicked, this, [this] {
-        deleteRows(m_view->selectedEntryRows());
+        deleteRows(effectiveSelectedRows());
         setSelectMode(false);
     });
     connect(m_selectionBar, &SelectionBar::duplicateClicked, this, [this] {
@@ -1147,7 +1174,7 @@ void DocumentBuilderWidget::buildUi()
 
 void DocumentBuilderWidget::updateSelectionActions()
 {
-    const bool hasRows = !m_view->selectedEntryRows().isEmpty();
+    const bool hasRows = !effectiveSelectedRows().isEmpty();
     m_removeButton->setEnabled(hasRows && !m_exporting);
     if (m_exportSelectedAction) {
         m_exportSelectedAction->setEnabled(hasRows && !m_exporting);
@@ -1420,7 +1447,7 @@ void DocumentBuilderWidget::showContextMenu(const QPoint &globalPos)
 
 void DocumentBuilderWidget::duplicateRows()
 {
-    const QList<QUuid> ids = m_view->selectedEntryIds();
+    const QList<QUuid> ids = effectiveSelectedIds();
     if (ids.isEmpty() || m_model->pageCount() == 0) {
         return;
     }
@@ -1442,13 +1469,14 @@ void DocumentBuilderWidget::setSelectMode(bool on)
     auto *delegate = qobject_cast<DocumentBuilderDelegate *>(m_view->itemDelegate());
     if (delegate) {
         delegate->setSelectMode(on);
-        delegate->setSelectedEntryIds(m_selectedEntryIds);
+        delegate->setSelectionOrder(m_selectionOrder);
     }
     m_selectionBar->setVisible(on);
     m_selectionBar->setSelectionCount(m_selectedEntryIds.size());
     // When leaving select mode, clear the selection set.
     if (!on) {
         m_selectedEntryIds.clear();
+        m_selectionOrder.clear();
     }
     m_view->viewport()->update();
     updateSelectionActions();
@@ -1458,29 +1486,67 @@ void DocumentBuilderWidget::toggleEntry(const QUuid &id)
 {
     if (m_selectedEntryIds.contains(id)) {
         m_selectedEntryIds.remove(id);
+        m_selectionOrder.removeAll(id);
     } else {
         m_selectedEntryIds.insert(id);
+        m_selectionOrder.append(id);
     }
     auto *delegate = qobject_cast<DocumentBuilderDelegate *>(m_view->itemDelegate());
     if (delegate) {
-        delegate->setSelectedEntryIds(m_selectedEntryIds);
+        delegate->setSelectionOrder(m_selectionOrder);
     }
     m_selectionBar->setSelectionCount(m_selectedEntryIds.size());
     m_view->viewport()->update();
+    updateSelectionActions();
 }
 
 void DocumentBuilderWidget::selectAllEntries()
 {
     m_selectedEntryIds.clear();
+    m_selectionOrder.clear();
     for (const QUuid &id : m_model->entryIds()) {
         m_selectedEntryIds.insert(id);
+        m_selectionOrder.append(id);
     }
     auto *delegate = qobject_cast<DocumentBuilderDelegate *>(m_view->itemDelegate());
     if (delegate) {
-        delegate->setSelectedEntryIds(m_selectedEntryIds);
+        delegate->setSelectionOrder(m_selectionOrder);
     }
     m_selectionBar->setSelectionCount(m_selectedEntryIds.size());
     m_view->viewport()->update();
+    updateSelectionActions();
+}
+
+QList<QUuid> DocumentBuilderWidget::effectiveSelectedIds() const
+{
+    if (m_selectMode && !m_selectedEntryIds.isEmpty()) {
+        // in the order the cards were checked
+        QList<QUuid> ids;
+        for (const QUuid &id : m_selectionOrder) {
+            if (m_selectedEntryIds.contains(id) && m_model->rowForId(id) >= 0) {
+                ids.append(id);
+            }
+        }
+        return ids;
+    }
+    return m_view->selectedEntryIds();
+}
+
+QList<int> DocumentBuilderWidget::effectiveSelectedRows() const
+{
+    if (m_selectMode && !m_selectedEntryIds.isEmpty()) {
+        QList<int> rows;
+        const QList<QUuid> ids = effectiveSelectedIds();
+        for (const QUuid &id : ids) {
+            const int row = m_model->rowForId(id);
+            if (row >= 0) {
+                rows.append(row);
+            }
+        }
+        std::sort(rows.begin(), rows.end());
+        return rows;
+    }
+    return m_view->selectedEntryRows();
 }
 
 // --- Phase 5b: export -------------------------------------------------------------------------
@@ -1492,7 +1558,7 @@ void DocumentBuilderWidget::exportAllPages()
 
 void DocumentBuilderWidget::exportSelectedPages()
 {
-    exportPages(m_view->selectedEntryIds());
+    exportPages(effectiveSelectedIds());
 }
 
 void DocumentBuilderWidget::saveToTarget()
@@ -1581,7 +1647,7 @@ void DocumentBuilderWidget::updateExportActions()
         m_exportAllAction->setEnabled(available && hasPages && !m_exporting);
     }
     if (m_exportSelectedAction) {
-        m_exportSelectedAction->setEnabled(available && !m_view->selectedEntryRows().isEmpty() && !m_exporting);
+        m_exportSelectedAction->setEnabled(available && !effectiveSelectedRows().isEmpty() && !m_exporting);
     }
 }
 
@@ -1637,7 +1703,15 @@ void DocumentBuilderWidget::exportPages(const QList<QUuid> &selection)
         return;
     }
 
-    const QList<DocumentBuilderExport::Page> pages = m_model->pagesForExport(selection);
+    // the cards are exported in the order of the selection (document order when nothing is selected)
+    QList<DocumentBuilderExport::Page> pages;
+    if (selection.isEmpty()) {
+        pages = m_model->pagesForExport(selection);
+    } else {
+        for (const QUuid &id : selection) {
+            pages += m_model->pagesForExport(QList<QUuid>() << id);
+        }
+    }
     if (pages.isEmpty()) {
         KMessageBox::information(this, i18n("There are no pages to export."), i18n("Export"));
         return;

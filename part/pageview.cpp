@@ -372,6 +372,7 @@ PageView::PageView(QWidget *parent, Okular::Document *document)
     d->document = document;
     d->mouseMode = Okular::Settings::mouseMode();
     d->mouseAnnotation = new MouseAnnotation(this, document);
+    connect(d->mouseAnnotation, &MouseAnnotation::selectionChanged, this, &PageView::updateAnnotationSelectionPanel);
     d->messageWindow = new PageViewMessage(this);
     d->annotationSelectionPanel = new QFrame(viewport());
     d->annotationSelectionPanel->setFrameShape(QFrame::StyledPanel);
@@ -696,6 +697,9 @@ void PageView::selectAnnotations(const QList<Okular::Annotation *> &annotations,
 
 void PageView::updateAnnotationSelectionPanel()
 {
+    if (!d->mouseAnnotation || !d->annotationSelectionPanel) {
+        return;
+    }
     const QList<AnnotationDescription> selected = d->mouseAnnotation->selectedAnnotations();
     const bool allowSelectionPanel = d->annotationSelectionMode || d->mouseMode == Okular::Settings::EnumMouseMode::Browse;
     Okular::Annotation *annotation = allowSelectionPanel && !selected.isEmpty() ? selected.constFirst().annotation : nullptr;
@@ -2494,6 +2498,11 @@ void PageView::tabletEvent(QTabletEvent *e)
         PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
         const QPoint localOriginInGlobal = mapToGlobal(QPoint(0, 0));
 
+        if (e->type() == QEvent::TabletPress && !d->mouseAnnotation->selectedAnnotations().isEmpty() && !d->mouseAnnotation->containsPoint(pageItem, QPoint(qRound(eventPos.x()), qRound(eventPos.y())))) {
+            d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+            updateAnnotationSelectionPanel();
+        }
+
         // routeTabletEvent will accept or ignore event as appropriate
         d->annotator->routeTabletEvent(e, pageItem, localOriginInGlobal);
     } else {
@@ -2748,6 +2757,10 @@ void PageView::mousePressEvent(QMouseEvent *e)
         if (e->button() == Qt::RightButton) {
             d->mousePressPos = e->globalPosition();
         }
+        if (e->button() == Qt::LeftButton && !d->mouseAnnotation->selectedAnnotations().isEmpty() && !d->mouseAnnotation->containsPoint(pageItem, eventPos)) {
+            d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+            updateAnnotationSelectionPanel();
+        }
         d->annotator->routeMouseEvent(e, pageItem);
         return;
     }
@@ -2759,13 +2772,11 @@ void PageView::mousePressEvent(QMouseEvent *e)
         if (e->button() == Qt::LeftButton) {
             PageViewItem *pageItem = pickItemOnPoint(eventPos.x(), eventPos.y());
             if (pageItem) {
-                if (!d->annotationSelectionLassoMode) {
-                    d->mouseAnnotation->routeMousePressEvent(pageItem, eventPos, true);
-                    if (d->mouseAnnotation->isActive()) {
-                        d->scroller->stop();
-                        updateAnnotationSelectionPanel();
-                        return;
-                    }
+                d->mouseAnnotation->routeMousePressEvent(pageItem, eventPos, true);
+                if (d->mouseAnnotation->isActive()) {
+                    d->scroller->stop();
+                    updateAnnotationSelectionPanel();
+                    return;
                 }
                 d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
                 updateAnnotationSelectionPanel();
@@ -4228,7 +4239,7 @@ void PageView::setAnnotationSelectionMode(bool enabled, bool lassoMode)
         d->annotationSelectionDragging = false;
         d->annotationSelectionItem = nullptr;
         d->annotationSelectionPath.clear();
-        d->mouseAnnotation->selectAnnotationsInRect(nullptr, {});
+        // the selection survives a tool change: it is cleared by a click outside of it
         if (oldLassoBounds.isValid()) {
             viewport()->update(oldLassoBounds.translated(-contentAreaPosition()));
         }
