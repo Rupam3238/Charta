@@ -27,6 +27,7 @@
 
 #include <KIO/JobUiDelegateFactory>
 #include <KIO/OpenUrlJob>
+#include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
 #include <QTemporaryFile>
@@ -53,12 +54,17 @@ public:
             dir.mkpath(cacheDir);
         }
 
-        // Clean up old clipboard stamp images (keep only the 10 most recent)
-        QStringList filters = QStringList() << QStringLiteral("charta-clipboard-*.png");
-        QFileInfoList files = dir.entryInfoList(filters, QDir::Files | QDir::Readable, QDir::Time);
-        // Remove files beyond the 10 most recent
-        for (int i = 10; i < files.size(); ++i) {
-            QFile::remove(files[i].absoluteFilePath());
+        // Clean up clipboard stamp images that have not been used for a month.
+        // Do not limit the number of files: an image that is still on a page of
+        // an open document must stay available for drawing and regenerating its stamp.
+        // (A document can always recover the picture from its PDF if a file is gone.)
+        const QStringList filters = QStringList() << QStringLiteral("charta-clipboard-*.png");
+        const QDateTime cutoff = QDateTime::currentDateTime().addDays(-30);
+        const QFileInfoList files = dir.entryInfoList(filters, QDir::Files | QDir::Readable);
+        for (const QFileInfo &fileInfo : files) {
+            if (fileInfo.lastModified() < cutoff) {
+                QFile::remove(fileInfo.absoluteFilePath());
+            }
         }
 
         // Generate unique filename

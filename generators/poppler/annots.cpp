@@ -11,10 +11,13 @@
 #include "annots.h"
 
 // qt/kde includes
+#include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
 #include <QImageReader>
 #include <QLoggingCategory>
+#include <QSaveFile>
+#include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTransform>
 #include <QVariant>
@@ -409,6 +412,73 @@ static bool isChartaClipboardImageAnnotation(const QString &uniqueName)
 {
     return !uniqueName.isEmpty() && uniqueName.startsWith(QStringLiteral("charta-clipboard-image-"));
 }
+
+#ifdef POPPLER_QT6_HAS_STAMP_APPEARANCE_IMAGE
+// The original picture of a pasted image stamp lives only in the appearance
+// stream of the PDF (the stamp's /Name is never the cache path: it stays
+// "Draft"), while Charta draws and regenerates the stamp from an image file.
+// The file written at paste time is a cache: it is gone after a reopen on
+// another machine, after the cache is cleaned, or simply because the name
+// above was never stored.  These helpers rebuild that file from the PDF.
+
+// Must match the directory used by ClipboardImageStampAnnotation (part/annotationpopup.cpp).
+static QString clipboardStampCacheDir()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QLatin1String("/charta/clipboard-stamps/");
+}
+
+static QString clipboardStampPathForUniqueName(const QString &uniqueName)
+{
+    QString id = uniqueName;
+    id.remove(QStringLiteral("charta-clipboard-image-"));
+    // The unique name comes from the document: keep it a plain file name component.
+    for (QChar &c : id) {
+        if (!c.isLetterOrNumber() && c != QLatin1Char('-')) {
+            c = QLatin1Char('_');
+        }
+    }
+    if (id.isEmpty() || id.size() > 100) {
+        return QString();
+    }
+    return clipboardStampCacheDir() + QStringLiteral("charta-clipboard-recovered-") + id + QStringLiteral(".png");
+}
+
+// Extract the picture painted by the stamp's appearance stream into \p path.
+static bool writeClipboardStampImageFromAppearance(const Poppler::StampAnnotation *popplerStamp, const QString &path)
+{
+    if (!popplerStamp || path.isEmpty()) {
+        return false;
+    }
+    const QImage image = popplerStamp->stampAppearanceImage();
+    if (image.isNull()) {
+        return false;
+    }
+    if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
+        return false;
+    }
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly) || !image.save(&file, "PNG")) {
+        return false;
+    }
+    return file.commit();
+}
+
+// Make sure that a loaded clipboard image stamp has an image file Charta can use
+// and return its path (empty if the PDF holds no recoverable image).
+static QString recoverClipboardStampImageFile(const Poppler::StampAnnotation *popplerStamp, const QString &uniqueName)
+{
+    const QString path = clipboardStampPathForUniqueName(uniqueName);
+    if (path.isEmpty()) {
+        return QString();
+    }
+    if (QFile::exists(path)) {
+        // Keep it young so that the cache cleanup in the paste code leaves it alone.
+        QFile(path).setFileTime(QDateTime::currentDateTime(), QFileDevice::FileModificationTime);
+        return path;
+    }
+    return writeClipboardStampImageFromAppearance(popplerStamp, path) ? path : QString();
+}
+#endif
 
 static void setPopplerStampAnnotationCustomImage(const Poppler::Page *page, Poppler::StampAnnotation *pStampAnnotation, const Okular::StampAnnotation *oStampAnnotation)
 {
@@ -970,14 +1040,30 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
 
     QMutexLocker ml(mutex);
 
+    // Changing the boundary of a stamp makes Poppler drop its appearance stream, and
+    // the stamp is then rebuilt from the image file.  If that file vanished (cache
+    // cleanup), re-extract it from the appearance, which is still intact here.
+    bool keepStampAppearance = false;
+    if (okl_ann->subType() == Okular::Annotation::AStamp && isChartaClipboardImageAnnotation(okl_ann->uniqueName())) {
+        const QString stampImagePath = static_cast<const Okular::StampAnnotation *>(okl_ann)->stampIconName();
+#ifdef POPPLER_QT6_HAS_STAMP_APPEARANCE_IMAGE
+        if (!stampImagePath.isEmpty() && !QFile::exists(stampImagePath)) {
+            writeClipboardStampImageFromAppearance(static_cast<const Poppler::StampAnnotation *>(ppl_ann), stampImagePath);
+        }
+#endif
+        // Last resort: no image to rebuild the stamp from. Keep the stored appearance
+        // (it only gets moved/stretched) instead of letting Poppler replace it by the
+        // default "Draft" stamp, which would destroy the user's picture on save.
+        keepStampAppearance = stampImagePath.isEmpty() || !QFile::exists(stampImagePath);
+    }
+
     const QRectF newBoundary = normRectToRectF(okl_ann->boundingRectangle());
     std::unique_ptr<Poppler::AnnotationAppearance> savedAppearance;
     const bool rotatedFrame = !qFuzzyIsNull(okl_ann->frame().rotation);
     const bool positionOnlyGeomChange = !rotatedFrame && ppl_ann->boundary() != newBoundary && sameStyle(okl_ann->style(), ppl_ann->style()) && okl_ann->subType() == Okular::Annotation::AGeom
         && static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalInnerColor() == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomInnerColor()
         && okularToPoppler(static_cast<const Okular::GeomAnnotation *>(okl_ann)->geometricalType()) == static_cast<Poppler::GeomAnnotation *>(ppl_ann)->geomType();
-    const bool positionOnlyClipboardStampChange = false; // Disabled for clipboard image stamps because their appearance depends on the boundary
-    if (positionOnlyGeomChange || positionOnlyClipboardStampChange) {
+    if (positionOnlyGeomChange || keepStampAppearance) {
         savedAppearance = ppl_ann->annotationAppearance();
     }
 
@@ -1065,8 +1151,12 @@ void PopplerAnnotationProxy::notifyModification(const Okular::Annotation *okl_an
 
 #ifdef POPPLER_QT6_HAS_ANNOTATION_ROTATION
     // Must be last: the appearance generators rebuild the unrotated AP first.
-    std::unique_ptr<Poppler::Page> ppl_page = ppl_doc->page(page);
-    applyFrameRotationToPopplerAnnotation(okl_ann, ppl_ann, ppl_page.get());
+    // Not for a stamp whose stored appearance was kept: regenerating it would
+    // replace the picture by the default stamp.
+    if (!keepStampAppearance) {
+        std::unique_ptr<Poppler::Page> ppl_page = ppl_doc->page(page);
+        applyFrameRotationToPopplerAnnotation(okl_ann, ppl_ann, ppl_page.get());
+    }
 #endif
 
     qCDebug(OkularPdfDebug) << okl_ann->uniqueName();
@@ -1549,8 +1639,22 @@ Okular::Annotation *createAnnotationFromPopplerAnnotation(Poppler::Annotation *p
         if (okularAnnotation->subType() == Okular::Annotation::SubType::AStamp) {
             Okular::StampAnnotation *oStampAnn = static_cast<Okular::StampAnnotation *>(okularAnnotation);
             Poppler::StampAnnotation *pStampAnn = static_cast<Poppler::StampAnnotation *>(popplerAnnotation);
+            bool stampImageRecovered = false;
+#ifdef POPPLER_QT6_HAS_STAMP_APPEARANCE_IMAGE
+            if (isChartaClipboardImageAnnotation(popplerAnnotation->uniqueName())) {
+                // The saved PDF only has "Draft" as the stamp name, so Charta would show (and,
+                // on the next move, save) the default stamp instead of the pasted picture.
+                // Recover the picture from the appearance stream and use it as the stamp image.
+                // The appearance in the PDF is already correct (it may be rotated), so leave it alone.
+                const QString recoveredPath = recoverClipboardStampImageFile(pStampAnn, popplerAnnotation->uniqueName());
+                if (!recoveredPath.isEmpty()) {
+                    oStampAnn->setStampIconName(recoveredPath);
+                    stampImageRecovered = true;
+                }
+            }
+#endif
             QFileInfo stampIconFile {oStampAnn->stampIconName()};
-            if (stampIconFile.exists() && stampIconFile.isFile()) {
+            if (!stampImageRecovered && stampIconFile.exists() && stampIconFile.isFile()) {
                 setPopplerStampAnnotationCustomImage(&popplerPage, pStampAnn, oStampAnn);
             }
 
